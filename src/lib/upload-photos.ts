@@ -1,15 +1,14 @@
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 
-export const maxUploadPhotos = 15;
-export const maxPhotoBytes = 10 * 1024 * 1024;
-export const maxTotalPhotoBytes = 60 * 1024 * 1024;
+import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "./photo-upload-limits";
+export { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "./photo-upload-limits";
 const formats = new Map([["image/jpeg", "jpeg"], ["image/png", "png"], ["image/webp", "webp"]]);
 
 export async function validateUploadPhotos(photos: File[]) {
   const fail = (status: number, message: string) => ({ ok: false as const, status, message });
-  if (!photos.length) return fail(400, "Agrega al menos una foto de la vivienda.");
-  if (photos.length > maxUploadPhotos) return fail(400, "Puedes enviar hasta 15 fotos. No se guardo ninguna; retira las adicionales.");
+  if (photos.length < minUploadPhotos) return fail(400, `Agrega al menos ${minUploadPhotos} fotos de la vivienda.`);
+  if (photos.length > maxUploadPhotos) return fail(400, `Puedes enviar hasta ${maxUploadPhotos} fotos. No se guardo ninguna; retira las adicionales.`);
   if (photos.some(photo => photo.size > maxPhotoBytes) || photos.reduce((sum, photo) => sum + photo.size, 0) > maxTotalPhotoBytes) return fail(413, "Maximo 10 MB por foto y 60 MB en total.");
   const fingerprints = new Set<string>();
   for (const photo of photos) {

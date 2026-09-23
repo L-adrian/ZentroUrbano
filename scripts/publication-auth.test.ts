@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { createUploadPhotoFixtures } from "./fixtures/upload-photos";
 
 const enabled = process.env.RUN_AUTH_QA === "1";
 const options = { skip: !enabled };
@@ -78,14 +79,14 @@ test("authenticated publication still enforces direct rentals and photo requirem
   }
   const response = await request("/api/publication-requests", payload, cookie);
   assert.equal(response.status, 400);
-  assert.match((await response.json()).message, /Agrega al menos una foto/);
+  assert.match((await response.json()).message, /Agrega al menos 5 fotos/);
 });
 
 test("submission stores photos and belongs to the authenticated account, not a forged id", options, async () => {
   const photo = await readFile("public/images/properties/torre-urbari/01.jpg");
   const form = new FormData();
   form.set("payload", JSON.stringify({ ...payload, price: 400, currency: "USD", exchangeRate: 8.25, accountId: "someone-else", accountEmail: "someone-else@example.invalid" }));
-  form.set("photos", new Blob([photo], { type: "image/jpeg" }), "test.jpg");
+  for (const file of await createUploadPhotoFixtures()) form.append("photos", file);
   const response = await fetch(`${baseUrl}/api/publication-requests`, { method: "POST", headers: { cookie }, body: form });
   assert.equal(response.status, 201);
   const result = await response.json();
@@ -94,7 +95,7 @@ test("submission stores photos and belongs to the authenticated account, not a f
   assert.equal(record.accountId, accountId);
   assert.equal(record.accountEmail, email);
   assert.equal(record.status, "pending_review");
-  assert.equal(record.photos.length, 1);
+  assert.equal(record.photos.length, 5);
   assert.equal(record.price, 400);
   assert.equal(record.currency, "USD");
   assert.equal(record.exchangeRate, 8.25);
@@ -141,12 +142,12 @@ test("Google rejects invalid state and handles cancellation and provider errors"
 });
 
 test("publication rejects malformed images and excess photos via the real API", options, async () => {
-  for (const count of [1, 16]) {
+  for (const count of [1, 4, 5, 16]) {
     const form = new FormData();
     form.set("payload", JSON.stringify(payload));
     for (let i = 0; i < count; i++) form.append("photos", new Blob(["not a JPEG"], { type: "image/jpeg" }), `fake-${i}.jpg`);
     const response = await fetch(`${baseUrl}/api/publication-requests`, { method: "POST", headers: { cookie }, body: form });
-    assert.equal(response.status, count === 1 ? 415 : 400);
+    assert.equal(response.status, count === 5 ? 415 : 400);
     assert.equal((await response.json()).ok, false);
   }
 });

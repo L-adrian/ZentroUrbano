@@ -4,7 +4,7 @@ import { PublicationGuideActions } from "@/components/publication-guide-actions"
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { buildSeoMetadata } from "@/lib/seo";
 import { absoluteUrl, siteConfig } from "@/lib/site";
-import { maxPhotoBytes, maxTotalPhotoBytes, maxUploadPhotos } from "@/lib/upload-photos";
+import { minUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes, maxUploadPhotos } from "@/lib/photo-upload-limits";
 import "./requirements.css";
 
 export const metadata = buildSeoMetadata({
@@ -20,9 +20,9 @@ const sections: { id: string; title: string; icon: typeof House; items: GuideIte
     { id: "contacto", title: "Nombre y número de WhatsApp", detail: "Nombre del propietario y celular de Bolivia de 8 dígitos, con o sin +591. Las consultas del alquiler llegarán a ese número." },
   ] },
   { id: "fotos", title: "Fotos de la vivienda", icon: Camera, items: [
-    { id: "archivos", title: `Entre 1 y ${maxUploadPhotos} fotos reales`, detail: `JPG, PNG o WebP. Hasta ${maxPhotoBytes / 1024 / 1024} MB por foto y ${maxTotalPhotoBytes / 1024 / 1024} MB en total. Máximo 40 megapíxeles. Sin archivos repetidos.`, note: "Obligatorio" },
+    { id: "archivos", title: `Entre ${minUploadPhotos} y ${maxUploadPhotos} fotos reales`, detail: `Mínimo ${minUploadPhotos} fotos obligatorio. JPG, PNG o WebP. Hasta ${maxPhotoBytes / 1024 / 1024} MB por foto y ${maxTotalPhotoBytes / 1024 / 1024} MB en total. Máximo 40 megapíxeles. Sin archivos repetidos.`, note: "Obligatorio" },
     { id: "clasificacion", title: "El ambiente de cada foto", detail: "Al subirlas, selecciona qué muestra cada foto: sala, cocina, dormitorio, baño u otro ambiente. La primera será la portada; puedes cambiarla.", note: "Obligatorio" },
-    { id: "ambientes", title: "Sala, cocina, dormitorio y baño", detail: "Prepara al menos 5 fotos para mostrar los ambientes. Añade fachada, parqueo, patio o áreas comunes cuando corresponda.", note: "Recomendado" },
+    { id: "ambientes", title: "Sala, cocina, dormitorio y baño", detail: "Muestra los ambientes principales. Añade fachada, parqueo, patio o áreas comunes cuando corresponda.", note: "Recomendado" },
     { id: "calidad", title: "Fotos claras y bien iluminadas", detail: "Se recomienda una resolución de 900 × 600 px o mayor. Al cargarlas, verás avisos sobre resolución, iluminación y posible desenfoque.", note: "Recomendado" },
   ] },
   { id: "vivienda", title: "Ubicación y características", icon: MapPin, items: [

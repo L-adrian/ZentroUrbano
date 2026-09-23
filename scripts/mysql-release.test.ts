@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import path from "node:path";
 import mysql,{type RowDataPacket} from "mysql2/promise";
 import sharp from "sharp";
+import { createUploadPhotoFixtures } from "./fixtures/upload-photos";
 
 const enabled=Boolean(process.env.QA_MYSQL_URL);
 const options={skip:!enabled};
@@ -40,9 +41,9 @@ async function startServer() {
 async function stopServer() {if (server && server.exitCode === null && server.signalCode === null) {const stopped=new Promise<void>(resolve=>server.once("exit",()=>resolve()));server.kill();await stopped;}}
 after(async()=>{await stopServer(); if (connection) await connection.end();});
 const json=(body:unknown,extra:Record<string,string>={})=>({method:"POST",headers:{"content-type":"application/json",cookie,...extra},body:JSON.stringify(body)});
-async function submit(key=randomUUID(),count=1) {
+async function submit(key=randomUUID(),count=5) {
   const form=new FormData();form.set("payload",JSON.stringify({operation:"Alquiler",propertyType:"Departamento",publisherKind:"owner",ownerConfirmed:true,contactName:"Propietario QA",whatsapp:"75000000",sourceText:details.description,currency:"USD",exchangeRate:8.5,details,accountId:"forged"}));
-  for(let i=1;i<=count;i++) form.append("photos",new Blob([await readFile(`public/images/properties/torre-urbari/0${i}.jpg`)],{type:"image/jpeg"}),`0${i}.jpg`);
+  for(const photo of await createUploadPhotoFixtures(count)) form.append("photos",photo);
   return fetch(`${base}/api/publication-requests`,{method:"POST",headers:{cookie,"idempotency-key":key},body:form});
 }
 async function decision(id:string,body:unknown,headers=admin) {return fetch(`${base}/admin/solicitudes/${id}/decision`,json(body,{...headers,origin:base}));}
@@ -74,6 +75,7 @@ test("MySQL stores original photos and retries return the same request, even con
   const [timestamps]=await connection.query<RowDataPacket[]>("SELECT created_at FROM publication_requests WHERE id=?",[requestId]);
   assert.ok(Math.abs(Date.now()-timestamps[0].created_at.getTime())<10000,"Database timestamps are stored/read in UTC");
   const [photos]=await connection.query<RowDataPacket[]>("SELECT original_data FROM publication_photos WHERE request_id=?",[requestId]);
+  assert.equal(photos.length,5);
   assert.deepEqual(photos[0].original_data,await readFile("public/images/properties/torre-urbari/01.jpg"));
   assert.equal((await fetch(`${base}/media/propiedades/${requestId}/01.jpg`)).status,404);
 });
@@ -81,7 +83,7 @@ test("MySQL stores original photos and retries return the same request, even con
 test("SQL failure on the second photo rolls back the request and every photo",options,async()=>{
   const key=randomUUID(),trigger=`qa_fail_${randomUUID().replaceAll("-","")}`;
   await connection.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON publication_photos FOR EACH ROW BEGIN IF NEW.filename='02.jpg' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated QA failure'; END IF; END`);
-  try {assert.equal((await submit(key,2)).status,503);assert.equal(await count("publication_requests","account_id=? AND idempotency_key=?",[accountId,key]),0);}
+  try {assert.equal((await submit(key)).status,503);assert.equal(await count("publication_requests","account_id=? AND idempotency_key=?",[accountId,key]),0);}
   finally {await connection.query(`DROP TRIGGER ${trigger}`);}
 });
 

@@ -24,6 +24,7 @@ import Link from "next/link";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { getPublicationCosts } from "@/lib/publication-costs";
+import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parsePropertyExchangeRate } from "@/lib/currency";
 import {
   analyzePhotoFile,
@@ -172,16 +173,16 @@ export function PublishWizard({ account }: { account: { id: string; name: string
 
   async function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
     if (processingPhotos) return;
-    const availableSlots = Math.max(0, 15 - photos.length);
+    const availableSlots = Math.max(0, maxUploadPhotos - photos.length);
     const selectedFiles = Array.from(event.target.files ?? []);
     const seen = new Set(photos.map(photo => `${photo.file.name}:${photo.file.size}:${photo.file.lastModified}`));
     const files = selectedFiles.filter(file => {
       const key = `${file.name}:${file.size}:${file.lastModified}`;
-      if (seen.has(key) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size === 0 || file.size > 10 * 1024 * 1024) return false;
+      if (seen.has(key) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size === 0 || file.size > maxPhotoBytes) return false;
       seen.add(key); return true;
     }).slice(0, availableSlots);
     event.target.value = "";
-    if (files.reduce((sum, file) => sum + file.size, photos.reduce((sum, photo) => sum + photo.file.size, 0)) > 60 * 1024 * 1024) {
+    if (files.reduce((sum, file) => sum + file.size, photos.reduce((sum, photo) => sum + photo.file.size, 0)) > maxTotalPhotoBytes) {
       setMessage("El total de fotos no puede superar 60 MB."); setStatus("error"); return;
     }
     if (files.length !== selectedFiles.length) { setMessage("Se omitieron archivos repetidos o no compatibles. Máximo 15 fotos JPG, PNG o WebP de 10 MB cada una."); setStatus("error"); }
@@ -458,9 +459,15 @@ function PhotoStep({
       <label className="mt-6 flex min-h-40 cursor-pointer flex-col items-center justify-center border border-dashed border-neutral-400 bg-neutral-50 p-5 text-center hover:border-[#176b4d]">
         <ImagePlus className="h-6 w-6 text-[#176b4d]" aria-hidden="true" />
         <span className="mt-3 text-sm font-semibold text-neutral-900">Seleccionar fotos</span>
-        <span className="mt-1 text-xs text-neutral-500">JPG, PNG o WebP. Máximo 15 imágenes y 10 MB por foto.</span>
-        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing || photos.length >= 15} onChange={onPhotos} className="sr-only" />
+        <span className="mt-1 text-xs text-neutral-500">Mínimo {minUploadPhotos} y máximo {maxUploadPhotos} fotos. JPG, PNG o WebP, hasta {maxPhotoBytes / 1024 / 1024} MB por foto.</span>
+        <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing || photos.length >= maxUploadPhotos} onChange={onPhotos} className="sr-only" />
       </label>
+
+      <p role="status" className="mt-3 text-sm text-neutral-600">
+        {photos.length < minUploadPhotos
+          ? `Falta${minUploadPhotos - photos.length === 1 ? "" : "n"} ${minUploadPhotos - photos.length} foto${minUploadPhotos - photos.length === 1 ? "" : "s"} para completar el mínimo obligatorio.`
+          : `${photos.length} de ${maxUploadPhotos} fotos. Mínimo obligatorio completo.`}
+      </p>
 
       {photos.length > 0 ? (
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -499,7 +506,7 @@ function PhotoStep({
 
       {photos.length > 0 ? (
         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border border-neutral-200 bg-neutral-50 p-3 text-xs font-semibold text-neutral-700">
-          <span>{photos.length}/15 fotos</span>
+          <span>{photos.length}/{maxUploadPhotos} fotos</span>
           <span>{photos.filter((photo) => photo.category).length} clasificadas</span>
           {analyzingCount > 0 ? <span>{analyzingCount} analizando</span> : null}
           {warningCount > 0 ? <span className="text-amber-700">{warningCount} con observaciones</span> : null}
@@ -770,7 +777,7 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
   const hasBedroomPhoto =
     form.type === "Monoambiente" || photos.some((photo) => photo.category === "bedroom");
   const rules = [
-    { complete: photos.length >= 5, points: 15, missing: "Agregar al menos 5 fotos" },
+    { complete: photos.length >= minUploadPhotos, points: 15, missing: `Agregar al menos ${minUploadPhotos} fotos` },
     { complete: photos.length > 0 && categorizedPhotos.length === photos.length, points: 10, missing: "Clasificar todas las fotos" },
     { complete: hasBathroomPhoto, points: 8, missing: "Agregar y clasificar una foto del baño" },
     { complete: hasBedroomPhoto, points: 5, missing: "Agregar una foto de dormitorio" },
@@ -794,7 +801,7 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
 function canAdvanceStep(step: number, form: PropertyForm, photos: UploadPhoto[]) {
   if (step === 0) {
     return (
-      photos.length > 0 &&
+      photos.length >= minUploadPhotos && photos.length <= maxUploadPhotos &&
       photos.every((photo) => !photo.analyzing && photo.category) &&
       photos.every((photo) => (photo.analysis?.blockingIssues.length ?? 1) === 0)
     );
