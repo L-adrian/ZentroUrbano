@@ -57,8 +57,9 @@ export function SiteHeader() {
           <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={17} />Cómo funciona</Link>
         </nav>
         <div className="header-actions">
+          <Link href="/contacto" className="header-contact" aria-current={pathname === "/contacto" ? "page" : undefined}><MessageCircle size={17} aria-hidden="true" /><span>Contáctanos</span></Link>
           <CurrencySelector className="header-currency" />
-          <ThemeToggle />
+          <div className="header-theme"><ThemeToggle /></div>
           <Link href="/publicar" className="zu-button zu-button-primary header-publish"><Plus size={17} />Publicar alquiler</Link>
           <details ref={menu} className="account-menu">
             <summary className="zu-icon-button" aria-label="Abrir menú de cuenta" title="Menú de cuenta"><Menu size={21} /></summary>
@@ -73,6 +74,7 @@ export function SiteHeader() {
               <Link href="/ayuda"><MessageCircle size={18} />Centro de ayuda</Link>
               <SupportWhatsAppButton />
               <div className="menu-currency"><span>Moneda</span><CurrencySelector /></div>
+              <div className="menu-theme"><span>Apariencia</span><ThemeToggle /></div>
               {account.authenticated && <button type="button" onClick={signout}><LogOut size={18} />Cerrar sesión</button>}
             </div>
           </details>

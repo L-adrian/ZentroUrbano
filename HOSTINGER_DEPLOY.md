@@ -7,7 +7,7 @@ No incluye un servidor MySQL, una copia de datos privados ni credenciales.
 
 ## 0. Conectar GitHub una sola vez
 
-Repositorio previsto: https://github.com/L-adrian/ZentroUrbano (privado).
+Repositorio: https://github.com/L-adrian/ZentroUrbano (publico).
 En la cuenta que tiene el hosting, elige Continue with GitHub, autoriza solamente
 este repositorio y selecciona main como rama de produccion. No se transfiere el dominio.
 Si el hosting ya tiene una cuenta GitHub conectada, coordina con su propietario:
@@ -114,6 +114,34 @@ usa npm y package-lock.json para no depender de esa instalacion de pnpm.
 En Settings and redeploy cambia Package manager a npm y Build command a
 npm run build. Conserva Node 24.x, main, raiz ./ y salida .next, y selecciona
 Save and redeploy. Un push no cambia automaticamente el gestor guardado en Hostinger.
+
+### El despliegue automatico falla pero Fix and redeploy funciona
+
+No confirma por si solo un error en el codigo. Segun la API oficial de Hostinger,
+los despliegues automaticos de Git usan la configuracion GUARDADA del sitio.
+Un build iniciado manualmente mediante la API puede usar otros valores y no
+reemplaza necesariamente una configuracion que ya existia.
+
+Revisar exclusivamente zentrourbano.com, sin desconectar la cuenta compartida:
+
+1. Abrir el intento automatico fallido y conservar su primer error de Build logs.
+   Comparar el commit y los ajustes con el despliegue manual que si termino.
+2. En Settings and redeploy guardar los ajustes de la seccion 3: npm,
+   npm run build, Node 24.x, Next.js, raiz ./ y salida .next. Mantener las
+   variables privadas existentes; no borrar ni volver a crear la base de datos.
+3. Verificar que el repositorio conectado es L-adrian/ZentroUrbano, la rama es
+   main y el despliegue automatico esta activado para ese sitio.
+4. Despues del siguiente push verificado, comprobar que se crea un despliegue
+   para ese commit y termina correctamente SIN pulsar Fix and redeploy.
+5. Si no aparece un intento, revisar la integracion GitHub de este repositorio.
+   Si aparece y falla, corregir el primer error real. Con Lines: 0, solicitar a
+   soporte la revision del entorno de build de Zentro Urbano; no cambiar otras webs.
+
+GitHub no necesita un workflow de Actions para que funcione la integracion
+nativa de Hostinger. Anadir un workflow o modificar package.json no sustituye
+la configuracion guardada en el hosting. No publicar archivos .env ni tokens.
+
+Referencia: [Hostinger: configuracion guardada de Node.js](https://github.com/hostinger/api-python-sdk/blob/main/docs/HostingNodeJSApi.md#get_node_js_build_settings_v1).
 
 ## 4. Flujo de publicacion
 
