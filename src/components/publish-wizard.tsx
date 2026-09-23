@@ -24,6 +24,7 @@ import Link from "next/link";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { getPublicationCosts } from "@/lib/publication-costs";
+import { getPublicationStepErrors, normalizePublicationPhone, publicationFieldStep, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parsePropertyExchangeRate } from "@/lib/currency";
 import {
@@ -166,9 +167,11 @@ export function PublishWizard({ account }: { account: { id: string; name: string
 
   const quality = useMemo(() => calculateQuality(form, photos), [form, photos]);
   const canContinue = canAdvanceStep(step, form, photos);
+  const stepErrors = step === 1 || step === 2 ? getPublicationStepErrors(step, form, form.ownerName, form.phone) : {};
 
   function updateField<TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) {
     setForm((current) => ({ ...current, [key]: value }));
+    if (status === "error") { setStatus("idle"); setMessage(""); }
   }
 
   async function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
@@ -248,7 +251,11 @@ export function PublishWizard({ account }: { account: { id: string; name: string
       return;
     }
     const invalidStep = [0, 1, 2].find(index => !canAdvanceStep(index, form, photos));
-    if (invalidStep !== undefined) { setStep(invalidStep); setStatus("error"); setMessage("Revisa los datos de este paso antes de enviar."); return; }
+    if (invalidStep !== undefined) {
+      setStep(invalidStep); setStatus("error");
+      setMessage(Object.values(getPublicationStepErrors(invalidStep, form, form.ownerName, form.phone)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
+      return;
+    }
 
     setStatus("sending");
     setMessage("");
@@ -280,6 +287,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
       const body = new FormData();
       body.append("payload", JSON.stringify(payload));
       photos.forEach((photo) => body.append("photos", photo.file, photo.file.name));
+      if (!/^[a-zA-Z0-9_-]{32,64}$/.test(submissionKey.current)) submissionKey.current = crypto.randomUUID();
 
       const response = await fetch("/api/publication-requests", {
         method: "POST",
@@ -287,11 +295,14 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         body,
         signal: AbortSignal.timeout(120_000),
       });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; message?: string; requestId?: string; photosStored?: number };
+      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number };
 
       if (response.status === 401) setSessionExpired(true);
 
       if (!response.ok || !data.ok || !data.requestId || data.photosStored !== photos.length) {
+        const invalidField = Object.keys(data.fieldErrors ?? {})[0];
+        if (invalidField) setStep(publicationFieldStep(invalidField));
+        if (data.code === "INVALID_REQUEST_KEY") submissionKey.current = crypto.randomUUID();
         throw new Error(data.message ?? "No se pudo guardar la solicitud.");
       }
 
@@ -365,7 +376,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
           ) : null}
 
           {step === 1 ? <InformationStep form={form} updateField={updateField} /> : null}
-          {step === 2 ? <PriceStep form={form} updateField={updateField} /> : null}
+          {step === 2 ? <PriceStep form={form} updateField={updateField} errors={stepErrors} /> : null}
           {step === 3 ? (
             <ConfirmationStep
               form={form}
@@ -382,9 +393,11 @@ export function PublishWizard({ account }: { account: { id: string; name: string
           ) : null}
 
           {step < steps.length - 1 && !canContinue ? (
-            <p className="mt-5 text-xs font-medium text-neutral-500">
-              Completa los campos principales de este paso para continuar.
-            </p>
+            <div className="mt-5 text-sm font-medium text-neutral-600" aria-live="polite">
+              {Object.keys(stepErrors).length ? (
+                <ul className="list-disc space-y-1 pl-5">{Object.entries(stepErrors).map(([field, error]) => <li key={field}>{error}</li>)}</ul>
+              ) : <p>Completa las fotos y sus categorías para continuar.</p>}
+            </div>
           ) : null}
 
           <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-5">
@@ -617,9 +630,11 @@ function InformationStep({
 function PriceStep({
   form,
   updateField,
+  errors,
 }: {
   form: PropertyForm;
   updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void;
+  errors: PublicationFieldErrors;
 }) {
   return (
     <section>
@@ -635,7 +650,8 @@ function PriceStep({
           </select>
         </Field>
         <Field label="Expensas mensuales">
-          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="number" min="0" inputMode="numeric" placeholder="0" className={inputClassName} />
+          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="number" min="0" max="1000000" step="any" inputMode="decimal" required aria-invalid={Boolean(errors.commonExpenses)} aria-describedby="publication-expenses-help" className={inputClassName} />
+          <span id="publication-expenses-help" className="text-xs text-neutral-600">Escribe 0 si están incluidas o no se cobran.</span>
         </Field>
         {form.currency === "USD" && <Field label="Tipo de cambio (Bs por USD)">
           <input value={form.exchangeRate} onChange={event => updateField("exchangeRate", event.target.value)} type="number" min="0.0001" max={maxPropertyExchangeRate} step="0.0001" inputMode="decimal" required className={inputClassName} />
@@ -655,7 +671,8 @@ function PriceStep({
           <input value={form.ownerName} onChange={(event) => updateField("ownerName", event.target.value)} autoComplete="name" placeholder="Nombre completo" className={inputClassName} />
         </Field>
         <Field label="WhatsApp" icon={<Phone className="h-4 w-4" />}>
-          <input value={form.phone} onChange={(event) => updateField("phone", event.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="Ej. 78504969" className={inputClassName} />
+          <input value={form.phone} onChange={(event) => updateField("phone", event.target.value)} type="tel" inputMode="tel" autoComplete="tel" placeholder="Ej. 78504969" required aria-invalid={Boolean(errors.whatsapp)} aria-describedby="publication-phone-help" className={inputClassName} />
+          <span id="publication-phone-help" className="text-xs text-neutral-600">8 dígitos que empiecen por 6 o 7. Puedes agregar +591.</span>
         </Field>
       </div>
       <CostSummary form={form} />
@@ -789,7 +806,7 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
     { complete: form.description.trim().length >= 60, points: 7, missing: "Describir distribución y servicios" },
     { complete: Number(form.price) > 0, points: 10, missing: "Indicar precio mensual" },
     { complete: Boolean(form.guarantee), points: 5, missing: "Indicar garantía" },
-    { complete: Boolean(form.ownerName.trim() && form.phone.replace(/\D/g, "").length >= 8), points: 5, missing: "Completar propietario y WhatsApp" },
+    { complete: Boolean(form.ownerName.trim() && normalizePublicationPhone(form.phone)), points: 5, missing: "Completar propietario y WhatsApp" },
   ];
 
   return {
@@ -807,28 +824,8 @@ function canAdvanceStep(step: number, form: PropertyForm, photos: UploadPhoto[])
     );
   }
 
-  if (step === 1) {
-    return Boolean(
-      form.title.trim().length >= 8 &&
-        form.zone.trim() &&
-        form.address.trim() &&
-        form.bedrooms !== "" && Number(form.bedrooms) >= 0 &&
-        (form.bathrooms === "" || Number(form.bathrooms) >= 0) &&
-        (form.area === "" || Number(form.area) > 0) &&
-        form.description.trim().length >= 30,
-    );
-  }
-
-  if (step === 2) {
-    return Boolean(
-      Number(form.price) > 0 &&
-        (form.currency !== "USD" || parsePropertyExchangeRate(form.exchangeRate) !== null) &&
-        form.guarantee &&
-        Number(form.commonExpenses) >= 0 &&
-        (form.guarantee !== "Otro monto" || (form.guaranteeAmount.trim() !== "" && Number(form.guaranteeAmount) >= 0)) &&
-        form.ownerName.trim() &&
-        form.phone.replace(/\D/g, "").length >= 8,
-    );
+  if (step === 1 || step === 2) {
+    return Object.keys(getPublicationStepErrors(step, form, form.ownerName, form.phone)).length === 0;
   }
 
   return true;

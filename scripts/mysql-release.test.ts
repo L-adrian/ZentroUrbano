@@ -41,8 +41,8 @@ async function startServer() {
 async function stopServer() {if (server && server.exitCode === null && server.signalCode === null) {const stopped=new Promise<void>(resolve=>server.once("exit",()=>resolve()));server.kill();await stopped;}}
 after(async()=>{await stopServer(); if (connection) await connection.end();});
 const json=(body:unknown,extra:Record<string,string>={})=>({method:"POST",headers:{"content-type":"application/json",cookie,...extra},body:JSON.stringify(body)});
-async function submit(key=randomUUID(),count=5) {
-  const form=new FormData();form.set("payload",JSON.stringify({operation:"Alquiler",propertyType:"Departamento",publisherKind:"owner",ownerConfirmed:true,contactName:"Propietario QA",whatsapp:"75000000",sourceText:details.description,currency:"USD",exchangeRate:8.5,details,accountId:"forged"}));
+async function submit(key=randomUUID(),count=5,changes:Record<string,unknown>={}) {
+  const form=new FormData();form.set("payload",JSON.stringify({operation:"Alquiler",propertyType:"Departamento",publisherKind:"owner",ownerConfirmed:true,contactName:"Propietario QA",whatsapp:"75000000",sourceText:details.description,currency:"USD",exchangeRate:8.5,details,accountId:"forged",...changes}));
   for(const photo of await createUploadPhotoFixtures(count)) form.append("photos",photo);
   return fetch(`${base}/api/publication-requests`,{method:"POST",headers:{cookie,"idempotency-key":key},body:form});
 }
@@ -66,6 +66,30 @@ test("MySQL Google login reuses the password account without creating a shadow i
   assert.equal(result.status,307);assert.equal(result.headers.get("location"),`${base}/publicar`);
   assert.equal(await count("morada_users","email=?",[email]),1);assert.equal(await count("client_accounts","email=?",[email]),1);
   assert.equal((await fetch(`${base}/api/auth/login`,json({email,password}))).status,200);
+});
+
+test("publication API identifies blank expenses, invalid phones and request keys separately",options,async()=>{
+  const before=await count("publication_requests","account_id=?",[accountId]);
+  const expenses=await submit(randomUUID(),5,{details:{...details,commonExpenses:""},whatsapp:"+591 78504969"});
+  assert.equal(expenses.status,400);
+  const expenseError=await expenses.json();
+  assert.equal(expenseError.code,"VALIDATION_ERROR");
+  assert.deepEqual(Object.keys(expenseError.fieldErrors),["commonExpenses"]);
+  assert.doesNotMatch(expenseError.message,/WhatsApp/);
+  const phone=await submit(randomUUID(),5,{whatsapp:"785049469"});
+  assert.equal(phone.status,400);
+  assert.deepEqual(Object.keys((await phone.json()).fieldErrors),["whatsapp"]);
+  const key=await submit("");assert.equal(key.status,400);
+  assert.equal((await key.json()).code,"INVALID_REQUEST_KEY");
+  assert.equal(await count("publication_requests","account_id=?",[accountId]),before);
+  const corrected=await submit(randomUUID(),5,{details:{...details,commonExpenses:"0"},whatsapp:"+591 78504969"});
+  assert.equal(corrected.status,201);
+  const id=(await corrected.json()).requestId;
+  const [[saved]]=await connection.query<RowDataPacket[]>("SELECT payload,status FROM publication_requests WHERE id=?",[id]);
+  const payload=typeof saved.payload === "string" ? JSON.parse(saved.payload) : saved.payload;
+  assert.equal(payload.details.commonExpenses,0);
+  assert.equal(payload.whatsapp,"59178504969");
+  assert.equal(saved.status,"pending_review");
 });
 
 test("MySQL stores original photos and retries return the same request, even concurrently",options,async()=>{

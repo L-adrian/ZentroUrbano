@@ -4,7 +4,7 @@ import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { saveContactLeads } from "@/lib/contact-leads";
 import { hasDatabaseConfig, requiresDatabase } from "@/lib/mysql";
-import { parsePublicationDetails } from "@/lib/publication-input";
+import { getPublicationContactErrors, normalizePublicationPhone, validatePublicationDetails } from "@/lib/publication-input";
 import { PublicationError, storeDatabaseRequest } from "@/lib/database-publications";
 import { getCurrentAccount } from "@/lib/mysql-auth";
 import { isRentalPropertyType } from "@/lib/rentals";
@@ -79,6 +79,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const validation = hasDatabaseConfig() ? validatePublicationDetails(payload.details) : null;
+  const fieldErrors = { ...validation?.fieldErrors, ...getPublicationContactErrors(contactName, whatsapp) };
+  if (Object.keys(fieldErrors).length) {
+    return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", fieldErrors, message: Object.values(fieldErrors).join(" ") }, { status: 400 });
+  }
+  const normalizedPhone = normalizePublicationPhone(whatsapp)!;
+  const key = request.headers.get("idempotency-key") || "";
+  if (hasDatabaseConfig() && !/^[a-zA-Z0-9_-]{32,64}$/.test(key)) {
+    return NextResponse.json({ ok: false, code: "INVALID_REQUEST_KEY", message: "No pudimos identificar este envío. Vuelve a intentarlo; tus datos y fotos siguen en el formulario." }, { status: 400 });
+  }
+
   const photoValidation = await validateUploadPhotos(photos);
   if (!photoValidation.ok) {
     return NextResponse.json(
@@ -89,15 +100,10 @@ export async function POST(request: NextRequest) {
 
   const requestId = `publication_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
   if (hasDatabaseConfig()) {
-    const details = parsePublicationDetails(payload.details);
-    const key = request.headers.get("idempotency-key") || "";
-    const normalizedPhone = whatsapp.replace(/\D/g, "");
-    if (!details || !/^[a-zA-Z0-9_-]{32,64}$/.test(key) || !/^(591)?[67]\d{7}$/.test(normalizedPhone) || contactName.length > 160) {
-      return NextResponse.json({ok:false,message:"Revisa los datos de la vivienda y un WhatsApp válido de Bolivia."},{status:400});
-    }
+    const details = validation!.details!;
     try {
       const result = await storeDatabaseRequest({id:requestId,accountId:account.id,accountEmail:account.email,contactName,
-        whatsapp:normalizedPhone.startsWith("591") ? normalizedPhone : `591${normalizedPhone}`,sourceText,details,
+        whatsapp:normalizedPhone,sourceText,details,
         price:details.price,currency:details.currency,exchangeRate:details.exchangeRate},photos,key);
       return NextResponse.json({ok:true,...result},{status:201});
     } catch(error) {
