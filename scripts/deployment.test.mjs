@@ -1,7 +1,29 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+
+test("npm deployment is locked, includes build tools and does not require pnpm", () => {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+  assert.match(pkg.packageManager, /^npm@/);
+  assert.equal(lock.lockfileVersion, 3);
+  for (const section of ["dependencies", "devDependencies"]) {
+    assert.deepEqual(lock.packages[""][section], pkg[section]);
+  }
+  assert.equal(existsSync("pnpm-lock.yaml"), false);
+  assert.equal(existsSync("pnpm-workspace.yaml"), false);
+  assert.match(readFileSync(".npmrc", "utf8"), /^include=dev\s*$/m);
+  assert.equal(pkg.overrides.postcss, "8.5.14");
+  for (const [name, entry] of Object.entries(lock.packages)) {
+    if (name === "node_modules/postcss" || name.endsWith("/node_modules/postcss")) {
+      assert.equal(entry.version, pkg.overrides.postcss);
+    }
+  }
+  for (const name of ["@next/swc-linux-x64-gnu", "@img/sharp-linux-x64", "@tailwindcss/oxide-linux-x64-gnu"]) {
+    assert.ok(lock.packages[`node_modules/${name}`], `Missing Linux dependency: ${name}`);
+  }
+});
 
 test("production uses the database preflight for GitHub and ZIP", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));

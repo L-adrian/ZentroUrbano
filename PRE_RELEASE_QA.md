@@ -34,7 +34,7 @@ QA separada. Se comprobaron solicitudes, fotos, usuarios y decisiones restaurada
 ## Necesario en Hostinger
 
 - Introducir credenciales reales de MySQL, admin y Google; no estan en el ZIP.
-- Migrar/verificar la base seleccionada y configurar el arranque pnpm start.
+- Migrar/verificar la base seleccionada y configurar el arranque npm start.
 - Probar Google real, HTTPS y limites del hosting; esas comprobaciones no se pueden
   sustituir con el servidor local ni con la prueba de proveedor simulado.
 - Programar respaldo de toda la base (incluidas fotos) y probar restauracion.
@@ -43,3 +43,19 @@ QA separada. Se comprobaron solicitudes, fotos, usuarios y decisiones restaurada
 - Verificar disponibilidad real y consentimiento antes de aprobar cada ficha.
 
 No se garantiza ausencia de cualquier fallo ni compatibilidad fisica con todos los dispositivos.
+
+## Instalador de Hostinger: cambio a npm (2026-09-23)
+
+El log recibido falla al cargar pnpm.cjs desde Corepack, antes de instalar dependencias.
+Se reemplazo pnpm por npm, con package-lock.json, dependencias directas fijadas a las
+versiones ya probadas y el override PostCSS 8.5.14 conservado. .npmrc incluye las
+herramientas de compilacion incluso al instalar con NODE_ENV=production.
+
+Verificado en una copia limpia sin .env ni datos locales, Node 24.13.1/npm 11.10.0:
+npm ci, 26 pruebas, npm run lint y npm run build correctos. El lock incluye los binarios
+Linux x64 de Next, Sharp y Tailwind. El empaquetador ZIP tambien se verifico.
+El instalador advierte que ESLint 9 ya no recibe soporte; no es el error de Corepack.
+
+Pendiente en el panel: seleccionar npm y npm run build y volver a desplegar.
+Las credenciales, importacion de tablas y comprobaciones reales de Hostinger siguen
+siendo necesarias. No se modificaron MySQL, cuentas, fotos ni reglas de aprobacion.

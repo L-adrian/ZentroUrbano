@@ -47,8 +47,8 @@ No compartas esa clave ni la contraseña de la base de datos.
 Despues de instalar dependencias, con las variables ya definidas:
 1. Respalda la base seleccionada.
 2. Define ZENTRO_CONFIRM_DATABASE con el nombre exacto de esa base.
-3. Ejecuta pnpm db:migrate.
-4. Ejecuta pnpm db:check.
+3. Ejecuta npm run db:migrate.
+4. Ejecuta npm run db:check.
 5. Retira ZENTRO_CONFIRM_DATABASE del entorno normal.
 
 El migrador no crea ni borra bases, no importa cuentas demo y no corre automaticamente
@@ -70,21 +70,31 @@ El proxy del hosting debe aceptar el formulario de hasta 60 MB de fotos mas meta
 
 - Framework: Next.js con backend, no PHP ni exportacion estatica.
 - Node.js: 24.x.
-- Instalacion: pnpm install --frozen-lockfile.
-- Build: pnpm build.
-- Inicio: pnpm start. GitHub y ZIP usan scripts/start-hostinger.mjs.
+- Package manager: npm (no pnpm).
+- Instalacion: npm ci. .npmrc conserva las herramientas necesarias para compilar.
+- Build: npm run build.
+- Inicio: npm start. GitHub y ZIP usan scripts/start-hostinger.mjs.
 - Carpeta de salida, si la solicita: .next (no out ni public).
 - PORT lo proporciona Hostinger.
 
 El arranque comprueba la conexion, las tablas y el limite de fotos antes de abrir
 el servidor. Si falta MySQL o la clave administrativa, falla explicitamente.
 No crea cuentas ni guarda solicitudes en archivos locales como alternativa.
-pnpm start:preview es exclusivamente para pruebas locales, no para Hostinger.
+npm run start:preview es exclusivamente para pruebas locales, no para Hostinger.
 
-Antes de enviar una version a main: pnpm lint, pnpm test y pnpm build.
+Antes de enviar una version a main: npm run lint, npm test y npm run build.
 Una migracion nueva requiere respaldo y ejecucion explicita de db:migrate;
 no se ejecuta al hacer push, build ni start. No ejecutes db:seed en produccion.
 Volver a una version del codigo no revierte automaticamente cambios en MySQL.
+
+### Error de Corepack antes de instalar dependencias
+
+Si Hostinger muestra MODULE_NOT_FOUND para pnpm.cjs al preparar el entorno,
+la aplicacion todavia no se ha compilado ni conectado a MySQL. Este repositorio
+usa npm y package-lock.json para no depender de esa instalacion de pnpm.
+En Settings and redeploy cambia Package manager a npm y Build command a
+npm run build. Conserva Node 24.x, main, raiz ./ y salida .next, y selecciona
+Save and redeploy. Un push no cambia automaticamente el gestor guardado en Hostinger.
 
 ## 4. Flujo de publicacion
 

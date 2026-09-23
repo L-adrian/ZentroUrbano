@@ -8,12 +8,11 @@ requieren una cuenta y aprobacion manual del administrador.
 
 ## Desarrollo local
 
-Requiere Node.js 24 y pnpm 11.1.2.
+Requiere Node.js 24 y npm 11 (probado con 11.10.0). No requiere Corepack.
 
 ```bash
-corepack enable
-pnpm install --frozen-lockfile
-pnpm dev
+npm ci
+npm run dev
 ```
 
 Abre http://localhost:3000. Usa CONFIGURACION.env.example como referencia para
@@ -23,17 +22,17 @@ local; produccion exige base de datos y credenciales administrativas.
 ## Verificacion
 
 ```bash
-pnpm lint
-pnpm test
-pnpm build
+npm run lint
+npm test
+npm run build
 ```
 
-pnpm test ejecuta pruebas sin base de datos ni claves reales. Las pruebas de
+npm test ejecuta pruebas sin base de datos ni claves reales. Las pruebas de
 integracion SQL y autenticacion estan documentadas en PRE_RELEASE_QA.md;
 solo deben ejecutarse contra entornos aislados, nunca contra usuarios reales.
 
-pnpm start abre el servidor de produccion tras comprobar MySQL y la configuracion
-administrativa. Para revisar un build local sin esa comprobacion usa pnpm start:preview.
+npm start abre el servidor de produccion tras comprobar MySQL y la configuracion
+administrativa. Para revisar un build local sin esa comprobacion usa npm run start:preview.
 
 ## Publicar y actualizar
 

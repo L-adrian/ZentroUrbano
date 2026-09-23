@@ -7,7 +7,7 @@ $output = Join-Path $root 'output/hostinger'
 [IO.Directory]::CreateDirectory($output) | Out-Null
 $destination = Join-Path $output ('zentro-urbano-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
 $paths = @(
-    'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'next.config.ts',
+    'package-lock.json', '.npmrc', 'next.config.ts',
     'next-env.d.ts', 'tsconfig.json', 'postcss.config.mjs', 'eslint.config.mjs',
     'HOSTINGER_DEPLOY.md', 'CONFIGURACION.env.example',
     'scripts/database-cli.mjs', 'scripts/database-migrations.mjs', 'scripts/start-hostinger.mjs',
@@ -58,7 +58,7 @@ try {
 $check = [IO.Compression.ZipFile]::OpenRead($destination)
 try {
     $names = @($check.Entries | ForEach-Object { $_.FullName })
-    foreach ($required in @('package.json', 'pnpm-lock.yaml', 'src/app/page.tsx', 'src/app/api/publication-requests/route.ts', 'src/app/admin/solicitudes/[id]/decision/route.ts', 'database/mysql/003_publication_review.sql', 'scripts/database-cli.mjs', 'scripts/start-hostinger.mjs', 'CONFIGURACION.env.example', 'public/images/family-rental/family-atlas.webp')) {
+    foreach ($required in @('package.json', 'package-lock.json', '.npmrc', 'src/app/page.tsx', 'src/app/api/publication-requests/route.ts', 'src/app/admin/solicitudes/[id]/decision/route.ts', 'database/mysql/003_publication_review.sql', 'scripts/database-cli.mjs', 'scripts/start-hostinger.mjs', 'CONFIGURACION.env.example', 'public/images/family-rental/family-atlas.webp')) {
         if ($required -notin $names) { throw "Missing ZIP entry: $required" }
     }
     if ($names.Count -ne ($paths.Count + 1)) { throw 'ZIP entry count mismatch' }
