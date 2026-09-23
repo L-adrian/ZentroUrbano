@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
+import Link from "next/link";
+import { ClipboardCheck } from "lucide-react";
 import { LoginPanel } from "@/components/login-panel";
 import { buildSeoMetadata } from "@/lib/seo";
 
@@ -17,6 +19,7 @@ export default async function LoginPage() {
         <Suspense fallback={<LoginFallback />}>
           <LoginPanel authEnabled />
         </Suspense>
+        <div className="mt-6 flex justify-center"><Link href="/requisitos" className="zu-button zu-button-secondary"><ClipboardCheck size={16} aria-hidden="true" />Qué necesito para publicar</Link></div>
       </section>
     </main>
   );

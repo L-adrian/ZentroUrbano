@@ -3,7 +3,7 @@ import { ChevronDown, House, MapPin } from "lucide-react";
 
 const groups = [
   { title: "Encuentra tu lugar", links: [["Explorar alquileres", "/propiedades"], ["Casas", "/propiedades?type=Casa"], ["Departamentos", "/propiedades?type=Departamento"], ["Buscar en el mapa", "/mapa"]] },
-  { title: "Para propietarios", links: [["Publicar mi vivienda", "/publicar"], ["Mi cuenta", "/cliente"]] },
+  { title: "Para propietarios", links: [["Publicar mi vivienda", "/publicar"], ["Qué necesito para publicar", "/requisitos"], ["Mi cuenta", "/cliente"]] },
   { title: "Ayuda", links: [["Conoce Zentro Urbano", "/bienvenida"], ["Centro de ayuda", "/ayuda"], ["Preguntas frecuentes", "/preguntas-frecuentes"], ["Contáctanos", "/contacto"], ["Seguridad y reportes", "/seguridad"]] },
 ];
 export function SiteFooter() {

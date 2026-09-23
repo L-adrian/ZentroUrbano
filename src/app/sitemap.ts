@@ -14,6 +14,7 @@ const staticRoutes = [
   "/mapa",
   "/preguntas-frecuentes",
   "/ayuda",
+  "/requisitos",
   "/seguridad",
   "/publicidad",
   "/contacto",

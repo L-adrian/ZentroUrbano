@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { ArrowUpRight, CircleHelp, HousePlus, MapPin, ShieldCheck, UserRound } from "lucide-react";
+import { ArrowUpRight, CircleHelp, ClipboardCheck, HousePlus, MapPin, ShieldCheck, UserRound } from "lucide-react";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const metadata = buildSeoMetadata({ title: "Centro de ayuda", description: "Ayuda para tu cuenta, publicación de alquileres, visitas y reportes de anuncios en Zentro Urbano.", path: "/ayuda" });
 const topics = [
+  { icon: ClipboardCheck, title: "Qué necesito para publicar", text: "Lista de fotos, datos y condiciones para preparar tu alquiler.", href: "/requisitos" },
   { icon: UserRound, title: "Mi cuenta", text: "Registro, inicio de sesión y acceso para propietarios.", href: "/login" },
   { icon: HousePlus, title: "Publicar una vivienda", text: "Inicia sesión y envía fotos, precio y condiciones para revisión.", href: "/publicar" },
   { icon: MapPin, title: "Buscar y coordinar una visita", text: "Encuentra un alquiler y contacta directamente con su propietario.", href: "/propiedades" },

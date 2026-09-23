@@ -6,7 +6,7 @@ import { ArrowRight, Check, ClipboardCheck, Home, Images, MessageCircle, Sliders
 
 const stages = [
   { label: "Tu cuenta", icon: UserRound, title: "Empieza a tu nombre", description: "Tu cuenta es el punto de partida para enviar tu vivienda y mantener tus datos de contacto.", points: ["Registro con correo o Google", "Nombre y WhatsApp del propietario", "Contrato directo, sin intermediarios"], action: "Crear mi cuenta", href: "/publicar" },
-  { label: "Tu anuncio", icon: Images, title: "Los detalles hacen la diferencia", description: "Prepara la información que una persona necesita para decidir si quiere visitar tu vivienda.", points: ["Fotos de los ambientes y revisión técnica", "Zona, características y condiciones", "Alquiler, garantía y tu T/C si cobras en dólares"], action: "Preparar mi anuncio", href: "/publicar" },
+  { label: "Tu anuncio", icon: Images, title: "Los detalles hacen la diferencia", description: "Prepara la información que una persona necesita para decidir si quiere visitar tu vivienda.", points: ["Fotos de los ambientes y revisión técnica", "Zona, características y condiciones", "Alquiler, garantía y tu T/C si cobras en dólares"], action: "Ver qué necesito para publicar", href: "/requisitos" },
   { label: "Revisión", icon: ClipboardCheck, title: "Una última revisión antes de salir", description: "Revisamos manualmente la solicitud. Si falta información, podemos pedirte una aclaración antes de publicarla.", points: ["Envío vinculado a tu cuenta", "Revisión de fotos y datos del anuncio", "Consultas directas al publicarse"], action: "Conocer el proceso", href: "/preguntas-frecuentes" },
 ];
 

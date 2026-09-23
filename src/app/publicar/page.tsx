@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import Link from "next/link";
+import { ClipboardCheck } from "lucide-react";
 import { PublishWizard } from "@/components/publish-wizard";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { getCurrentAccount } from "@/lib/mysql-auth";
@@ -28,6 +30,7 @@ export default async function PublishPage() {
           </p>
         </div>
         <div className="publication-account-bar"><span>Publicando como <strong>{account.display_name}</strong></span><SupportWhatsAppButton /></div>
+        <Link href="/requisitos" target="_blank" rel="noopener noreferrer" className="zu-button zu-button-secondary mb-5"><ClipboardCheck size={16} aria-hidden="true" />Qué necesito para publicar</Link>
         <PublishWizard key={account.id} account={{ id: account.id, name: account.display_name, phone: account.phone ?? "" }} />
       </div>
     </main>
