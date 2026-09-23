@@ -1,0 +1,158 @@
+import assert from "node:assert/strict";
+import { before,after,test } from "node:test";
+import { randomUUID,createHash } from "node:crypto";
+import { spawn,type ChildProcess } from "node:child_process";
+import { readFile,mkdir,mkdtemp } from "node:fs/promises";
+import { createServer } from "node:net";
+import { pathToFileURL } from "node:url";
+import path from "node:path";
+import mysql,{type RowDataPacket} from "mysql2/promise";
+import sharp from "sharp";
+
+const enabled=Boolean(process.env.QA_MYSQL_URL);
+const options={skip:!enabled};
+const email=`mysql-${randomUUID()}@example.invalid`,password=randomUUID(),adminPassword=`private:${randomUUID()}`;
+let connection:mysql.Connection,server:ChildProcess,base:string,storage:string,cookie:string,accountId:string,requestId:string,slug:string;
+let serverArgs:string[],serverEnv:NodeJS.ProcessEnv;
+const admin={authorization:`Basic ${Buffer.from(`qa-admin:${adminPassword}`).toString("base64")}`};
+const details={title:"Departamento transaccional QA",type:"Departamento",zone:"Urbari",address:"Dirección referencial QA",bedrooms:"2",bathrooms:"",garage:"1",area:"",pets:true,furnished:false,security:true,pool:false,patio:false,grill:false,elevator:true,price:"400",currency:"USD",exchangeRate:"8.5",commonExpenses:"20",guarantee:"1 mes de alquiler",guaranteeAmount:"",description:"Departamento de prueba aislado. No es una oferta inmobiliaria real."};
+
+before(async()=>{
+  if (!enabled) return;
+  const url=new URL(process.env.QA_MYSQL_URL!);
+  assert.ok(url.pathname.endsWith("_qa") && ["localhost","127.0.0.1"].includes(url.hostname),"Only a local isolated *_qa database is permitted");
+  connection=await mysql.createConnection({uri:url.toString(),timezone:"Z"});
+  await connection.query("SET time_zone = '+00:00'");
+  await mkdir("output/auth-qa",{recursive:true});
+  storage=await mkdtemp(path.resolve("output/auth-qa/mysql-"));
+  const listener=createServer();await new Promise<void>(resolve=>listener.listen(0,"127.0.0.1",resolve));
+  const address=listener.address();assert.ok(address && typeof address !== "string");
+  await new Promise<void>(resolve=>listener.close(()=>resolve()));base=`http://127.0.0.1:${address.port}`;
+  serverArgs=["--import",pathToFileURL(path.resolve("scripts/oauth-qa-provider.mjs")).href,"node_modules/next/dist/bin/next","start","-p",String(address.port),"--hostname","127.0.0.1"];
+  serverEnv={...process.env,DATABASE_URL:url.toString(),ZENTRO_REQUIRE_DATABASE:"1",ZENTRO_STORAGE_DIR:storage,NODE_ENV:"production",ZENTRO_URBANO_ADMIN_USER:"qa-admin",ZENTRO_URBANO_ADMIN_PASSWORD:adminPassword,GOOGLE_CLIENT_ID:"qa-client.apps.googleusercontent.com",GOOGLE_CLIENT_SECRET:"qa-not-a-real-secret",GOOGLE_QA_EMAIL:email,GOOGLE_QA_SUBJECT:email};
+  await startServer();
+});
+async function startServer() {
+  server=spawn(process.execPath,serverArgs,{cwd:process.cwd(),windowsHide:true,stdio:"ignore",env:serverEnv});
+  for (let i=0;i<100;i++) {try {if ((await fetch(`${base}/api/session`)).ok) return;} catch {} await new Promise(resolve=>setTimeout(resolve,100));}
+  throw new Error("SQL QA server did not start");
+}
+async function stopServer() {if (server && server.exitCode === null && server.signalCode === null) {const stopped=new Promise<void>(resolve=>server.once("exit",()=>resolve()));server.kill();await stopped;}}
+after(async()=>{await stopServer(); if (connection) await connection.end();});
+const json=(body:unknown,extra:Record<string,string>={})=>({method:"POST",headers:{"content-type":"application/json",cookie,...extra},body:JSON.stringify(body)});
+async function submit(key=randomUUID(),count=1) {
+  const form=new FormData();form.set("payload",JSON.stringify({operation:"Alquiler",propertyType:"Departamento",publisherKind:"owner",ownerConfirmed:true,contactName:"Propietario QA",whatsapp:"75000000",sourceText:details.description,currency:"USD",exchangeRate:8.5,details,accountId:"forged"}));
+  for(let i=1;i<=count;i++) form.append("photos",new Blob([await readFile(`public/images/properties/torre-urbari/0${i}.jpg`)],{type:"image/jpeg"}),`0${i}.jpg`);
+  return fetch(`${base}/api/publication-requests`,{method:"POST",headers:{cookie,"idempotency-key":key},body:form});
+}
+async function decision(id:string,body:unknown,headers=admin) {return fetch(`${base}/admin/solicitudes/${id}/decision`,json(body,{...headers,origin:base}));}
+async function count(table:string,where:string,values:unknown[]) {const [rows]=await connection.query<RowDataPacket[]>(`SELECT COUNT(*) AS n FROM ${table} WHERE ${where}`,values);return Number(rows[0].n);}
+
+test("MySQL registration is unique, owner-only, transactional and survives password login",options,async()=>{
+  const body={email,password,displayName:"Propietario QA",accountKind:"admin"};
+  const responses=await Promise.all([fetch(`${base}/api/auth/register`,json(body)),fetch(`${base}/api/auth/register`,json(body))]);
+  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+  const success=responses.find(r=>r.status===200)!;cookie=success.headers.get("set-cookie")!.split(";")[0];accountId=(await success.json()).accountId;
+  assert.equal(await count("client_accounts","email=? AND kind='owner'",[email]),1);
+  assert.equal(await count("morada_users","email=? AND password_hash IS NOT NULL",[email]),1);
+  const login=await fetch(`${base}/api/auth/login`,json({email,password}));assert.equal(login.status,200);assert.equal((await login.json()).accountId,accountId);
+});
+
+test("MySQL Google login reuses the password account without creating a shadow identity",options,async()=>{
+  const start=await fetch(`${base}/api/auth/google/start?next=/publicar`,{redirect:"manual"});assert.equal(start.status,307);
+  const google=new URL(start.headers.get("location")!);const state=google.searchParams.get("state")!;
+  const result=await fetch(`${base}/api/auth/google/callback?state=${state}&code=qa-success`,{redirect:"manual",headers:{cookie:start.headers.get("set-cookie")!.split(";")[0]}});
+  assert.equal(result.status,307);assert.equal(result.headers.get("location"),`${base}/publicar`);
+  assert.equal(await count("morada_users","email=?",[email]),1);assert.equal(await count("client_accounts","email=?",[email]),1);
+  assert.equal((await fetch(`${base}/api/auth/login`,json({email,password}))).status,200);
+});
+
+test("MySQL stores original photos and retries return the same request, even concurrently",options,async()=>{
+  const key=randomUUID();const responses=await Promise.all([submit(key),submit(key)]);
+  assert.deepEqual(responses.map(r=>r.status),[201,201]);const [a,b]=await Promise.all(responses.map(r=>r.json()));requestId=a.requestId;assert.equal(a.requestId,b.requestId);
+  assert.equal(await count("publication_requests","account_id=? AND idempotency_key=?",[accountId,key]),1);
+  const [timestamps]=await connection.query<RowDataPacket[]>("SELECT created_at FROM publication_requests WHERE id=?",[requestId]);
+  assert.ok(Math.abs(Date.now()-timestamps[0].created_at.getTime())<10000,"Database timestamps are stored/read in UTC");
+  const [photos]=await connection.query<RowDataPacket[]>("SELECT original_data FROM publication_photos WHERE request_id=?",[requestId]);
+  assert.deepEqual(photos[0].original_data,await readFile("public/images/properties/torre-urbari/01.jpg"));
+  assert.equal((await fetch(`${base}/media/propiedades/${requestId}/01.jpg`)).status,404);
+});
+
+test("SQL failure on the second photo rolls back the request and every photo",options,async()=>{
+  const key=randomUUID(),trigger=`qa_fail_${randomUUID().replaceAll("-","")}`;
+  await connection.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON publication_photos FOR EACH ROW BEGIN IF NEW.filename='02.jpg' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated QA failure'; END IF; END`);
+  try {assert.equal((await submit(key,2)).status,503);assert.equal(await count("publication_requests","account_id=? AND idempotency_key=?",[accountId,key]),0);}
+  finally {await connection.query(`DROP TRIGGER ${trigger}`);}
+});
+
+test("only the configured admin may moderate; owner sessions and cross-origin requests cannot",options,async()=>{
+  const body={decision:"approve",latitude:-17.7978,longitude:-63.1908,confirmed:true};
+  assert.equal((await decision(requestId,body,{} as typeof admin)).status,401);
+  const cross=await fetch(`${base}/admin/solicitudes/${requestId}/decision`,json(body,{...admin,origin:"https://example.invalid"}));assert.equal(cross.status,403);
+  assert.equal((await decision(requestId,{...body,confirmed:false})).status,400);
+  assert.equal((await decision(requestId,{...body,latitude:0})).status,400);
+  assert.equal((await fetch(`${base}/admin/solicitudes/${requestId}/fotos/01.jpg`,{headers:{cookie}})).status,401);
+  const original=await fetch(`${base}/admin/solicitudes/${requestId}/fotos/01.jpg`,{headers:admin});assert.equal(original.status,200);assert.match(original.headers.get("cache-control")!,/no-store/);
+});
+
+test("concurrent manual approval publishes exactly one direct-owner listing and audit event",options,async()=>{
+  const body={decision:"approve",latitude:-17.7978,longitude:-63.1908,confirmed:true};
+  const responses=await Promise.all([decision(requestId,body),decision(requestId,body)]);assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+  slug=(await responses.find(r=>r.status===200)!.json()).slug;
+  assert.equal(await count("properties","slug=? AND published=1",[slug]),1);assert.equal(await count("client_account_properties","property_slug=? AND account_id=?",[slug,accountId]),1);
+  assert.equal(await count("publication_review_audit","request_id=?",[requestId]),1);
+  const page=await fetch(`${base}/propiedades/${slug}`);assert.equal(page.status,200);const html=await page.text();assert.match(html,/Departamento transaccional QA/);assert.match(html,/Propietario QA/);
+  const image=await fetch(`${base}/media/propiedades/${requestId}/01.jpg`);assert.equal(image.status,200);assert.equal(image.headers.get("content-type"),"image/webp");const metadata=await sharp(Buffer.from(await image.arrayBuffer())).metadata();assert.equal(metadata.format,"webp");assert.equal(metadata.exif,undefined);
+  assert.match(await (await fetch(`${base}/cliente`,{headers:{cookie}})).text(),new RegExp(slug));
+});
+
+test("rejection requires a reason, stays private and is visible only to its owner",options,async()=>{
+  const submitted=await submit();assert.equal(submitted.status,201);const id=(await submitted.json()).requestId;
+  assert.equal((await decision(id,{decision:"reject",reason:""})).status,400);
+  assert.equal((await decision(id,{decision:"reject",reason:"Datos de ubicación incompletos"})).status,200);
+  assert.equal((await fetch(`${base}/media/propiedades/${id}/01.jpg`)).status,404);
+  const own=await fetch(`${base}/cliente/solicitudes`,{headers:{cookie}});assert.match(await own.text(),/Datos de ubicación incompletos/);
+  const other=await fetch(`${base}/api/auth/register`,json({email:`other-${email}`,password,displayName:"Otro propietario"}));const otherCookie=other.headers.get("set-cookie")!.split(";")[0];
+  assert.doesNotMatch(await (await fetch(`${base}/cliente/solicitudes`,{headers:{cookie:otherCookie}})).text(),new RegExp(id));
+});
+
+test("owner edits persist in SQL; invalid prices and temporary media never overwrite the listing",options,async()=>{
+  const [rows]=await connection.query<RowDataPacket[]>("SELECT * FROM properties WHERE slug=?",[slug]);const row=rows[0];
+  const parse=(value:unknown)=>typeof value === "string" ? JSON.parse(value) : value;
+  const body={title:row.title,type:row.type,operation:"Alquiler",price:450,currency:"USD",exchangeRate:8.25,city:row.city,zone:row.zone,address:row.address,bedrooms:2,bathrooms:0,garage:1,area:0,pets:true,furnished:false,security:true,pool:false,patio:false,grill:false,elevator:true,shortDescription:row.short_description,longDescription:row.long_description,requirements:parse(row.requirements),images:parse(row.images),video:null,mapUrl:null,whatsapp:row.whatsapp,idealFor:[],tags:[],coordinates:parse(row.coordinates),neighborhoodHighlights:[]};
+  const edit=(payload:unknown)=>fetch(`${base}/api/propiedades/${slug}`,{...json(payload),method:"PATCH"});
+  assert.equal((await edit({...body,price:-1})).status,400);
+  assert.equal((await edit({...body,images:["blob:temporary"]})).status,400);
+  assert.equal((await edit(body)).status,200);
+  assert.equal(await count("properties","slug=? AND price=450 AND exchange_rate=8.25",[slug]),1);
+  assert.equal((await edit({...body,currency:"BOB"})).status,400);
+});
+
+test("server restart preserves accounts, sessions, approvals and photos without filesystem state",options,async()=>{
+  await stopServer();await startServer();
+  assert.equal((await fetch(`${base}/publicar`,{headers:{cookie},redirect:"manual"})).status,200);
+  assert.equal((await fetch(`${base}/propiedades/${slug}`)).status,200);
+  assert.equal((await fetch(`${base}/media/propiedades/${requestId}/01.jpg`)).status,200);
+  await assert.rejects(readFile(path.join(storage,"auth/accounts.json")),{code:"ENOENT"});
+});
+
+test("disabling an account invalidates its SQL sessions, and logout revokes the token",options,async()=>{
+  await connection.execute("UPDATE morada_users SET status='disabled' WHERE account_id=?",[accountId]);
+  assert.equal((await fetch(`${base}/publicar`,{headers:{cookie},redirect:"manual"})).status,307);
+  await connection.execute("UPDATE morada_users SET status='active' WHERE account_id=?",[accountId]);
+  assert.equal((await fetch(`${base}/api/auth/signout`,json({}))).status,200);
+  assert.equal(await count("morada_sessions","token_hash=?",[createHash("sha256").update(cookie.slice(cookie.indexOf("=")+1)).digest("hex")]),0);
+  assert.equal((await fetch(`${base}/publicar`,{headers:{cookie},redirect:"manual"})).status,307);
+});
+
+test("database outage returns an error and never creates fallback local accounts",options,async()=>{
+  await stopServer();const original=serverEnv.DATABASE_URL;
+  serverEnv.DATABASE_URL="mysql://qa:qa@127.0.0.1:1/unreachable_qa";
+  await startServer();
+  try {
+    const response=await fetch(`${base}/api/auth/register`,json({email:`offline-${email}`,password,displayName:"Offline QA"}));
+    assert.equal(response.status,503);
+    assert.equal((await fetch(`${base}/api/auth/login`,json({email,password}))).status,503);
+    await assert.rejects(readFile(path.join(storage,"auth/accounts.json")),{code:"ENOENT"});
+  } finally {await stopServer();serverEnv.DATABASE_URL=original;}
+});

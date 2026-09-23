@@ -1,65 +1,48 @@
-import Image from "next/image";
+import { ArrowRight, Building2, Car, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
+import type { Metadata } from "next";
+import Link from "next/link";
+import { HomeRentalSearch } from "@/components/home-rental-search";
+import { PropertyCard } from "@/components/property-card";
+import { RentalMotion } from "@/components/rental-motion";
+import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
+import { getPublishedPropertiesData } from "@/lib/property-data";
+import { getDirectRentals, getRentalZones } from "@/lib/rentals";
+import { buildSeoMetadata } from "@/lib/seo";
 
-export default function Home() {
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+export const metadata: Metadata = buildSeoMetadata({
+  title: "Alquileres directos en Santa Cruz",
+  description: "Casas, departamentos y monoambientes en alquiler. Contacta directamente al propietario, sin intermediarios ni comisiones.",
+  path: "/", keywords: ["alquiler SCZ", "alquiler directo Santa Cruz", "departamentos en alquiler Santa Cruz", "casas en alquiler Santa Cruz"],
+});
+const categories = [
+  { label: "Todos", href: "/propiedades", icon: SlidersHorizontal },
+  { label: "Casas", href: "/propiedades?type=Casa", icon: Home },
+  { label: "Departamentos", href: "/propiedades?type=Departamento", icon: Building2 },
+  { label: "Monoambientes", href: "/propiedades?type=Departamento&bedrooms=Monoambiente", icon: KeyRound },
+  { label: "Aceptan mascotas", href: "/propiedades?amenity=pets", icon: PawPrint },
+  { label: "Con parqueo", href: "/propiedades?amenity=garage", icon: Car },
+];
+
+export default async function HomePage() {
+  const rentals = getDirectRentals(await getPublishedPropertiesData());
+  return <main id="contenido" className="home-page">
+    <section className="rental-heading">
+      <div className="zu-container">
+        <div className="rental-heading-row">
+          <div><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquileres de viviendas. De propietario a inquilino.</p></div>
+          <div className="rental-heading-art"><RentalMotion /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+        <HomeRentalSearch zones={getRentalZones(rentals)} />
+        <Link href="/bienvenida#sin-comisiones" className="home-welcome-link">Conoce Zentro Urbano: alquiler directo, sin comisiones<ArrowRight size={16} /></Link>
+      </div>
+    </section>
+    <section className="zu-container rental-catalog">
+      <nav className="rental-categories" aria-label="Tipos de alquiler">{categories.map(({label,href,icon: Icon},index) => <Link href={href} key={label} className={index === 0 ? "is-active" : ""}><Icon size={22} strokeWidth={1.6} /><span>{label}</span></Link>)}</nav>
+      <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length} viviendas · Contacto directo con el propietario</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
+      {rentals.length ? <div className="rental-grid">{rentals.slice(0, 8).map((property, index) => <PropertyCard key={property.slug} property={property} compact eagerImage={index < 2} />)}</div> : <div className="zu-empty"><Home size={32} /><h2>Pronto, nuevos alquileres</h2><p>Las nuevas viviendas aparecerán aquí.</p><Link href="/publicar" className="zu-button zu-button-primary">Publicar mi vivienda</Link></div>}
+      {rentals.length > 0 && <div className="catalog-more"><Link href="/propiedades" className="zu-button zu-button-secondary">Explorar todos los alquileres <ArrowRight size={17} /></Link></div>}
+    </section>
+    <section className="owner-band"><div className="zu-container"><span className="owner-band-icon"><KeyRound size={28} /></span><div><h2>Tu vivienda, tu trato.</h2><p>Publica tu alquiler y recibe consultas directamente.</p></div><Link href="/publicar" className="zu-button zu-button-primary">Publicar alquiler <ArrowRight size={17} /></Link></div></section>
+    <SupportWhatsAppButton floating />
+  </main>;
 }

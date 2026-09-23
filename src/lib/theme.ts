@@ -1,0 +1,1 @@
+export const themeScript = `(function(){try{var t=localStorage.getItem('zu-theme');var d=t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.dataset.theme=d?'dark':'light';document.documentElement.classList.toggle('dark',d)}catch(e){}})()`;

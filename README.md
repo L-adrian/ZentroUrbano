@@ -1,36 +1,60 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Zentro Urbano
 
-## Getting Started
+Alquileres de viviendas entre propietarios e inquilinos en Bolivia.
+Contacto directo, sin inmobiliarias ni comisiones de intermediacion.
 
-First, run the development server:
+Next.js 16, React 19, TypeScript y MySQL. Las solicitudes de publicacion
+requieren una cuenta y aprobacion manual del administrador.
+
+## Desarrollo local
+
+Requiere Node.js 24 y pnpm 11.1.2.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+corepack enable
+pnpm install --frozen-lockfile
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abre http://localhost:3000. Usa CONFIGURACION.env.example como referencia para
+tu .env.local privado. Sin MySQL, el desarrollo local puede usar almacenamiento
+local; produccion exige base de datos y credenciales administrativas.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Verificacion
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm lint
+pnpm test
+pnpm build
+```
 
-## Learn More
+pnpm test ejecuta pruebas sin base de datos ni claves reales. Las pruebas de
+integracion SQL y autenticacion estan documentadas en PRE_RELEASE_QA.md;
+solo deben ejecutarse contra entornos aislados, nunca contra usuarios reales.
 
-To learn more about Next.js, take a look at the following resources:
+pnpm start abre el servidor de produccion tras comprobar MySQL y la configuracion
+administrativa. Para revisar un build local sin esa comprobacion usa pnpm start:preview.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Publicar y actualizar
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Repositorio previsto: https://github.com/L-adrian/ZentroUrbano.
 
-## Deploy on Vercel
+Lee [HOSTINGER_DEPLOY.md](HOSTINGER_DEPLOY.md) para conectar GitHub, configurar
+variables privadas, importar el esquema y activar Google en el dominio correcto.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- main contiene la version aprobada para produccion.
+- Prueba los cambios antes de enviarlos a la rama conectada con Hostinger.
+- Las cuentas, sesiones y fotos recibidas se conservan en MySQL, no en GitHub.
+- Los cambios de esquema requieren respaldo y migracion explicita; nunca se
+  ejecutan automaticamente al publicar codigo.
+- No subas .env, tokens, respaldos, storage, output ni archivos de QA generados.
+- No ejecutes db:seed en produccion. Los ejemplos del catalogo son datos de prueba.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GitHub conserva versiones del codigo, pero no reemplaza los respaldos de MySQL.
+Revertir codigo no revierte la base de datos.
+
+## Documentacion
+
+- [Configuracion de Hostinger](HOSTINGER_DEPLOY.md)
+- [Lista de lanzamiento](LAUNCH_CHECKLIST.md)
+- [Pruebas previas al lanzamiento](PRE_RELEASE_QA.md)

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
+  <title id="title">Fotos por confirmar</title>
+  <desc id="desc">Imagen temporal para inmuebles importados desde Marketplace.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f7f5ef"/>
+      <stop offset="0.52" stop-color="#edf2ee"/>
+      <stop offset="1" stop-color="#d9e4dc"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f4f1ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1200" fill="url(#bg)"/>
+  <path d="M0 900 C260 760 480 930 730 800 C1000 660 1240 730 1600 560 L1600 1200 L0 1200 Z" fill="#20372c" opacity=".08"/>
+  <rect x="250" y="250" width="1100" height="700" rx="52" fill="url(#card)" stroke="#20372c" stroke-opacity=".16" stroke-width="3"/>
+  <path d="M470 730 L690 520 L845 670 L940 575 L1140 730 Z" fill="#20372c" opacity=".18"/>
+  <circle cx="1040" cy="450" r="78" fill="#c9965b" opacity=".45"/>
+  <rect x="470" y="785" width="660" height="18" rx="9" fill="#20372c" opacity=".16"/>
+  <text x="800" y="465" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="64" font-weight="700" fill="#111111">Fotos por confirmar</text>
+  <text x="800" y="555" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="500" fill="#4f5b52">Publicacion importada desde Marketplace</text>
+  <text x="800" y="625" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="500" fill="#6f766f">Abrir el anuncio original para ver las fotos de referencia</text>
+</svg>

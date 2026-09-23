@@ -29,6 +29,26 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+/runtime-logs/
+/storage/
+/output/
+/artifacts/
+/documentos/
+/plantillas/
+/.playwright-cli/
+/test-results/
+/playwright-report/
+/.21st/
+*.log
+*.zip
+*.sql.gz
+*.dump
+*.key
+*.p12
+*.pfx
+/backups/
+*.sql
+!/database/mysql/*.sql
 
 # env files (can opt-in for committing if needed)
 .env*

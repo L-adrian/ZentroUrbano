@@ -1,26 +1,50 @@
 {
-  "name": "casamia",
+  "name": "zentro-urbano",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "node scripts/start-hostinger.mjs",
+    "start:preview": "next start",
+    "lint": "eslint",
+    "test": "node --import tsx --test scripts/direct-rentals.test.ts scripts/redesign.test.ts scripts/google-oauth.test.ts scripts/upload-photos.test.ts scripts/publication-input.test.ts scripts/deployment.test.mjs",
+    "db:migrate": "node scripts/database-cli.mjs migrate",
+    "db:check": "node scripts/database-cli.mjs check",
+    "db:seed": "tsx scripts/seed-mysql.ts"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.16.0",
+    "mysql2": "^3.22.3",
     "next": "16.2.6",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "react-leaflet": "^5.0.0",
+    "sharp": "0.34.5",
+    "supercluster": "^8.0.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/leaflet": "^1.9.21",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/supercluster": "^7.1.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.20.6",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
   }
 }
