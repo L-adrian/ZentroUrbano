@@ -1,9 +1,22 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
+import sharp from "sharp";
 import { getPublicationCosts } from "../src/lib/publication-costs";
 import { getGoogleMapsDirectionsUrl, MAP_MAX_NATIVE_ZOOM, MAP_MAX_ZOOM, MAP_TILE_PROVIDERS } from "../src/lib/map-config";
 import robots from "../src/app/robots";
 import { formatPriceInCurrency, getPropertyPriceInCurrency, getPropertyExchangeRate, parsePropertyExchangeRate } from "../src/lib/currency";
+
+test("family illustration is static, transparent and sharp at 3x its largest display size", async () => {
+  const image = await readFile(new URL("../public/images/family-rental/family-scene-v2.webp", import.meta.url));
+  const metadata = await sharp(image).metadata();
+  assert.equal(metadata.format, "webp");
+  assert.ok(metadata.width >= 480 * 3);
+  assert.equal(metadata.width / metadata.height, 2);
+  assert.equal(metadata.hasAlpha, true);
+  assert.equal(metadata.pages ?? 1, 1);
+  assert.ok(image.length < 350_000);
+});
 
 test("one-off entry costs do not display a monthly suffix", () => {
   const property = { operation: "Alquiler" as const, currency: "BOB" as const, price: 5250 };

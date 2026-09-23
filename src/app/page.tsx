@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, Car, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, Car, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HomeRentalSearch } from "@/components/home-rental-search";
@@ -33,7 +33,10 @@ export default async function HomePage() {
           <div className="rental-heading-art"><RentalMotion /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
         </div>
         <HomeRentalSearch zones={getRentalZones(rentals)} />
-        <Link href="/bienvenida#sin-comisiones" className="home-welcome-link">Conoce Zentro Urbano: alquiler directo, sin comisiones<ArrowRight size={16} /></Link>
+        <div className="home-welcome">
+          <p>Alquiler directo. Sin comisiones.</p>
+          <Link href="/bienvenida" className="zu-button zu-button-secondary home-welcome-link"><BookOpen size={17} />Conoce Zentro Urbano<ArrowRight size={16} /></Link>
+        </div>
       </div>
     </section>
     <section className="zu-container rental-catalog">

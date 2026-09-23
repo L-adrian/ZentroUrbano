@@ -1,6 +1,6 @@
 "use client";
 
-import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight } from "lucide-react";
+import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight, BookOpen } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -54,6 +54,7 @@ export function SiteHeader() {
         <Link href="/" className="zu-logo" aria-label="Zentro Urbano, inicio"><span className="logo-mark"><House size={22} strokeWidth={1.8} /></span><span>Zentro<span className="logo-accent">Urbano</span></span></Link>
         <nav className="header-nav" aria-label="Navegación principal">
           {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}><Icon size={17} />{label}</Link>)}
+          <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={17} />Cómo funciona</Link>
         </nav>
         <div className="header-actions">
           <CurrencySelector className="header-currency" />
@@ -68,7 +69,7 @@ export function SiteHeader() {
               <Link href="/propiedades"><Search size={18} />Explorar alquileres</Link>
               <Link href="/mapa"><MapPin size={18} />Buscar en el mapa</Link>
               <Link href="/publicar"><Plus size={18} />Publicar mi vivienda</Link>
-              <Link href="/bienvenida"><House size={18} />Conoce Zentro Urbano</Link>
+              <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={18} />Cómo funciona</Link>
               <Link href="/ayuda"><MessageCircle size={18} />Centro de ayuda</Link>
               <SupportWhatsAppButton />
               <div className="menu-currency"><span>Moneda</span><CurrencySelector /></div>

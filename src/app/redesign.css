@@ -71,7 +71,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .logo-accent { color: var(--brand); font-weight: 500; }
 .logo-mark { display: grid; place-items: center; height: 35px; width: 35px; border-radius: 8px; background: var(--brand); color: white; }
 .header-nav, .header-actions { display: flex; align-items: center; gap: 8px; }
-.header-nav a { display: flex; align-items: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 550; color: var(--muted); border-radius: 6px; }
+.header-nav a { display: flex; align-items: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 550; color: var(--muted); border-radius: 6px; white-space: nowrap; }
 .header-nav a[aria-current], .header-nav a:hover { color: var(--brand); background: var(--brand-soft); }
 .header-actions { margin-left: auto; }
 .currency-selector { display: inline-flex; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--subtle); }
@@ -91,9 +91,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-heading h1 { margin-top: 12px; font-size: 36px; line-height: 1.18; font-weight: 650; }
 .rental-heading h1 span { color: var(--brand); }
 .heading-subtitle { color: var(--muted); font-size: 14px; margin-top: 12px; }
-.home-welcome-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; color: var(--brand); font-size: 12px; font-weight: 600; line-height: 1.7; }
+.home-welcome { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px 20px; margin-top: 16px; }
+.home-welcome p { margin: 0; color: var(--muted); font-size: 13px; }
+.home-welcome-link { color: var(--brand); }
 .home-welcome-link svg { flex-shrink: 0; }
-.home-welcome-link:hover { text-decoration: underline; text-underline-offset: 4px; }
 .dark .publication-receipt { background: var(--surface); color: var(--foreground); }
 .publish-wizard, .publication-receipt { scroll-margin-top: 96px; }
 .request-back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--brand); font-size: 13px; }
@@ -196,25 +197,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .owner-contact-card { border-radius: 8px; }.owner-contact-card a, .owner-contact-card button { border-radius: 6px; }.owner-contact-card > div > div { flex-wrap: wrap; }
 .property-detail h1 { font-size: 32px; line-height: 1.2; }.property-detail h2 { font-size: 23px; line-height: 1.35; }.property-detail .quick-facts { background: var(--subtle); }.quick-facts > div > div { background: transparent; border: 0; }.property-detail [class*="rounded-["], .property-detail .rounded-2xl { border-radius: 8px; }
 @media (max-width:768px) { .property-gallery { height: 280px; display: block; }.gallery-main { width: 100%; height: 100%; }.gallery-side { display: none; }.gallery-full-image { padding: 8px; }.gallery-toolbar { padding-inline: 14px; }.gallery-full-image button { top: auto; bottom: 10px; }.property-detail h1 { font-size: 26px; }.property-detail h2 { font-size: 21px; }.property-contact-dock { bottom: calc(66px + env(safe-area-inset-bottom)); }.auth-panel h1 { font-size: 25px; } }
-.family-motion { width: 270px; height: 150px; }
-.family-scene { position: relative; width: 100%; height: 100%; overflow: hidden; }
-.family-sprite { display: block; position: absolute; aspect-ratio: 512 / 544; background-image: url('/images/family-rental/family-atlas.webp'); background-size: 300% 188.2353%; background-repeat: no-repeat; }
-.family-house, .family-apartments, .family-boxes { aspect-ratio: 512 / 474; background-size: 300% 216.0338%; }
-.family-ground { position: absolute; height: 1px; background: var(--line); bottom: 12%; left: 4%; right: 4%; }
-.family-house { width: 57%; right: 0; bottom: 1%; background-position: 0 100%; }
-.family-apartments { width: 30%; left: 0; bottom: 4%; background-position: 50% 100%; opacity: .6; }
-.family-arrival { position: absolute; inset: 0; }
-.family-father { width: 35%; left: 12%; bottom: 2%; background-position: 0 0; }
-.family-mother { width: 35%; left: 29%; bottom: 2%; background-position: 50% 0; }
-.family-child { width: 27%; left: 28%; bottom: 2%; background-position: 100% 0; }
-.family-boxes { width: 19%; right: 3%; bottom: 4%; background-position: 100% 100%; }
-.family-motion.is-welcome { width: min(100%, 680px); height: auto; aspect-ratio: 3.5; margin: 20px auto 0; }
-.is-welcome .family-house { width: 30%; right: 15%; bottom: 5%; }
-.is-welcome .family-apartments { width: 25%; left: 1%; bottom: 6%; }
-.is-welcome .family-father { width: 22%; left: 21%; bottom: 9%; }
-.is-welcome .family-mother { width: 22%; left: 34%; bottom: 9%; }
-.is-welcome .family-child { width: 16%; left: 32%; bottom: 9%; }
-.is-welcome .family-boxes { width: 13%; right: 7%; bottom: 7%; }
+.family-motion { width: 340px; max-width: 100%; height: auto; aspect-ratio: 2; }
+.family-scene { display: block; width: 100%; height: auto; }
+.family-motion.is-welcome { width: min(100%, 480px); margin: 20px auto 0; }
+.family-motion.is-compact { width: 260px; margin-inline: auto; }
 .support-whatsapp { background: #087c65; color: #fff; border-color: #087c65; font-size: 12px; }.support-whatsapp:hover { background: #05624f; }.dark .support-whatsapp { background: #43c49b; border-color: #43c49b; color: #08291e; }.dark .support-whatsapp:hover { background: #69d4b1; }.support-whatsapp svg { width: 19px; height: 19px; }
 .publication-account-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-block: 1px solid var(--line); padding-block: 14px; margin-bottom: 24px; font-size: 12px; }.publication-account-bar > span { color: var(--muted); }.publication-account-bar strong { color: var(--foreground); }.auth-support { display: flex; justify-content: center; margin-top: 20px; }
 .footer-directory { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1.15fr; gap: 36px; padding-block: 42px; }.footer-brand > p { font-size: 13px; color: var(--muted); line-height: 1.8; margin-block: 15px; }.footer-directory nav { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }.footer-directory nav h2 { font-size: 13px; font-weight: 650; margin-bottom: 10px; }.footer-directory nav a { font-size: 12px; color: var(--muted); line-height: 1.6; padding-block: 4px; }.footer-directory nav a:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 4px; }
@@ -260,7 +246,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .zu-container { padding-inline: 20px; }.header-inner { height: 64px; gap: 8px; }.zu-logo { font-size: 19px; gap: 8px; }.logo-mark { height: 31px; width: 31px; }.header-currency, .header-publish { display: none; }.header-actions { gap: 7px; }.zu-icon-button { height: 38px; width: 38px; }
   .mobile-navigation { display: grid; grid-template-columns: repeat(5,1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 1200; background: var(--surface); border-top: 1px solid var(--line); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); }
   .mobile-navigation a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); padding: 5px 0; font-size: 10px; }.mobile-navigation a[aria-current] { color: var(--brand); font-weight: 700; }
-  .rental-heading { padding: 26px 0 22px; }.rental-heading-row { gap: 0; margin-bottom: 22px; }.rental-heading h1 { font-size: 30px; }.rental-heading-art { padding: 0; }.rental-heading-art .rental-motion { width: 145px; height: 120px; }.rental-heading-art .motion-home { width: 85px; right: 0; }.rental-heading-art .person-owner { left: 72px; }.rental-heading-art .person-tenant { left: 3px; }.rental-heading-art .motion-key { left: 47px; }.rental-heading-art .motion-door { right: 5px; width: 32px; }.heading-subtitle { max-width: 230px; font-size: 12px; line-height: 1.6; }
+  .rental-heading { padding: 26px 0 22px; }.rental-heading-row { gap: 0; margin-bottom: 22px; }.rental-heading h1 { font-size: 30px; }.rental-heading-art { padding: 0; }.rental-heading-art .rental-motion { width: 200px; height: auto; }.heading-subtitle { max-width: 230px; font-size: 12px; line-height: 1.6; }
   .home-search { grid-template-columns: 1fr 1fr; gap: 0; padding: 0; background: var(--surface); }.home-search label { padding: 12px; border: 0; }.home-search label > span { font-size: 10px; }.home-search .search-query { grid-column: 1/-1; border-bottom: 1px solid var(--line); }.home-search label:nth-of-type(2) { border-right: 1px solid var(--line); }.home-search input, .home-search select { font-size: 16px; }.home-search .zu-button { grid-column: 1/-1; height: 44px; min-height: 44px; margin: 0 10px 10px; }
   .rental-categories { gap: 24px; margin-bottom: 22px; }.rental-categories a { flex-direction: column; gap: 7px; padding-block: 18px 14px; font-size: 10px; }.catalog-heading h2 { font-size: 21px; }.catalog-heading p { font-size: 11px; max-width: 220px; line-height: 1.6; }.catalog-heading .zu-button { padding: 9px 11px; font-size: 12px; flex-shrink: 0; }
   .rental-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 16px; }.owner-band > div { flex-wrap: wrap; gap: 13px; padding-block: 25px; }.owner-band .zu-button { margin-left: 0; }.owner-band h2 { font-size: 19px; }.owner-band p { font-size: 12px; }.owner-band-icon { display: none; }
