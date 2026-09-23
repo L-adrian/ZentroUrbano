@@ -28,7 +28,14 @@ verifica el nombre y realiza un respaldo antes de migrar. No es necesario transf
 el dominio ni contratar servicios adicionales para utilizar este codigo; los limites
 y prestaciones disponibles dependen del plan de hosting existente.
 
-Introduce las variables de CONFIGURACION.env.example en Environment Variables:
+Puedes importar un archivo privado con Import .env en Environment Variables.
+El comando npm run config:hostinger crea output/hostinger-private/zentro-urbano.env,
+fuera de Git y del ZIP, con una clave administrativa aleatoria. Si DATABASE_URL ya
+esta definida en el proceso, la incluye; si no, hay que completarla antes de importar.
+No copia .env.local ni reutiliza la base de esta computadora. No sobrescribe archivos.
+La importacion debe reemplazar los valores antiguos, no dejar claves duplicadas.
+
+Tambien puedes introducir las variables de CONFIGURACION.env.example manualmente:
 - DATABASE_URL: URI privada de conexion, con host, usuario, clave y nombre de base.
   Codifica caracteres especiales de usuario/clave con percent-encoding.
 - ZENTRO_URBANO_ADMIN_USER: tu unico usuario administrador (puede ser tu correo).
@@ -41,6 +48,12 @@ Introduce las variables de CONFIGURACION.env.example en Environment Variables:
 El registro publico crea propietarios, nunca administradores. La cuenta administradora
 usa las credenciales privadas anteriores en /admin y /admin/solicitudes.
 No compartas esa clave ni la contraseña de la base de datos.
+
+El arranque y db:check leen .env.production.local, .env.local, .env.production y .env,
+en ese orden. Los valores del proceso tienen prioridad. Para un archivo privado fuera
+de la carpeta de despliegue usa ZENTRO_ENV_FILE con su ruta absoluta; si no existe,
+el arranque falla. Estos scripts leen valores literales, sin expansion de $VARIABLE.
+Para Hostinger se recomienda Import .env: los archivos del despliegue se reemplazan.
 
 ## 2. Importar el esquema
 
@@ -60,6 +73,12 @@ Alternativa si solo tienes phpMyAdmin: selecciona la base correcta e importa, en
 - database/mysql/001_zentro_urbano_core.sql
 - database/mysql/002_property_exchange_rate.sql
 - database/mysql/003_publication_review.sql
+
+Para una base recien creada y VACIA, npm run db:export prepara un unico archivo
+output/hostinger-private/zentro-urbano-inicial.sql con las tres migraciones y sus
+checksums. Selecciona la base en phpMyAdmin > Importar y carga ese archivo una sola vez.
+No incluye cuentas ni fichas de prueba. No utilizarlo para actualizar una base con datos;
+las actualizaciones usan db:migrate con respaldo y confirmacion del nombre.
 
 No importar datos de prueba. Las tablas de negocio deben usar InnoDB.
 max_allowed_packet debe ser como minimo 12 MB (recomendado 32 MB). Si el plan no

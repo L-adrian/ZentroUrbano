@@ -1,13 +1,14 @@
 import mysql from "mysql2/promise";
 import { applyMigrations } from "./database-migrations.mjs";
+import { databaseUrl, loadRuntimeEnvironment } from "./runtime-environment.mjs";
 
-for (const file of [".env.local",".env"]) { try { process.loadEnvFile(file); } catch(error) { if (error.code !== "ENOENT") throw error; } }
 let connection;
 try {
-  if (!process.env.DATABASE_URL) throw new Error("Define DATABASE_URL en las variables privadas del hosting.");
-  const database=decodeURIComponent(new URL(process.env.DATABASE_URL).pathname.slice(1));
+  loadRuntimeEnvironment();
+  const uri = databaseUrl();
+  const database=decodeURIComponent(new URL(uri).pathname.slice(1));
   if (!database) throw new Error("DATABASE_URL debe incluir el nombre de la base existente.");
-  connection=await mysql.createConnection({uri:process.env.DATABASE_URL,multipleStatements:true,connectTimeout:8000,timezone:"Z"});
+  connection=await mysql.createConnection({uri,multipleStatements:true,connectTimeout:8000,timezone:"Z"});
   if (process.argv[2] === "migrate") {
     if (process.env.ZENTRO_CONFIRM_DATABASE !== database) throw new Error("Respalda la base y define ZENTRO_CONFIRM_DATABASE con su nombre exacto antes de migrar.");
     await applyMigrations(connection);

@@ -11,6 +11,7 @@ $paths = @(
     'next-env.d.ts', 'tsconfig.json', 'postcss.config.mjs', 'eslint.config.mjs',
     'HOSTINGER_DEPLOY.md', 'CONFIGURACION.env.example',
     'scripts/database-cli.mjs', 'scripts/database-migrations.mjs', 'scripts/start-hostinger.mjs',
+    'scripts/runtime-environment.mjs',
     'database/mysql/001_zentro_urbano_core.sql',
     'database/mysql/002_property_exchange_rate.sql',
     'database/mysql/003_publication_review.sql'
@@ -40,6 +41,8 @@ $package = Get-Content -LiteralPath (Join-Path $root 'package.json') -Raw | Conv
 $package.scripts.PSObject.Properties.Remove('db:seed')
 $package.scripts.PSObject.Properties.Remove('test')
 $package.scripts.PSObject.Properties.Remove('start:preview')
+$package.scripts.PSObject.Properties.Remove('config:hostinger')
+$package.scripts.PSObject.Properties.Remove('db:export')
 $package.scripts.start = 'node scripts/start-hostinger.mjs'
 $stream = [IO.File]::Open($destination, [IO.FileMode]::CreateNew)
 $archive = [IO.Compression.ZipArchive]::new($stream, [IO.Compression.ZipArchiveMode]::Create)

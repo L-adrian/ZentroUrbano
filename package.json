@@ -12,9 +12,11 @@
     "start": "node scripts/start-hostinger.mjs",
     "start:preview": "next start",
     "lint": "eslint",
-    "test": "node --import tsx --test scripts/direct-rentals.test.ts scripts/redesign.test.ts scripts/google-oauth.test.ts scripts/upload-photos.test.ts scripts/publication-input.test.ts scripts/deployment.test.mjs",
+    "test": "node --import tsx --test scripts/direct-rentals.test.ts scripts/redesign.test.ts scripts/google-oauth.test.ts scripts/upload-photos.test.ts scripts/publication-input.test.ts scripts/deployment.test.mjs scripts/runtime-environment.test.mjs",
+    "config:hostinger": "node scripts/create-hostinger-env.mjs",
     "db:migrate": "node scripts/database-cli.mjs migrate",
     "db:check": "node scripts/database-cli.mjs check",
+    "db:export": "node scripts/export-database-schema.mjs",
     "db:seed": "tsx scripts/seed-mysql.ts"
   },
   "dependencies": {

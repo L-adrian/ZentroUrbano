@@ -1,14 +1,30 @@
 import { spawn } from "node:child_process";
+import { join } from "node:path";
+import { loadRuntimeEnvironment, projectDirectory, validateProductionEnvironment } from "./runtime-environment.mjs";
 
-process.env.ZENTRO_REQUIRE_DATABASE="1";
-if (!process.env.DATABASE_URL || !process.env.ZENTRO_URBANO_ADMIN_USER || (process.env.ZENTRO_URBANO_ADMIN_PASSWORD?.length || 0) < 16) {
-  console.error("Configura DATABASE_URL, ZENTRO_URBANO_ADMIN_USER y una contraseña privada de al menos 16 caracteres en Hostinger.");
+try {
+  loadRuntimeEnvironment();
+  validateProductionEnvironment();
+} catch (error) {
+  console.error(`[ZENTRO_CONFIG] ${error.message}`);
   process.exit(1);
 }
-const check=spawn(process.execPath,["scripts/database-cli.mjs","check"],{stdio:"inherit",env:process.env,windowsHide:true});
-const result=await new Promise(resolve=>check.once("exit",resolve));
-if (result !== 0) process.exit(1);
-const server=spawn(process.execPath,["node_modules/next/dist/bin/next","start","--hostname","0.0.0.0","--port",process.env.PORT || "3000"],{stdio:"inherit",env:process.env,windowsHide:true});
-for (const signal of ["SIGTERM","SIGINT"]) process.on(signal,()=>server.kill(signal));
-server.once("error",()=>process.exit(1));
-server.once("exit",code=>process.exit(code || 0));
+process.env.ZENTRO_REQUIRE_DATABASE = "1";
+process.env.NODE_ENV = "production";
+const options = { cwd: projectDirectory, stdio: "inherit", env: process.env, windowsHide: true };
+let child = spawn(process.execPath, [join(projectDirectory, "scripts/database-cli.mjs"), "check"], options);
+for (const signal of ["SIGTERM", "SIGINT"]) process.on(signal, () => child.kill(signal));
+const result = await new Promise(resolve => {
+  child.once("error", () => resolve(1));
+  child.once("exit", code => resolve(code ?? 1));
+});
+if (result !== 0) {
+  console.error("[ZENTRO_DATABASE] No se inicio la web: revisa la conexion o importa las tablas. No se guardaran datos en archivos alternativos.");
+  process.exit(1);
+}
+child = spawn(process.execPath, [
+  join(projectDirectory, "node_modules/next/dist/bin/next"), "start",
+  "--hostname", "0.0.0.0", "--port", process.env.PORT || "3000",
+], options);
+child.once("error", () => process.exit(1));
+child.once("exit", code => process.exit(code ?? 1));
