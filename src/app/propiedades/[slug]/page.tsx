@@ -236,7 +236,7 @@ export default async function PropertyDetailPage({
             </div>
 
             <ContentSection title="Descripción">
-              <p>{property.longDescription}</p>
+              <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{property.longDescription}</p>
             </ContentSection>
 
             <ContentSection title="Características">

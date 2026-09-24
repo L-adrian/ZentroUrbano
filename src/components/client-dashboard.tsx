@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 import type { ChangeEvent, FormEvent, ReactElement, ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { PriceDisplay } from "@/components/currency-preference";
-import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parsePropertyExchangeRate } from "@/lib/currency";
+import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
   getDemoAccountProperties,
   getDemoAccountTotals,
@@ -380,6 +380,7 @@ function PropertyEditModal({
     coordinates: { ...property.coordinates },
   }));
   const [exchangeRate, setExchangeRate] = useState(String(property.exchangeRate ?? currencyExchangeRateBobPerUsd));
+  const [priceInput, setPriceInput] = useState(String(property.price));
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
@@ -426,6 +427,8 @@ function PropertyEditModal({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (isSaving) return;
+    const price = parseCurrencyAmount(priceInput);
+    if (price === null || price <= 0 || price > 100_000_000) { setSaveError("Indica un precio válido. Puedes escribir 3400 o 3.400; para centavos, 3.400,50."); return; }
     const rate = draft.currency === "USD" ? parsePropertyExchangeRate(exchangeRate) : null;
     if (draft.currency === "USD" && rate === null) { setSaveError("Indica un tipo de cambio válido para este alquiler."); return; }
     setIsSaving(true);
@@ -434,6 +437,7 @@ function PropertyEditModal({
     try {
       await onSave({
       ...draft,
+      price,
       exchangeRate: rate,
       images,
       mapUrl:
@@ -512,12 +516,14 @@ function PropertyEditModal({
             </EditorField>
             <EditorField label="Precio">
               <input
-                value={draft.price}
-                onChange={(event) => update("price", Number(event.target.value))}
-                type="number"
-                min="0"
+                value={priceInput}
+                onChange={(event) => setPriceInput(event.target.value)}
+                type="text"
+                inputMode="decimal"
+                aria-describedby="edit-price-help"
                 className={inputClassName}
               />
+              <span id="edit-price-help" className="text-xs text-neutral-600">3400 y 3.400 son el mismo importe. Centavos: 3.400,50.</span>
             </EditorField>
             {draft.currency === "USD" && <EditorField label="Tipo de cambio (Bs por USD)">
               <input value={exchangeRate} onChange={event => setExchangeRate(event.target.value)} type="number" min="0.0001" max={maxPropertyExchangeRate} step="0.0001" inputMode="decimal" required className={inputClassName} />

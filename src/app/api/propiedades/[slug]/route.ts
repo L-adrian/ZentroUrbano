@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { canEditProperty } from "@/lib/mysql-auth";
 import { executeQuery, hasDatabaseConfig, queryOne } from "@/lib/mysql";
 import { isRentalPropertyType } from "@/lib/rentals";
-import { isDisplayCurrency, parsePropertyExchangeRate } from "@/lib/currency";
+import { isDisplayCurrency, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import { revalidatePath } from "next/cache";
 
 export async function PATCH(
@@ -46,10 +46,10 @@ export async function PATCH(
     );
   }
 
-  const price=Number(payload.price);
+  const price=parseCurrencyAmount(payload.price);
   const counts=["bedrooms","bathrooms","garage","area"].map(key=>Number(payload[key]));
   const coordinates=payload.coordinates as {lat?:unknown;lng?:unknown}|undefined;
-  if (!text(payload.title).trim() || text(payload.title).length>220 || !Number.isFinite(price) || price<=0 || price>100_000_000 ||
+  if (!text(payload.title).trim() || text(payload.title).length>220 || price===null || price<=0 || price>100_000_000 ||
     counts.some(value=>!Number.isInteger(value) || value<0 || value>1_000_000) ||
     typeof coordinates?.lat !== "number" || typeof coordinates.lng !== "number" || !Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng) || Math.abs(coordinates.lat)>90 || Math.abs(coordinates.lng)>180 ||
     !Array.isArray(payload.images) || !payload.images.length || payload.images.length>15 || payload.images.some(value=>typeof value !== "string" || !/^(\/images\/|\/media\/propiedades\/|https:\/\/)/.test(value)) ||
@@ -77,6 +77,7 @@ export async function PATCH(
             type = :type,
             operation = :operation,
             price = :price,
+            rental_details = case when rental_details is not null then JSON_SET(rental_details, '$.price', :price) else null end,
             currency = :currency,
             exchange_rate = case when :replaceExchangeRate = 1 then :exchangeRate else exchange_rate end,
             city = :city,
@@ -111,7 +112,7 @@ export async function PATCH(
       title: text(payload.title),
       type: text(payload.type),
       operation: text(payload.operation),
-      price: number(payload.price),
+      price,
       currency: text(payload.currency),
       exchangeRate,
       replaceExchangeRate: currency === "BOB" || hasExchangeRate,

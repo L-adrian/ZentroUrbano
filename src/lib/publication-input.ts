@@ -1,4 +1,4 @@
-import { parsePropertyExchangeRate } from "@/lib/currency";
+import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 
 export type PublicationDetails = {
   title:string; type:"Casa"|"Departamento"|"Monoambiente"; zone:string; address:string;
@@ -37,7 +37,8 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   const number = (key:string,max:number,integer=false): number|null => {
     const raw = input[key];
     if (raw === null || raw === undefined || (typeof raw === "string" && !raw.trim()) || (typeof raw !== "string" && typeof raw !== "number")) return null;
-    const number = Number(raw);
+    const number = ["price", "commonExpenses", "guaranteeAmount"].includes(key) ? parseCurrencyAmount(raw) : Number(raw);
+    if (number === null) return null;
     return Number.isFinite(number) && number >= 0 && number <= max && (!integer || Number.isInteger(number)) ? number : null;
   };
   const title=text("title",220), zone=text("zone",160), address=text("address",255), description=text("description",10000);

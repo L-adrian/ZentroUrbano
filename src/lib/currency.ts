@@ -5,6 +5,25 @@ export type DisplayCurrency = Property["currency"];
 export const currencyExchangeRateBobPerUsd = 7;
 export const maxPropertyExchangeRate = 1000;
 
+export function parseCurrencyAmount(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) && value >= 0 ? value : null;
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  let normalized: string;
+  // Three-digit groups are thousands; one or two trailing digits are cents.
+  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(text)) {
+    normalized = text.replaceAll(".", "").replace(",", ".");
+  } else if (/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(text)) {
+    normalized = text.replaceAll(",", "");
+  } else if (/^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d{1,2})?$/.test(text)) {
+    normalized = text.replace(/[ \u00a0\u202f]/g, "").replace(",", ".");
+  } else if (/^\d+(?:[.,]\d{1,2})?$/.test(text)) {
+    normalized = text.replace(",", ".");
+  } else return null;
+  const amount = Number(normalized);
+  return Number.isFinite(amount) && amount >= 0 ? amount : null;
+}
+
 export function parsePropertyExchangeRate(value: unknown): number | null {
   if (typeof value !== "number" && typeof value !== "string") return null;
   if (typeof value === "string" && !/^\d+(?:[.,]\d{1,4})?$/.test(value.trim())) return null;

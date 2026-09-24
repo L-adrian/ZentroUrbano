@@ -47,3 +47,13 @@ test("wizard and server agree on invalid details and the step to correct", () =>
   assert.deepEqual(getPublicationStepErrors(2, valid, "Owner", "78504969"), {});
   assert.ok(getPublicationStepErrors(2, valid, "x".repeat(161), "78504969").contactName);
 });
+
+test("publication parses grouped amounts and preserves the owner's multiline text", () => {
+  const description = "Descripción original\n\n  Cocina equipada\n- Un dormitorio\n- Un baño\nContacto directo.";
+  const result = parsePublicationDetails({...valid,price:"3.400",commonExpenses:"250,50",guaranteeAmount:"1.500",description});
+  assert.ok(result);
+  assert.equal(result.price,3400);
+  assert.equal(result.commonExpenses,250.5);
+  assert.equal(result.guaranteeAmount,1500);
+  assert.equal(result.description,description);
+});

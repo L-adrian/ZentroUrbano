@@ -26,7 +26,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { getPublicationCosts } from "@/lib/publication-costs";
 import { getPublicationStepErrors, normalizePublicationPhone, publicationFieldStep, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
-import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parsePropertyExchangeRate } from "@/lib/currency";
+import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
   analyzePhotoFile,
   isPhotoTechnicallyValid,
@@ -269,7 +269,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         ownerConfirmed: acceptedTerms,
         contactName: form.ownerName,
         whatsapp: form.phone,
-        price: Number(form.price),
+        price: parseCurrencyAmount(form.price),
         currency: form.currency,
         exchangeRate: form.currency === "USD" ? parsePropertyExchangeRate(form.exchangeRate) : null,
         sourcePlatform: "owner_wizard",
@@ -641,7 +641,8 @@ function PriceStep({
       <StepHeading title="Define el costo real" copy="El inquilino verá el alquiler mensual y cuánto necesita para ingresar." />
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <Field label="Alquiler mensual" icon={<CircleDollarSign className="h-4 w-4" />}>
-          <input value={form.price} onChange={(event) => updateField("price", event.target.value)} type="number" min="0" inputMode="numeric" placeholder="0" className={inputClassName} />
+          <input value={form.price} onChange={(event) => updateField("price", event.target.value)} type="text" inputMode="decimal" placeholder="Ej. 3.400" aria-describedby="publication-price-help" className={inputClassName} />
+          <span id="publication-price-help" className="text-xs text-neutral-600">Puedes escribir 3400 o 3.400. Para centavos: 3.400,50.</span>
         </Field>
         <Field label="Moneda">
           <select value={form.currency} onChange={(event) => updateField("currency", event.target.value as PropertyForm["currency"])} className={inputClassName}>
@@ -650,7 +651,7 @@ function PriceStep({
           </select>
         </Field>
         <Field label="Expensas mensuales">
-          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="number" min="0" max="1000000" step="any" inputMode="decimal" required aria-invalid={Boolean(errors.commonExpenses)} aria-describedby="publication-expenses-help" className={inputClassName} />
+          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="text" inputMode="decimal" required aria-invalid={Boolean(errors.commonExpenses)} aria-describedby="publication-expenses-help" className={inputClassName} />
           <span id="publication-expenses-help" className="text-xs text-neutral-600">Escribe 0 si están incluidas o no se cobran.</span>
         </Field>
         {form.currency === "USD" && <Field label="Tipo de cambio (Bs por USD)">
@@ -666,7 +667,7 @@ function PriceStep({
             <option value="Otro monto">Otro monto</option>
           </select>
         </Field>
-        {form.guarantee === "Otro monto" && <Field label="Monto de la garantía"><input type="number" min="0" inputMode="decimal" value={form.guaranteeAmount} onChange={event => updateField("guaranteeAmount", event.target.value)} className={inputClassName} /></Field>}
+        {form.guarantee === "Otro monto" && <Field label="Monto de la garantía"><input type="text" inputMode="decimal" value={form.guaranteeAmount} onChange={event => updateField("guaranteeAmount", event.target.value)} className={inputClassName} /></Field>}
         <Field label="Nombre del propietario" icon={<ShieldCheck className="h-4 w-4" />}>
           <input value={form.ownerName} onChange={(event) => updateField("ownerName", event.target.value)} autoComplete="name" placeholder="Nombre completo" className={inputClassName} />
         </Field>
@@ -804,7 +805,7 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
     { complete: Number(form.bedrooms) > 0 && Number(form.bathrooms) > 0, points: 8, missing: "Indicar dormitorios y baños" },
     { complete: Number(form.area) > 0, points: 5, missing: "Agregar superficie" },
     { complete: form.description.trim().length >= 60, points: 7, missing: "Describir distribución y servicios" },
-    { complete: Number(form.price) > 0, points: 10, missing: "Indicar precio mensual" },
+    { complete: (parseCurrencyAmount(form.price) ?? 0) > 0, points: 10, missing: "Indicar precio mensual" },
     { complete: Boolean(form.guarantee), points: 5, missing: "Indicar garantía" },
     { complete: Boolean(form.ownerName.trim() && normalizePublicationPhone(form.phone)), points: 5, missing: "Completar propietario y WhatsApp" },
   ];

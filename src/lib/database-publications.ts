@@ -5,6 +5,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { queryOne, queryRows, withTransaction } from "@/lib/mysql";
 import { parsePublicationDetails, type PublicationDetails } from "@/lib/publication-input";
 import type { PublicationRequest } from "@/lib/publication-requests";
+import { parseCurrencyAmount } from "@/lib/currency";
 
 export class PublicationError extends Error {
   constructor(public status:number,message:string) { super(message); }
@@ -89,6 +90,35 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
     await connection.execute("UPDATE publication_requests SET status=?,property_slug=?,reviewed_by=?,review_reason=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",[status,slug,admin,reason,id]);
     await connection.execute("INSERT INTO publication_review_audit (request_id,admin_user,decision,reason) VALUES (?,?,?,?)",[id,admin,status,reason]);
     return {status,slug};
+  });
+}
+
+export async function correctApprovedPublicationPrice(id:string,admin:string,input:Record<string,unknown>) {
+  const price = parseCurrencyAmount(input.price);
+  const expectedPrice = typeof input.expectedPrice === "number" ? input.expectedPrice : NaN;
+  const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+  if (price === null || price <= 0 || price > 100_000_000 || !Number.isFinite(expectedPrice) || expectedPrice < 0 ||
+    !["BOB","USD"].includes(String(input.currency)) || reason.length < 10 || reason.length > 700) {
+    throw new PublicationError(400,"Indica el precio correcto, la moneda, el precio anterior y el motivo de la corrección.");
+  }
+  return withTransaction(async connection => {
+    const [requests] = await connection.execute<RowDataPacket[]>("SELECT property_slug,status FROM publication_requests WHERE id=? FOR UPDATE",[id]);
+    if (!requests.length) throw new PublicationError(404,"Solicitud no encontrada.");
+    if (requests[0].status !== "approved" || !requests[0].property_slug) throw new PublicationError(409,"La ficha debe estar aprobada antes de corregir su precio.");
+    const slug = String(requests[0].property_slug);
+    const [rows] = await connection.execute<RowDataPacket[]>("SELECT price,currency,rental_details FROM properties WHERE slug=? FOR UPDATE",[slug]);
+    if (!rows.length) throw new PublicationError(404,"Ficha no encontrada.");
+    const current = rows[0];
+    const previousPrice = Number(current.price);
+    if (current.currency !== input.currency) throw new PublicationError(409,"La moneda no coincide; no se modificó la ficha.");
+    if (previousPrice === price) return {slug,price,currency:current.currency,changed:false};
+    if (previousPrice !== expectedPrice) throw new PublicationError(409,`El precio cambió desde la revisión. Precio actual: ${previousPrice} ${current.currency}.`);
+    const details = parseDbJson<PublicationDetails>(current.rental_details);
+    if (!details || typeof details !== "object") throw new PublicationError(409,"La ficha no tiene condiciones estructuradas para corregir su precio.");
+    await connection.execute("UPDATE properties SET price=?,rental_details=?,updated_at=CURRENT_TIMESTAMP WHERE slug=?",[price,JSON.stringify({...details,price}),slug]);
+    // Keep the original submission intact; the audit records the correction separately.
+    await connection.execute("INSERT INTO publication_review_audit (request_id,admin_user,decision,reason) VALUES (?,?,'price_corrected',?)",[id,admin,JSON.stringify({previousPrice,price,currency:current.currency,reason})]);
+    return {slug,price,currency:current.currency,previousPrice,changed:true};
   });
 }
 

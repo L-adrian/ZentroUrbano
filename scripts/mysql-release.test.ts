@@ -142,6 +142,38 @@ test("rejection requires a reason, stays private and is visible only to its owne
   assert.doesNotMatch(await (await fetch(`${base}/cliente/solicitudes`,{headers:{cookie:otherCookie}})).text(),new RegExp(id));
 });
 
+test("admin price corrections are scoped, transactional, audited and preserve the original submission",options,async()=>{
+  const correction={price:"3.400",currency:"USD",expectedPrice:400,reason:"Corrección de separador de miles confirmada por el propietario."};
+  const endpoint=`${base}/admin/solicitudes/${requestId}/precio`;
+  const correct=(body:unknown,headers:Record<string,string>=admin,origin=base)=>fetch(endpoint,{...json(body,{...headers,origin}),method:"PATCH"});
+  const [[before]]=await connection.query<RowDataPacket[]>("SELECT payload FROM publication_requests WHERE id=?",[requestId]);
+  const [[propertyBefore]]=await connection.query<RowDataPacket[]>("SELECT long_description,images FROM properties WHERE slug=?",[slug]);
+  assert.equal((await correct(correction,{})).status,401);
+  assert.equal((await correct(correction,admin,"https://example.invalid")).status,403);
+  assert.equal((await correct({...correction,price:-1})).status,400);
+  assert.equal((await correct({...correction,currency:"BOB"})).status,409);
+  assert.equal((await correct({...correction,expectedPrice:3.4})).status,409);
+  const pending=await (await submit()).json();
+  const response=await fetch(`${base}/admin/solicitudes/${pending.requestId}/precio`,{...json(correction,{...admin,origin:base}),method:"PATCH"});
+  assert.equal(response.status,409);
+  const trigger=`qa_price_${randomUUID().replaceAll("-","")}`;
+  await connection.query(`CREATE TRIGGER ${trigger} BEFORE INSERT ON publication_review_audit FOR EACH ROW BEGIN IF NEW.decision='price_corrected' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='isolated audit failure'; END IF; END`);
+  try {
+    assert.equal((await correct(correction)).status,503);
+    assert.equal(await count("properties","slug=? AND price=400",[slug]),1);
+  } finally {await connection.query(`DROP TRIGGER ${trigger}`);}
+  const corrected=await correct(correction);assert.equal(corrected.status,200);
+  assert.equal((await corrected.json()).price,3400);
+  assert.equal((await correct(correction)).status,200);
+  const [[saved]]=await connection.query<RowDataPacket[]>("SELECT price,rental_details,long_description,images FROM properties WHERE slug=?",[slug]);
+  const rental=typeof saved.rental_details === "string" ? JSON.parse(saved.rental_details) : saved.rental_details;
+  assert.equal(Number(saved.price),3400);assert.equal(rental.price,3400);
+  assert.equal(saved.long_description,propertyBefore.long_description);assert.deepEqual(saved.images,propertyBefore.images);
+  const [[after]]=await connection.query<RowDataPacket[]>("SELECT payload FROM publication_requests WHERE id=?",[requestId]);
+  assert.deepEqual(after.payload,before.payload);
+  assert.equal(await count("publication_review_audit","request_id=? AND decision='price_corrected'",[requestId]),1);
+});
+
 test("owner edits persist in SQL; invalid prices and temporary media never overwrite the listing",options,async()=>{
   const [rows]=await connection.query<RowDataPacket[]>("SELECT * FROM properties WHERE slug=?",[slug]);const row=rows[0];
   const parse=(value:unknown)=>typeof value === "string" ? JSON.parse(value) : value;
@@ -151,6 +183,11 @@ test("owner edits persist in SQL; invalid prices and temporary media never overw
   assert.equal((await edit({...body,images:["blob:temporary"]})).status,400);
   assert.equal((await edit(body)).status,200);
   assert.equal(await count("properties","slug=? AND price=450 AND exchange_rate=8.25",[slug]),1);
+  assert.equal((await edit({...body,price:"4.500"})).status,200);
+  assert.equal(await count("properties","slug=? AND price=4500",[slug]),1);
+  const [[updated]]=await connection.query<RowDataPacket[]>("SELECT rental_details FROM properties WHERE slug=?",[slug]);
+  assert.equal(parse(updated.rental_details).price,4500);
+  assert.equal((await edit({...body,price:"4.50.0"})).status,400);
   assert.equal((await edit({...body,currency:"BOB"})).status,400);
 });
 

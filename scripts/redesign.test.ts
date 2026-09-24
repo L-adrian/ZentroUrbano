@@ -5,7 +5,20 @@ import sharp from "sharp";
 import { getPublicationCosts } from "../src/lib/publication-costs";
 import { getGoogleMapsDirectionsUrl, MAP_MAX_NATIVE_ZOOM, MAP_MAX_ZOOM, MAP_TILE_PROVIDERS } from "../src/lib/map-config";
 import robots from "../src/app/robots";
-import { formatPriceInCurrency, getPropertyPriceInCurrency, getPropertyExchangeRate, parsePropertyExchangeRate } from "../src/lib/currency";
+import { formatPriceInCurrency, getPropertyPriceInCurrency, getPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "../src/lib/currency";
+
+test("money inputs preserve thousands and distinguish decimal cents", () => {
+  for (const value of ["3400", "3.400", "3,400", "3 400", "3\u00a0400", 3400]) assert.equal(parseCurrencyAmount(value),3400,String(value));
+  for (const value of ["3400,50", "3400.50", "3.400,50", "3,400.50", "3 400,50"]) assert.equal(parseCurrencyAmount(value),3400.5,String(value));
+  assert.equal(parseCurrencyAmount("1.234.567,89"),1234567.89);
+  assert.equal(parseCurrencyAmount("3.4"),3.4);
+  assert.equal(parseCurrencyAmount(3.4),3.4);
+  assert.equal(parseCurrencyAmount("0"),0);
+  for (const value of ["", " ", "3.40.0", "3,4,00", "1e3", "0x100", "3.400foo", "Bs 3.400", "-3400", -1, Infinity, NaN, null, undefined, true, {}, []]) assert.equal(parseCurrencyAmount(value),null,String(value));
+  assert.deepEqual(getPublicationCosts({price:"3.400",commonExpenses:"0",guarantee:"1 mes de alquiler",guaranteeAmount:""}),{monthly:3400,deposit:3400,entry:6800});
+  assert.equal(getPublicationCosts({price:"3.400",commonExpenses:"200,50",guarantee:"Otro monto",guaranteeAmount:"1.500"}).entry,5100.5);
+  assert.equal(formatPriceInCurrency({price:3400,currency:"BOB",operation:"Alquiler"},"BOB"),"Bs 3.400/mes");
+});
 
 test("family illustration is static, transparent and sharp at 3x its largest display size", async () => {
   const image = await readFile(new URL("../public/images/family-rental/family-scene-v2.webp", import.meta.url));
