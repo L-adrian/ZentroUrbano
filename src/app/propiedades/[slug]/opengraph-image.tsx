@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { getPropertyBySlugData } from "@/lib/property-data";
 import type { Property } from "@/lib/properties";
 
+export const dynamic = "force-dynamic";
+
 export const alt = "Vivienda en alquiler directo en Zentro Urbano";
 
 export const size = {

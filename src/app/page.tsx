@@ -9,6 +9,8 @@ import { getPublishedPropertiesData } from "@/lib/property-data";
 import { getDirectRentals, getRentalZones } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = buildSeoMetadata({
   title: "Alquileres directos en Santa Cruz",
   description: "Casas, departamentos y monoambientes en alquiler. Contacta directamente al propietario, sin intermediarios ni comisiones.",

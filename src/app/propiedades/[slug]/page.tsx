@@ -32,7 +32,6 @@ import { toSafeMobileImageUrl } from "@/components/safe-mobile-image";
 import type { Property } from "@/lib/properties";
 import {
   getPropertyBySlugData,
-  getPublishedPropertiesData,
   getSimilarPropertiesData,
 } from "@/lib/property-data";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -40,13 +39,8 @@ import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
 
-export async function generateStaticParams() {
-  const properties = await getPublishedPropertiesData();
-
-  return properties.filter(isDirectRental).map((property) => ({
-    slug: property.slug,
-  }));
-}
+// Prices and availability must not survive edits in an external CDN cache.
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

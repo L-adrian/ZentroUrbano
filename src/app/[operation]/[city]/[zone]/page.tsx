@@ -2,15 +2,10 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import {
-  filterPropertiesBySeoRoute,
-  getOperationSeoRoutes,
-} from "@/lib/seo-routes";
+import { filterPropertiesBySeoRoute } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
 
-export async function generateStaticParams() {
-  return getOperationSeoRoutes(await getPublishedPropertiesData());
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,

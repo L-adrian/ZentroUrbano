@@ -174,6 +174,28 @@ test("admin price corrections are scoped, transactional, audited and preserve th
   assert.equal(await count("publication_review_audit","request_id=? AND decision='price_corrected'",[requestId]),1);
 });
 
+test("public price responses cannot be cached and read subsequent database edits immediately",options,async()=>{
+  const routes=["/","/bienvenida","/mapa","/propiedades","/departamentos/urbari","/alquiler/santa-cruz/urbari",`/propiedades/${slug}`];
+  for (const route of routes) {
+    const response=await fetch(`${base}${route}`);
+    assert.equal(response.status,200,route);
+    assert.match(response.headers.get("cache-control") || "",/no-store/,route);
+    await response.text();
+  }
+  const url=`${base}/propiedades/${slug}`;
+  assert.match(await (await fetch(url)).text(),/\$us 3\.400\/mes/);
+  await connection.execute("UPDATE properties SET price=3456 WHERE slug=?",[slug]);
+  try {
+    const html=await fetch(url);
+    assert.match(await html.text(),/\$us 3\.456\/mes/);
+    const navigation=await fetch(url,{headers:{RSC:"1"}});
+    assert.match(navigation.headers.get("cache-control") || "",/no-store/);
+    assert.match(await navigation.text(),/"price":3456/);
+  } finally {
+    await connection.execute("UPDATE properties SET price=3400 WHERE slug=?",[slug]);
+  }
+});
+
 test("owner edits persist in SQL; invalid prices and temporary media never overwrite the listing",options,async()=>{
   const [rows]=await connection.query<RowDataPacket[]>("SELECT * FROM properties WHERE slug=?",[slug]);const row=rows[0];
   const parse=(value:unknown)=>typeof value === "string" ? JSON.parse(value) : value;

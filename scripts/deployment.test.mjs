@@ -2,6 +2,26 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import test from "node:test";
+import ts from "typescript";
+
+test("public rental prices are rendered at request time, not cached as static HTML", () => {
+  const routes = [
+    "src/app/page.tsx", "src/app/bienvenida/page.tsx", "src/app/mapa/page.tsx",
+    "src/app/propiedades/(catalog)/page.tsx", "src/app/propiedades/[slug]/page.tsx",
+    "src/app/propiedades/[slug]/opengraph-image.tsx",
+    "src/app/departamentos/[zone]/page.tsx", "src/app/[operation]/[city]/[zone]/page.tsx",
+  ];
+  for (const path of routes) {
+    const file = ts.createSourceFile(path, readFileSync(path, "utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+    const config = file.statements.filter(ts.isVariableStatement)
+      .filter(statement => statement.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword))
+      .flatMap(statement => statement.declarationList.declarations)
+      .find(declaration => ts.isIdentifier(declaration.name) && declaration.name.text === "dynamic");
+    assert.ok(config?.initializer && ts.isStringLiteral(config.initializer), `Missing dynamic policy: ${path}`);
+    assert.equal(config.initializer.text, "force-dynamic", path);
+    assert.ok(!file.statements.some(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "generateStaticParams"), path);
+  }
+});
 
 test("npm deployment is locked, includes build tools and does not require pnpm", () => {
   const pkg = JSON.parse(readFileSync("package.json", "utf8"));

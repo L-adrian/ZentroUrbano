@@ -14,6 +14,8 @@ import { buildSeoMetadata } from "@/lib/seo";
 import { rentalFaq } from "@/lib/support-content";
 import "./welcome.css";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = buildSeoMetadata({
   title: "Bienvenido | Alquiler directo con el propietario",
   description: "Encuentra tu próximo hogar en Santa Cruz. Casas, departamentos y monoambientes en alquiler directo con su propietario. Sin inmobiliarias ni comisión de intermediación.",

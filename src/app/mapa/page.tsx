@@ -4,6 +4,8 @@ import { getPublishedPropertiesData } from "@/lib/property-data";
 import { getDirectRentals } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = buildSeoMetadata({
   title: "Mapa de alquileres directos",
   description:
