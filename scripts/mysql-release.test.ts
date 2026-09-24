@@ -156,6 +156,10 @@ test("each approved rental retires one demo permanently, including concurrent ap
   const [replacements]=await connection.execute<RowDataPacket[]>("SELECT demo_slug FROM demo_listing_replacements WHERE property_slug=?",[slug]);
   assert.equal(replacements.length,1);
   const retired=String(replacements[0].demo_slug);
+  const catalog=await (await fetch(`${base}/propiedades`)).text();
+  assert.ok(catalog.includes(`/propiedades/${slug}`),"The newly approved rental appears in the catalog");
+  const firstDemo=catalog.indexOf("/propiedades/demo-");
+  if(firstDemo>=0) assert.ok(catalog.indexOf(`/propiedades/${slug}`)<firstDemo,"Real rentals appear before remaining demos");
   for (const route of ["/","/propiedades","/mapa","/sitemap.xml"]) {
     assert.ok(!(await (await fetch(`${base}${route}`)).text()).includes(`/propiedades/${retired}`),route);
   }

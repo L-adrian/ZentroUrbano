@@ -217,6 +217,9 @@ function mergeProperties(primary: Property[], secondary: Property[]) {
 }
 
 function sortPropertiesByVisibility(a: Property, b: Property) {
+  const demoRank = Number(Boolean(a.isSeeded)) - Number(Boolean(b.isSeeded));
+  if (demoRank !== 0) return demoRank;
+
   const planRank = (a.listingPlan === "featured" ? 0 : 1) - (b.listingPlan === "featured" ? 0 : 1);
 
   if (planRank !== 0) {
