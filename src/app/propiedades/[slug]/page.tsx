@@ -325,8 +325,8 @@ function propertyQuickFacts(property: Property) {
   const costs = details ? getPublicationCosts({price:String(property.price),commonExpenses:String(details.commonExpenses),guarantee:details.guarantee,guaranteeAmount:details.guaranteeAmount === null ? "" : String(details.guaranteeAmount)}) : null;
   const facts = [
     {
-      label: "Dormitorios",
-      value: property.bedrooms > 0 ? property.bedrooms : "N/A",
+      label: details?.type === "Monoambiente" ? "Distribución" : "Dormitorios",
+      value: details?.type === "Monoambiente" ? "Monoambiente" : property.bedrooms > 0 ? property.bedrooms : "Consultar",
       icon: <BedDouble className="h-4 w-4" />,
     },
     hasKnownBathrooms(property)
@@ -338,12 +338,12 @@ function propertyQuickFacts(property: Property) {
       : getBathroomReplacementFact(property),
     {
       label: "Parqueo",
-      value: property.garage > 0 ? property.garage : "Sin garaje",
+      value: details?.parkingNote || (property.garage > 0 ? property.garage : "Sin garaje"),
       icon: <Car className="h-4 w-4" />,
     },
     {
       label: "Mascotas",
-      value: property.pets ? "Permitidas" : "Consultar",
+      value: property.pets ? "Permitidas" : details?.petsPolicy === "not_allowed" ? "No acepta" : "Consultar",
       icon: <PawPrint className="h-4 w-4" />,
     },
     {

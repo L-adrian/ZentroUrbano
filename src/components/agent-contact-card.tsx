@@ -81,13 +81,13 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
           </div>
         ) : (
           <div className="mt-4 grid gap-2 text-sm text-neutral-600">
-            <a
+            {agent.email && <a
               href={`mailto:${agent.email}`}
               className="flex min-w-0 items-center gap-2 border border-neutral-200 bg-white px-3 py-2 transition-colors hover:border-neutral-400 hover:text-neutral-950"
             >
               <Mail className="h-4 w-4 shrink-0 text-[#58745f]" aria-hidden="true" />
               <span className="truncate">{agent.email}</span>
-            </a>
+            </a>}
             <a
               href={`tel:${agent.phone.replace(/\s/g, "")}`}
               className="flex items-center gap-2 border border-neutral-200 bg-white px-3 py-2 transition-colors hover:border-neutral-400 hover:text-neutral-950"

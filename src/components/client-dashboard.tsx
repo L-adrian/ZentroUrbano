@@ -6,6 +6,7 @@ import {
   Edit3,
   Eye,
   LogOut,
+  LockKeyhole,
   MapPin,
   MessageCircle,
   Save,
@@ -30,6 +31,7 @@ import {
 } from "@/lib/demo-accounts";
 import { type Property, type PropertyType } from "@/lib/properties";
 import { getDirectRentals, rentalPropertyTypes } from "@/lib/rentals";
+import { getOwnerListingSuggestions } from "@/lib/owner-listing-suggestions";
 
 const sessionEventName = "morada-session";
 
@@ -247,13 +249,14 @@ function PropertyPerformanceCard({
   onSaveProperty: (property: Property) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const suggestions = getOwnerListingSuggestions(property);
 
   return (
     <>
       <article className="grid gap-4 rounded-[24px] border border-black/10 bg-neutral-50 p-3 sm:grid-cols-[170px_1fr] sm:p-4">
         <Link
           href={`/propiedades/${property.slug}`}
-          className="relative block aspect-[4/3] overflow-hidden rounded-[18px] bg-neutral-200 sm:aspect-auto sm:min-h-[150px]"
+          className="relative block aspect-[4/3] self-start overflow-hidden rounded-[18px] bg-neutral-200"
         >
           <Image
             src={property.images[0]}
@@ -316,7 +319,7 @@ function PropertyPerformanceCard({
           </div>
 
           {performance ? (
-            <div className="grid gap-3 md:grid-cols-[1fr_220px]">
+            <div className="grid gap-3">
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <SmallMetric label="Vistas" value={performance.views} />
                 <SmallMetric label="Mapa" value={performance.mapViews} />
@@ -327,7 +330,12 @@ function PropertyPerformanceCard({
             </div>
           ) : null}
 
-          {performance ? (
+          {suggestions.length > 0 ? (
+            <section className="owner-listing-tips" aria-label="Sugerencias privadas para esta ficha">
+              <h3><LockKeyhole size={15} aria-hidden="true" />Mejora tu anuncio <span>Solo visible para ti</span></h3>
+              <ul>{suggestions.map(suggestion => <li key={suggestion}>{suggestion}</li>)}</ul>
+            </section>
+          ) : performance ? (
             <p className="rounded-[18px] bg-white p-3 text-sm leading-6 text-neutral-600 ring-1 ring-black/10">
               <span className="font-semibold text-neutral-950">Sugerencia:</span>{" "}
               {performance.recommendation}
@@ -389,13 +397,11 @@ function PropertyEditModal({
   }
 
   function updateCoordinate(field: "lat" | "lng", value: number) {
-    setDraft((current) => ({
-      ...current,
-      coordinates: {
-        ...current.coordinates,
-        [field]: value,
-      },
-    }));
+    setDraft((current) => {
+      const coordinates = { ...current.coordinates, [field]: value };
+      return { ...current, coordinates,
+        mapUrl: `https://www.google.com/maps/search/?api=1&query=${coordinates.lat},${coordinates.lng}` };
+    });
   }
 
   function handleImageUpload(event: ChangeEvent<HTMLInputElement>) {
@@ -558,7 +564,9 @@ function PropertyEditModal({
                 value={draft.coordinates.lat}
                 onChange={(event) => updateCoordinate("lat", Number(event.target.value))}
                 type="number"
-                step="0.000001"
+                step="any"
+                min="-90"
+                max="90"
                 className={inputClassName}
               />
             </EditorField>
@@ -567,7 +575,9 @@ function PropertyEditModal({
                 value={draft.coordinates.lng}
                 onChange={(event) => updateCoordinate("lng", Number(event.target.value))}
                 type="number"
-                step="0.000001"
+                step="any"
+                min="-180"
+                max="180"
                 className={inputClassName}
               />
             </EditorField>

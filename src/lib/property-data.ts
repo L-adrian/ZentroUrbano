@@ -10,6 +10,7 @@ import {
 import { hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { isDirectRental } from "@/lib/rentals";
 import { parsePropertyExchangeRate } from "@/lib/currency";
+import { getRetiredDemoSlugs } from "@/lib/demo-replacements";
 
 export type PropertyRow = {
   id: string;
@@ -67,10 +68,12 @@ export async function getPublishedPropertiesData() {
 
     const storedProperties = data ? data.map(mapPropertyRow) : publishedProperties;
 
+    const retired = await getRetiredDemoSlugs();
     return mergeProperties(directRentalDemoProperties, storedProperties)
-      .filter(isDirectRental)
+      .filter(property => !retired.has(property.slug) && isDirectRental(property))
       .sort(sortPropertiesByVisibility);
   } catch {
+    if (hasDatabaseConfig()) return [];
     return mergeProperties(
       directRentalDemoProperties,
       hasDatabaseConfig() ? [] : publishedProperties,
@@ -84,6 +87,7 @@ export async function getPropertyBySlugData(slug: string) {
   const fallback = candidate && isDirectRental(candidate) ? candidate : undefined;
 
   try {
+    if (demoFallback && (await getRetiredDemoSlugs()).has(slug)) return undefined;
     const data = await queryOne<PropertyRow>(
       "select * from properties where slug = :slug and published = 1 limit 1",
       { slug },
@@ -100,7 +104,7 @@ export async function getPropertyBySlugData(slug: string) {
     const property = mapPropertyRow(data);
     return isDirectRental(property) ? property : undefined;
   } catch {
-    return demoFallback ?? (hasDatabaseConfig() ? undefined : fallback);
+    return hasDatabaseConfig() ? undefined : fallback;
   }
 }
 

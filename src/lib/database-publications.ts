@@ -6,6 +6,7 @@ import { queryOne, queryRows, withTransaction } from "@/lib/mysql";
 import { parsePublicationDetails, type PublicationDetails } from "@/lib/publication-input";
 import type { PublicationRequest } from "@/lib/publication-requests";
 import { parseCurrencyAmount } from "@/lib/currency";
+import { replaceDemoForPublication } from "@/lib/demo-replacements";
 
 export class PublicationError extends Error {
   constructor(public status:number,message:string) { super(message); }
@@ -85,6 +86,7 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
       const values=[`prop_${randomUUID().replaceAll("-","")}`,slug,details.title,details.type === "Casa" ? "Casa" : "Departamento","Alquiler",details.price,details.currency,details.exchangeRate,"Santa Cruz de la Sierra",details.zone,details.address,details.bedrooms ?? 0,details.bathrooms ?? 0,details.garage,details.area ?? 0,details.pets,details.furnished,details.security,details.pool,details.patio,details.grill,details.elevator,details.description.slice(0,240),details.description,JSON.stringify(requirements),JSON.stringify(images),record.whatsapp,"[]",JSON.stringify(details.type === "Monoambiente" ? ["Monoambiente"] : []),JSON.stringify({lat,lng}),"[]",true,new Date(),JSON.stringify(profile),JSON.stringify(details)];
       await connection.execute(`INSERT INTO properties (${columns.join(",")}) VALUES (${columns.map(()=>"?").join(",")})`,values);
       await connection.execute("INSERT INTO client_account_properties (id,account_id,property_slug,status) VALUES (?,?,?,'active')",[`cap_${randomUUID().replaceAll("-","")}`,record.accountId,slug]);
+      await replaceDemoForPublication(connection, slug);
     }
     const status=decision === "approve" ? "approved" : "rejected";
     await connection.execute("UPDATE publication_requests SET status=?,property_slug=?,reviewed_by=?,review_reason=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",[status,slug,admin,reason,id]);

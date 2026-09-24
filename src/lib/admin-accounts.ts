@@ -115,7 +115,7 @@ export async function getAdminAccountsOverview() {
           ca.kind,
           ca.display_name,
           ca.company_name,
-          ca.email,
+          coalesce(ca.email, '') as email,
           ca.phone,
           ca.avatar_initials,
           ca.avatar_url,

@@ -42,9 +42,12 @@ export async function registerDatabaseOwner(input: RegisterInput) {
   }
 }
 
-export async function loginDatabasePassword(email: string, password: string) {
+export async function loginDatabasePassword(identifier: string, password: string) {
+  const login = identifier.trim().toLowerCase();
+  const emailLogin = login.includes("@");
+  if (!login || login.length > 190 || (!emailLogin && !/^[a-z0-9][a-z0-9._-]{2,79}$/.test(login)) || !password || Buffer.byteLength(password) > 72) return denied();
   try {
-    const user = await queryOne<{id:string;account_id:string;password_hash:string|null;status:string}>("SELECT id,account_id,password_hash,status FROM morada_users WHERE email=:email",{email:email.trim().toLowerCase()});
+    const user = await queryOne<{id:string;account_id:string;password_hash:string|null;status:string}>(`SELECT id,account_id,password_hash,status FROM morada_users WHERE ${emailLogin ? "email" : "username"}=:login`,{login});
     if (!user || user.status !== "active" || !user.password_hash || !await bcrypt.compare(password,user.password_hash)) return denied();
     return await withTransaction(async connection => {
       const [rows] = await connection.execute<RowDataPacket[]>("SELECT u.status FROM morada_users u JOIN client_accounts a ON a.id=u.account_id WHERE u.id=? AND a.status='active' AND u.status='active' FOR UPDATE",[user.id]);

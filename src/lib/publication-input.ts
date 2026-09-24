@@ -1,6 +1,8 @@
 import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 
 export type PublicationDetails = {
+  petsPolicy?: "allowed" | "not_allowed" | "consult";
+  parkingNote?:string; mediaNote?:string;
   title:string; type:"Casa"|"Departamento"|"Monoambiente"; zone:string; address:string;
   bedrooms:number|null; bathrooms:number|null; garage:number; area:number|null;
   pets:boolean; furnished:boolean; security:boolean; pool:boolean; patio:boolean; grill:boolean; elevator:boolean;
@@ -65,9 +67,13 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
     }
   }
   const flags=["pets","furnished","security","pool","patio","grill","elevator"] as const;
+  if (input.petsPolicy != null && !["allowed","not_allowed","consult"].includes(String(input.petsPolicy))) fieldErrors.pets = "Selecciona una condición válida para mascotas.";
   if (flags.some(key=>typeof input[key] !== "boolean")) fieldErrors.details = "Revisa las características de la vivienda en el paso Información.";
   if (Object.keys(fieldErrors).length || price === null || commonExpenses === null || garage === null) return { details: null, fieldErrors };
   return {fieldErrors,details:{title,type:input.type as PublicationDetails["type"],zone,address,description,price,currency:input.currency as "BOB"|"USD",exchangeRate,
+    ...(input.petsPolicy != null ? {petsPolicy: input.petsPolicy as PublicationDetails["petsPolicy"]} : {}),
+    ...(text("parkingNote",120) ? {parkingNote:text("parkingNote",120)} : {}),
+    ...(text("mediaNote",500) ? {mediaNote:text("mediaNote",500)} : {}),
     bedrooms:number("bedrooms",100,true),bathrooms:number("bathrooms",100,true),area:number("area",1_000_000,true),garage,commonExpenses,guarantee,guaranteeAmount,
     pets:input.pets as boolean,furnished:input.furnished as boolean,security:input.security as boolean,pool:input.pool as boolean,patio:input.patio as boolean,grill:input.grill as boolean,elevator:input.elevator as boolean}};
 }

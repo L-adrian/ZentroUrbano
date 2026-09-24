@@ -288,7 +288,7 @@ export async function getCurrentAccount() {
 
   try {
     const row = await queryOne<AccountRow>(
-      `select ca.id, ca.kind, ca.display_name, ca.company_name, ca.email, ca.phone,
+      `select ca.id, ca.kind, ca.display_name, ca.company_name, coalesce(ca.email, '') as email, ca.phone,
               ca.avatar_initials, ca.avatar_url, ca.role_label, ca.location
          from morada_sessions s
          join client_accounts ca on ca.id = s.account_id

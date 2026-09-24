@@ -4,6 +4,7 @@ import { executeQuery, hasDatabaseConfig, queryOne } from "@/lib/mysql";
 import { isRentalPropertyType } from "@/lib/rentals";
 import { isDisplayCurrency, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import { revalidatePath } from "next/cache";
+import { getPropertyVideoUrl } from "@/lib/property-video";
 
 export async function PATCH(
   request: NextRequest,
@@ -53,7 +54,7 @@ export async function PATCH(
     counts.some(value=>!Number.isInteger(value) || value<0 || value>1_000_000) ||
     typeof coordinates?.lat !== "number" || typeof coordinates.lng !== "number" || !Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng) || Math.abs(coordinates.lat)>90 || Math.abs(coordinates.lng)>180 ||
     !Array.isArray(payload.images) || !payload.images.length || payload.images.length>15 || payload.images.some(value=>typeof value !== "string" || !/^(\/images\/|\/media\/propiedades\/|https:\/\/)/.test(value)) ||
-    (typeof payload.video === "string" && payload.video && !payload.video.startsWith("https://"))) {
+    (payload.video != null && payload.video !== "" && !getPropertyVideoUrl(payload.video))) {
     return NextResponse.json({ok:false,stored:false,message:"Revisa precio, medidas y ubicación. Las fotos o videos deben tener una URL permanente; los archivos nuevos requieren una nueva solicitud."},{status:400});
   }
 

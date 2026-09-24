@@ -7,6 +7,8 @@ import {
 import { absoluteUrl } from "@/lib/site";
 import { getDirectRentals } from "@/lib/rentals";
 
+export const dynamic = "force-dynamic";
+
 const staticRoutes = [
   "/",
   "/bienvenida",

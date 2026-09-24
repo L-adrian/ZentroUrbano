@@ -14,9 +14,11 @@ try {
     await applyMigrations(connection);
   }
   const [tables]=await connection.query("SELECT table_name AS name,engine FROM information_schema.tables WHERE table_schema=DATABASE()");
-  const required=["client_accounts","morada_users","morada_sessions","properties","client_account_properties","publication_requests","publication_photos","publication_review_audit"];
+  const required=["client_accounts","morada_users","morada_sessions","properties","client_account_properties","publication_requests","publication_photos","publication_review_audit","demo_listing_replacements"];
   const missing=required.filter(name=>!tables.some(table=>table.name === name && table.engine === "InnoDB"));
   if (missing.length) throw new Error(`Tablas pendientes o sin transacciones InnoDB: ${missing.join(", ")}. Ejecuta db:migrate.`);
+  const [usernameColumns]=await connection.query("SHOW COLUMNS FROM morada_users LIKE 'username'");
+  if (!usernameColumns.length) throw new Error("Falta la migracion de usuarios de propietarios. Ejecuta db:migrate.");
   const [[settings]]=await connection.query("SELECT @@max_allowed_packet AS maxPacket,VERSION() AS version");
   if (Number(settings.maxPacket) < 12*1024*1024) throw new Error("max_allowed_packet debe ser al menos 12 MB para fotos originales de 10 MB. Solicita el ajuste antes de habilitar cargas.");
   console.log(JSON.stringify({ok:true,database,version:settings.version,transactionalTables:required.length,maxPacketMB:Number(settings.maxPacket)/1024/1024}));

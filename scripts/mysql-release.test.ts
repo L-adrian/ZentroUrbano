@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import path from "node:path";
 import mysql,{type RowDataPacket} from "mysql2/promise";
 import sharp from "sharp";
+import bcrypt from "bcryptjs";
 import { createUploadPhotoFixtures } from "./fixtures/upload-photos";
 
 const enabled=Boolean(process.env.QA_MYSQL_URL);
@@ -66,6 +67,25 @@ test("MySQL Google login reuses the password account without creating a shadow i
   assert.equal(result.status,307);assert.equal(result.headers.get("location"),`${base}/publicar`);
   assert.equal(await count("morada_users","email=?",[email]),1);assert.equal(await count("client_accounts","email=?",[email]),1);
   assert.equal((await fetch(`${base}/api/auth/login`,json({email,password}))).status,200);
+});
+
+test("provisioned owners can use a unique username without an email; disabled accounts remain blocked",options,async()=>{
+  const suffix=randomUUID().replaceAll("-","");
+  const owner=`acct_username_${suffix}`,user=`user_username_${suffix}`,username=`owner_${suffix}`;
+  await connection.execute("INSERT INTO client_accounts (id,kind,display_name,email,avatar_initials,role_label) VALUES (?,'owner','Owner without email',NULL,'OW','Propietario')",[owner]);
+  await connection.execute("INSERT INTO morada_users (id,account_id,email,username,password_hash) VALUES (?,?,NULL,?,?)",[user,owner,username,await bcrypt.hash(password,12)]);
+  const login=await fetch(`${base}/api/auth/login`,json({email:` ${username.toUpperCase()} `,password}));
+  assert.equal(login.status,200);assert.equal((await login.json()).accountId,owner);
+  const ownCookie=login.headers.get("set-cookie")!.split(";")[0];
+  assert.equal((await fetch(`${base}/cliente`,{headers:{cookie:ownCookie},redirect:"manual"})).status,200);
+  assert.equal((await fetch(`${base}/api/auth/login`,json({email:username,password:"wrong-password"}))).status,401);
+  assert.equal((await fetch(`${base}/api/auth/login`,json({email:"",password}))).status,401);
+  await assert.rejects(connection.execute("INSERT INTO morada_users (id,account_id,email,username) VALUES (?,?,NULL,?)",[`duplicate_${suffix}`,owner,username]),{code:"ER_DUP_ENTRY"});
+  await connection.execute("UPDATE client_accounts SET status='disabled' WHERE id=?",[owner]);
+  assert.equal((await fetch(`${base}/api/auth/login`,json({email:username,password}))).status,401);
+  await connection.execute("UPDATE client_accounts SET status='active' WHERE id=?",[owner]);
+  await connection.execute("UPDATE morada_users SET status='disabled' WHERE id=?",[user]);
+  assert.equal((await fetch(`${base}/api/auth/login`,json({email:username,password}))).status,401);
 });
 
 test("publication API identifies blank expenses, invalid phones and request keys separately",options,async()=>{
@@ -130,6 +150,28 @@ test("concurrent manual approval publishes exactly one direct-owner listing and 
   const page=await fetch(`${base}/propiedades/${slug}`);assert.equal(page.status,200);const html=await page.text();assert.match(html,/Departamento transaccional QA/);assert.match(html,/Propietario QA/);
   const image=await fetch(`${base}/media/propiedades/${requestId}/01.jpg`);assert.equal(image.status,200);assert.equal(image.headers.get("content-type"),"image/webp");const metadata=await sharp(Buffer.from(await image.arrayBuffer())).metadata();assert.equal(metadata.format,"webp");assert.equal(metadata.exif,undefined);
   assert.match(await (await fetch(`${base}/cliente`,{headers:{cookie}})).text(),new RegExp(slug));
+});
+
+test("each approved rental retires one demo permanently, including concurrent approvals",options,async()=>{
+  const [replacements]=await connection.execute<RowDataPacket[]>("SELECT demo_slug FROM demo_listing_replacements WHERE property_slug=?",[slug]);
+  assert.equal(replacements.length,1);
+  const retired=String(replacements[0].demo_slug);
+  for (const route of ["/","/propiedades","/mapa","/sitemap.xml"]) {
+    assert.ok(!(await (await fetch(`${base}${route}`)).text()).includes(`/propiedades/${retired}`),route);
+  }
+  assert.equal((await fetch(`${base}/propiedades/${retired}`)).status,404);
+  const contact=await fetch(`${base}/api/propiedades/${retired}/whatsapp`,{redirect:"manual"});
+  assert.equal(contact.status,307);assert.equal(new URL(contact.headers.get("location")!).pathname,"/propiedades");
+  await connection.execute("UPDATE properties SET published=0 WHERE slug=?",[slug]);
+  try {assert.equal((await fetch(`${base}/propiedades/${retired}`)).status,404);}
+  finally {await connection.execute("UPDATE properties SET published=1 WHERE slug=?",[slug]);}
+  const ids=[];
+  for (let i=0;i<2;i++) ids.push((await (await submit()).json()).requestId);
+  const approved=await Promise.all(ids.map(id=>decision(id,{decision:"approve",confirmed:true,latitude:-17.78,longitude:-63.19})));
+  assert.deepEqual(approved.map(response=>response.status),[200,200]);
+  const slugs=await Promise.all(approved.map(async response=>(await response.json()).slug));
+  const [added]=await connection.query<RowDataPacket[]>("SELECT demo_slug FROM demo_listing_replacements WHERE property_slug IN (?)",[slugs]);
+  assert.equal(added.length,2);assert.equal(new Set(added.map(row=>row.demo_slug)).size,2);
 });
 
 test("rejection requires a reason, stays private and is visible only to its owner",options,async()=>{
@@ -211,6 +253,15 @@ test("owner edits persist in SQL; invalid prices and temporary media never overw
   assert.equal(parse(updated.rental_details).price,4500);
   assert.equal((await edit({...body,price:"4.50.0"})).status,400);
   assert.equal((await edit({...body,currency:"BOB"})).status,400);
+  const coordinates={lat:-17.7270093,lng:-63.1385327};
+  assert.equal((await edit({...body,coordinates,video:"/videos/properties/espiritu-santo.mp4"})).status,200);
+  const [[media]]=await connection.query<RowDataPacket[]>("SELECT coordinates,video FROM properties WHERE slug=?",[slug]);
+  assert.deepEqual(parse(media.coordinates),coordinates);
+  assert.equal(media.video,"/videos/properties/espiritu-santo.mp4");
+  for (const video of ["blob:temporary","//example.invalid/video.mp4","javascript:alert(1)",{},true]) {
+    assert.equal((await edit({...body,video})).status,400);
+  }
+  assert.equal(await count("properties","slug=? AND video=?",[slug,"/videos/properties/espiritu-santo.mp4"]),1);
 });
 
 test("server restart preserves accounts, sessions, approvals and photos without filesystem state",options,async()=>{

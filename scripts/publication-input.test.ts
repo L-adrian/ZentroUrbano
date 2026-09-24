@@ -1,10 +1,25 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getPublicationContactErrors, getPublicationStepErrors, normalizePublicationPhone, parsePublicationDetails, publicationFieldStep, validatePublicationDetails } from "../src/lib/publication-input";
+import { getOwnerListingSuggestions } from "../src/lib/owner-listing-suggestions";
+import { directRentalDemoProperties } from "../src/lib/direct-rental-demo";
 
 const valid={title:"Departamento en alquiler",type:"Monoambiente",zone:"Centro",address:"Dirección referencial",bedrooms:"1",bathrooms:"",area:"",garage:"0",pets:false,furnished:true,security:true,pool:false,patio:false,grill:false,elevator:true,price:"350",currency:"USD",exchangeRate:"8.5",commonExpenses:"0",guarantee:"Otro monto",guaranteeAmount:"200",description:"Monoambiente equipado con cocina y lavandería para alquiler directo."};
 test("publication schema preserves unknown fields, currency and explicit zero values",()=>{
   const result=parsePublicationDetails(valid);assert.ok(result);assert.equal(result.bathrooms,null);assert.equal(result.area,null);assert.equal(result.commonExpenses,0);assert.equal(result.garage,0);assert.equal(result.exchangeRate,8.5);assert.equal(result.guaranteeAmount,200);
+});
+test("confirmed pet restrictions differ from unknown information",()=>{
+  assert.equal(parsePublicationDetails({...valid,petsPolicy:"not_allowed"})?.petsPolicy,"not_allowed");
+  assert.equal(parsePublicationDetails(valid)?.petsPolicy,undefined);
+  assert.equal(parsePublicationDetails({...valid,petsPolicy:"made-up"}),null);
+});
+test("owner suggestions count unique photos and disappear when missing information is completed",()=>{
+  const details=parsePublicationDetails({...valid,petsPolicy:"consult",guarantee:"Consultar con el propietario"})!;
+  const property={...directRentalDemoProperties[0],images:["/a.jpg","/b.jpg","/c.jpg"],area:0,bathrooms:0,pets:false,rentalDetails:details};
+  const tips=getOwnerListingSuggestions(property);
+  assert.equal(tips.length,5);assert.match(tips[0],/Tienes 3 fotos.*Añade 2 más/);
+  assert.equal(getOwnerListingSuggestions({...property,images:[...property.images,"/a.jpg"]})[0],tips[0]);
+  assert.deepEqual(getOwnerListingSuggestions({...property,images:["/a.jpg","/b.jpg","/c.jpg","/d.jpg","/e.jpg"],area:40,bathrooms:1,rentalDetails:{...details,guarantee:"1 mes de alquiler",petsPolicy:"not_allowed"}}),[]);
 });
 test("publication schema rejects malformed costs, coordinates-independent facts and boolean spoofing",()=>{
   for(const patch of [{price:-1},{price:"Infinity"},{exchangeRate:0},{commonExpenses:-2},{bedrooms:1.5},{garage:"unknown"},{pets:"true"},{type:"Terreno"},{guaranteeAmount:""},{description:"short"}]) assert.equal(parsePublicationDetails({...valid,...patch}),null,JSON.stringify(patch));
