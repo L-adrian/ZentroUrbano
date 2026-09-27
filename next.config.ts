@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.*.*"],
   devIndicators: false,
+  experimental: {
+    // The admin importer accepts two SPZ scenes plus a small manifest.
+    proxyClientMaxBodySize: 21 * 1024 * 1024,
+  },
   async redirects() {
     return [
       {
