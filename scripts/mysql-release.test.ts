@@ -42,7 +42,7 @@ async function startServer() {
 async function stopServer() {if (server && server.exitCode === null && server.signalCode === null) {const stopped=new Promise<void>(resolve=>server.once("exit",()=>resolve()));server.kill();await stopped;}}
 after(async()=>{await stopServer(); if (connection) await connection.end();});
 const json=(body:unknown,extra:Record<string,string>={})=>({method:"POST",headers:{"content-type":"application/json",cookie,...extra},body:JSON.stringify(body)});
-async function submit(key=randomUUID(),count=5,changes:Record<string,unknown>={}) {
+async function submit(key:string=randomUUID(),count=5,changes:Record<string,unknown>={}) {
   const form=new FormData();form.set("payload",JSON.stringify({operation:"Alquiler",propertyType:"Departamento",publisherKind:"owner",ownerConfirmed:true,contactName:"Propietario QA",whatsapp:"75000000",sourceText:details.description,currency:"USD",exchangeRate:8.5,details,accountId:"forged",...changes}));
   for(const photo of await createUploadPhotoFixtures(count)) form.append("photos",photo);
   return fetch(`${base}/api/publication-requests`,{method:"POST",headers:{cookie,"idempotency-key":key},body:form});

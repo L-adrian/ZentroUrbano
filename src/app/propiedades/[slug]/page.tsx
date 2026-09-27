@@ -39,6 +39,7 @@ import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
+import { publishedTour } from "@/lib/property-tours";
 
 // Prices and availability must not survive edits in an external CDN cache.
 export const dynamic = "force-dynamic";
@@ -111,6 +112,7 @@ export default async function PropertyDetailPage({
   };
 
   const similarProperties = await getSimilarPropertiesData(property);
+  const tour = await publishedTour(property.slug);
 
   return (
     <main id="contenido" className="property-detail bg-white pb-24 lg:pb-0">
@@ -149,7 +151,7 @@ export default async function PropertyDetailPage({
             </div>
           </div>
 
-          <PropertyGallery property={property} />
+          <PropertyGallery property={property} tour={tour} />
         </div>
       </section>
 

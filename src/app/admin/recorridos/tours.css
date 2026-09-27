@@ -1,0 +1,20 @@
+.admin-tours-page { padding-block: 32px 60px; }
+.admin-tours-page>header { margin-block: 24px; }
+.admin-tours-page h1 { font-size: 28px; font-weight: 650; }
+.admin-tours-page p { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.admin-tour-row { border-block-start: 1px solid var(--line); padding-block: 24px; }
+.admin-tour-row h2 { font-size: 18px; font-weight: 650; }
+.admin-tour-metrics { display: flex; flex-wrap: wrap; gap: 16px 32px; margin-block: 14px; }
+.admin-tour-metrics dt { font-size: 12px; color: var(--muted); }
+.admin-tour-metrics dd { font-size: 22px; font-weight: 650; }
+.admin-tour-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.admin-tour-actions label { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.admin-tour-actions input { width: 18px; height: 18px; flex: 0 0 18px; }
+.admin-tour-upload { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 20px; }
+.admin-tour-upload summary { cursor: pointer; font-weight: 650; }
+.admin-tour-upload form { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; margin-top: 20px; }
+.admin-tour-upload label { display: grid; gap: 6px; font-size: 13px; }
+.admin-tour-upload input, .admin-tour-upload select { width: 100%; min-width: 0; padding: 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.admin-tour-upload p { grid-column: 1/-1; }
+.admin-tour-upload button { justify-self: start; }
+@media (max-width: 650px) { .admin-tour-upload form { grid-template-columns: 1fr; }.admin-tour-actions { align-items: flex-start; flex-direction: column; } }

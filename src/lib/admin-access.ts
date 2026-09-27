@@ -20,10 +20,10 @@ export function authenticatedAdmin(headers:Headers):string|null {
   } catch { return null; }
 }
 
-export function sameOriginAdminMutation(request:Request) {
+export function sameOriginAdminMutation(request:Request, contentType = "application/json") {
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin=request.headers.get("origin");
   const host=(request.headers.get("x-forwarded-host") || request.headers.get("host") || new URL(request.url).host).split(",")[0].trim();
   const protocol=(request.headers.get("x-forwarded-proto") || new URL(request.url).protocol.replace(":","")).split(",")[0].trim();
-  return origin === `${protocol}://${host}` && request.headers.get("content-type")?.split(";")[0] === "application/json";
+  return origin === `${protocol}://${host}` && request.headers.get("content-type")?.split(";")[0] === contentType;
 }

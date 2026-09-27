@@ -34,7 +34,7 @@ test("npm deployment is locked, includes build tools and does not require pnpm",
   assert.equal(existsSync("pnpm-lock.yaml"), false);
   assert.equal(existsSync("pnpm-workspace.yaml"), false);
   assert.match(readFileSync(".npmrc", "utf8"), /^include=dev\s*$/m);
-  assert.equal(pkg.overrides.postcss, "8.5.14");
+  assert.equal(pkg.overrides.postcss, "8.5.23");
   for (const [name, entry] of Object.entries(lock.packages)) {
     if (name === "node_modules/postcss" || name.endsWith("/node_modules/postcss")) {
       assert.equal(entry.version, pkg.overrides.postcss);

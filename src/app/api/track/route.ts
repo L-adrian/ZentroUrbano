@@ -8,6 +8,10 @@ const allowedEvents = new Set<TrackingEventType>([
   "property_share_click",
   "property_map_view",
   "property_gallery_open",
+  "property_tour_open",
+  "property_tour_ready",
+  "property_tour_error",
+  "property_tour_whatsapp_click",
   "ad_impression",
   "ad_click",
 ]);

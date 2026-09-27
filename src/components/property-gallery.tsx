@@ -4,8 +4,10 @@ import { ChevronLeft, ChevronRight, Images, Play, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Property } from "@/lib/properties";
 import { getPropertyVideoUrl } from "@/lib/property-video";
+import { PropertyTourButton } from "@/components/property-tour";
+import type { PublicTour } from "@/lib/property-tour-contract";
 
-export function PropertyGallery({ property }: { property: Property }) {
+export function PropertyGallery({ property, tour }: { property: Property; tour?: PublicTour | null }) {
   const [active, setActive] = useState<number | null>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLElement | null>(null);
@@ -42,7 +44,7 @@ export function PropertyGallery({ property }: { property: Property }) {
       </button>
       {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><Image src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
     </div>}
-    {videoUrl && <div className="gallery-media-actions"><button type="button" className="zu-button zu-button-secondary" onClick={() => open(photoCount)}><Play size={16} aria-hidden="true" />Ver video</button></div>}
+    {(videoUrl || tour) && <div className="gallery-media-actions">{videoUrl && <button type="button" className="zu-button zu-button-secondary" onClick={() => open(photoCount)}><Play size={16} aria-hidden="true" />Ver video</button>}{tour && <PropertyTourButton tour={tour} />}</div>}
     {property.rentalDetails?.mediaNote && <p className="gallery-media-note">{property.rentalDetails.mediaNote}</p>}
     <dialog ref={dialog} className="gallery-dialog" onCancel={() => setActive(null)} onClose={() => setActive(null)} aria-modal="true" aria-label={`Galería: ${property.title}`} onKeyDown={event => {
       if (event.key === "Escape") { event.preventDefault(); setActive(null); }

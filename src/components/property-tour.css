@@ -1,0 +1,38 @@
+.gallery-media-actions { gap: 10px; flex-wrap: wrap; }
+.tour-beta { color: var(--muted); font-size: 10px; font-weight: 500; }
+.property-tour-dialog { position: fixed; inset: 0; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: 0; border: 0; color: var(--foreground); background: var(--surface); }
+.property-tour-dialog::backdrop { background: #161b19e6; }
+.tour-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.tour-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+.tour-heading h2 { font-size: 17px; line-height: 1.35; font-weight: 650; }
+.tour-heading span { color: var(--muted); font-size: 12px; }
+.tour-icon { width: 40px; height: 40px; flex: 0 0 40px; display: inline-flex; align-items: center; justify-content: center; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--foreground); cursor: pointer; }
+.tour-icon:disabled { opacity: .4; cursor: default; }
+.tour-toolbar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 16px; background: var(--subtle); }
+.tour-tabs { display: flex; gap: 4px; }
+.tour-tabs button { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; border-radius: 5px; padding: 8px 12px; font-size: 13px; border: 1px solid transparent; }
+.tour-tabs button[aria-pressed=true] { background: var(--surface); border-color: var(--line); color: var(--brand); }
+.tour-settings { display: flex; gap: 6px; align-items: center; }
+.tour-settings select { width: 125px; min-height: 38px; font-size: 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; padding: 5px; }
+.tour-canvas-area { position: relative; flex: 1; min-height: 120px; overflow: hidden; background: #242826; color: #fff; }
+.tour-scene-host, .tour-original { position: absolute; inset: 0; }
+.tour-scene-host canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.tour-original img { object-fit: contain; }
+.tour-loading, .tour-error { display: flex; position: absolute; inset: 0; align-items: center; justify-content: center; gap: 12px; font-size: 14px; background: #242826; color: #fff; }
+.tour-error { flex-direction: column; padding: 24px; text-align: center; }
+.tour-error>div { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.tour-shell>.tour-loading { position: relative; flex: 1; }
+.tour-movement { position: absolute; bottom: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.tour-movement>span { color: white; background: #202726d9; font-size: 12px; border-radius: 4px; }
+.tour-movement>span:not(:empty) { padding: 6px 10px; }
+.tour-movement>div, .tour-photo-paging { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 7px; background: var(--surface); color: var(--foreground); }
+.tour-photo-paging { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 13px; }
+.tour-photo-paging span { min-width: 42px; text-align: center; }
+.tour-disclaimer { display: flex; gap: 8px; align-items: flex-start; padding: 10px 20px; font-size: 12px; line-height: 1.5; border-bottom: 1px solid var(--line); background: var(--subtle); }
+.tour-disclaimer svg { flex-shrink: 0; color: var(--muted); margin-top: 1px; }
+.tour-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 20px max(10px, env(safe-area-inset-bottom)); }
+.tour-footer small { font-size: 11px; color: var(--muted); }
+.tour-spin { animation: tour-spin 1s linear infinite; }
+@keyframes tour-spin { to { transform: rotate(360deg); } }
+@media (max-width: 600px) { .tour-heading { padding: 10px 12px; }.tour-toolbar { padding: 6px 8px; }.tour-tabs button { padding-inline: 8px; font-size: 12px; }.tour-settings select { width: 98px; }.tour-settings .tour-icon { width: 36px; flex-basis: 36px; }.tour-disclaimer { padding: 8px 12px; font-size: 11px; }.tour-footer { padding-inline: 12px; }.tour-footer .zu-button { min-height: 40px; font-size: 12px; padding: 8px 10px; }.tour-movement { right: 10px; bottom: 10px; } }
+@media (prefers-reduced-motion: reduce) { .tour-spin { animation: none; } }
