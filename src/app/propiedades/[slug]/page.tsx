@@ -38,6 +38,7 @@ import { buildSeoMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
+import { getPropertyParkingLabel } from "@/lib/property-parking";
 
 // Prices and availability must not survive edits in an external CDN cache.
 export const dynamic = "force-dynamic";
@@ -338,7 +339,7 @@ function propertyQuickFacts(property: Property) {
       : getBathroomReplacementFact(property),
     {
       label: "Parqueo",
-      value: details?.parkingNote || (property.garage > 0 ? property.garage : "Sin garaje"),
+      value: getPropertyParkingLabel(property),
       icon: <Car className="h-4 w-4" />,
     },
     {
