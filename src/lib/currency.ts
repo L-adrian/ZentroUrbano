@@ -38,7 +38,7 @@ export function getPropertyExchangeRate(property: Pick<Property, "currency" | "e
     ? parsePropertyExchangeRate(property.exchangeRate) ?? currencyExchangeRateBobPerUsd
     : currencyExchangeRateBobPerUsd;
 }
-export const defaultDisplayCurrency: DisplayCurrency = "USD";
+export const defaultDisplayCurrency: DisplayCurrency = "BOB";
 export const currencyPreferenceStorageKey = "morada.displayCurrency";
 export const currencyPreferenceEventName = "morada-currency";
 
@@ -87,4 +87,19 @@ export function formatPriceInCurrency(
 
 export function getCurrencyLabel(currency: DisplayCurrency) {
   return currency === "USD" ? "$us" : "Bs";
+}
+
+export function formatExchangeRate(exchangeRate: number) {
+  const rate = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 4 }).format(exchangeRate);
+  return `1 USD = ${rate} Bs`;
+}
+
+export function getPropertyExchangeRateNote(
+  property: Pick<Property, "currency" | "exchangeRate">,
+  displayCurrency: DisplayCurrency,
+) {
+  if (property.currency === "BOB" && displayCurrency === "BOB") return null;
+  const ownerRate = property.currency === "USD" && parsePropertyExchangeRate(property.exchangeRate) !== null;
+  const source = ownerRate ? "del propietario" : "referencial";
+  return `T/C ${source}: ${formatExchangeRate(getPropertyExchangeRate(property))}`;
 }

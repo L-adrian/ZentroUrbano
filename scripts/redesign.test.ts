@@ -5,7 +5,25 @@ import sharp from "sharp";
 import { getPublicationCosts } from "../src/lib/publication-costs";
 import { getGoogleMapsDirectionsUrl, MAP_MAX_NATIVE_ZOOM, MAP_MAX_ZOOM, MAP_TILE_PROVIDERS } from "../src/lib/map-config";
 import robots from "../src/app/robots";
-import { formatPriceInCurrency, getPropertyPriceInCurrency, getPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "../src/lib/currency";
+import { defaultDisplayCurrency, formatExchangeRate, formatPriceInCurrency, getPropertyExchangeRateNote, getPropertyPriceInCurrency, getPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "../src/lib/currency";
+
+test("prices start in bolivianos and exchange-rate notes match the actual conversion", () => {
+  assert.equal(defaultDisplayCurrency, "BOB");
+  const bob = { price: 3000, currency: "BOB" as const, operation: "Alquiler" as const };
+  assert.equal(formatPriceInCurrency(bob, defaultDisplayCurrency), "Bs 3.000/mes");
+  assert.equal(getPropertyExchangeRateNote(bob, "BOB"), null);
+  assert.equal(getPropertyExchangeRateNote(bob, "USD"), "T/C referencial: 1 USD = 7 Bs");
+  assert.equal(formatPriceInCurrency(bob, "USD"), "$us 429/mes");
+  assert.equal(getPropertyExchangeRateNote({ ...bob, exchangeRate: 10 }, "USD"), "T/C referencial: 1 USD = 7 Bs");
+  const usd = { ...bob, price: 400, currency: "USD" as const, exchangeRate: 8.25 };
+  for (const currency of ["BOB", "USD"] as const) {
+    assert.equal(getPropertyExchangeRateNote(usd, currency), "T/C del propietario: 1 USD = 8,25 Bs");
+    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: null }, currency), "T/C referencial: 1 USD = 7 Bs");
+    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: 0 }, currency), "T/C referencial: 1 USD = 7 Bs");
+  }
+  assert.equal(formatPriceInCurrency(usd, defaultDisplayCurrency), "Bs 3.300/mes");
+  assert.equal(formatExchangeRate(7.1234), "1 USD = 7,1234 Bs");
+});
 
 test("money inputs preserve thousands and distinguish decimal cents", () => {
   for (const value of ["3400", "3.400", "3,400", "3 400", "3\u00a0400", 3400]) assert.equal(parseCurrencyAmount(value),3400,String(value));

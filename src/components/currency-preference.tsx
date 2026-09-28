@@ -2,11 +2,14 @@
 
 import { useSyncExternalStore } from "react";
 import {
+  currencyExchangeRateBobPerUsd,
   currencyPreferenceEventName,
   currencyPreferenceStorageKey,
   defaultDisplayCurrency,
   formatPriceInCurrency,
+  formatExchangeRate,
   getCurrencyLabel,
+  getPropertyExchangeRateNote,
   isDisplayCurrency,
   type DisplayCurrency,
 } from "@/lib/currency";
@@ -16,6 +19,7 @@ type PriceDisplayProps = {
   property: Pick<Property, "currency" | "price" | "operation" | "exchangeRate">;
   className?: string;
   showPeriod?: boolean;
+  showExchangeRate?: boolean;
 };
 
 type CurrencySelectorProps = {
@@ -23,16 +27,18 @@ type CurrencySelectorProps = {
 };
 
 const displayCurrencyOptions: Array<{ value: DisplayCurrency; label: string; helper: string }> = [
-  { value: "USD", label: "$us", helper: "Dolares" },
   { value: "BOB", label: "Bs", helper: "Bolivianos" },
+  { value: "USD", label: "$us", helper: "Dólares" },
 ];
 
-export function PriceDisplay({ property, className, showPeriod = true }: PriceDisplayProps) {
+export function PriceDisplay({ property, className, showPeriod = true, showExchangeRate = true }: PriceDisplayProps) {
   const displayCurrency = useCurrencyPreference();
+  const exchangeRateNote = showExchangeRate ? getPropertyExchangeRateNote(property, displayCurrency) : null;
 
   return (
     <span className={className}>
       {formatPriceInCurrency(property, displayCurrency, showPeriod)}
+      {exchangeRateNote && <span className="exchange-rate-note price-exchange-rate">{exchangeRateNote}</span>}
     </span>
   );
 }
@@ -41,21 +47,24 @@ export function CurrencySelector({ className }: CurrencySelectorProps) {
   const displayCurrency = useCurrencyPreference();
 
   return (
-    <div
-      className={`currency-selector ${className ?? ""}`}
-      aria-label="Moneda para ver precios"
-    >
-      {displayCurrencyOptions.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          onClick={() => setCurrencyPreference(option.value)}
-          aria-pressed={displayCurrency === option.value}
-          title={option.helper}
-        >
-          {option.label}
-        </button>
-      ))}
+    <div className={`currency-control ${className ?? ""}`}>
+      <div className="currency-selector" role="group" aria-label="Moneda para ver precios">
+        {displayCurrencyOptions.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            onClick={() => setCurrencyPreference(option.value)}
+            aria-pressed={displayCurrency === option.value}
+            aria-label={option.helper}
+            title={option.helper}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <span className="currency-reference" aria-live="polite">
+        {displayCurrency === "USD" ? `T/C ref.: ${formatExchangeRate(currencyExchangeRateBobPerUsd)}` : null}
+      </span>
     </div>
   );
 }

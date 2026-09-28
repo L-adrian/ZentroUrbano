@@ -82,6 +82,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .header-contact { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding-inline: 8px; color: var(--muted); font-size: 13px; font-weight: 550; white-space: nowrap; border-radius: 6px; }
 .header-contact:hover, .header-contact[aria-current] { color: var(--brand); background: var(--brand-soft); }
 .menu-theme { display: none; }
+.currency-control { display: grid; justify-items: center; gap: 2px; width: 148px; flex-shrink: 0; }
+.currency-reference { min-height: 15px; font-size: 11px; line-height: 15px; color: var(--muted); text-align: center; }
 .currency-selector { display: inline-flex; align-items: center; padding: 3px; border: 1px solid var(--line); border-radius: 7px; background: var(--subtle); }
 .currency-selector button { min-width: 40px; height: 32px; padding: 0 9px; border-radius: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
 .currency-selector button[aria-pressed=true] { background: var(--surface); color: var(--foreground); }
@@ -297,6 +299,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .property-feature-icon { flex-shrink: 0; color: var(--brand); }
 .property-feature-icon svg { width: 20px; height: 20px; }
 .exchange-rate-note { display: block; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.price-exchange-rate { margin-top: 3px; font-weight: 400; white-space: normal; overflow-wrap: anywhere; letter-spacing: 0; }
 .property-edit-overlay > div, .property-edit-overlay [class*="bg-white"] { background: var(--surface); color: var(--foreground); }
 .property-edit-overlay fieldset { min-width: 0; }.property-edit-overlay fieldset:disabled { opacity: .7; }
 .support-whatsapp-floating { position: fixed; z-index: 1050; right: 24px; bottom: 24px; min-height: 46px; box-shadow: 0 3px 12px #00000014; }

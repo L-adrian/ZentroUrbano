@@ -19,6 +19,7 @@ export function MobileStickyContact({ property }: MobileStickyContactProps) {
         <div className="min-w-0 flex-1">
           <PriceDisplay
             property={property}
+            showExchangeRate={false}
             className="block truncate text-sm font-semibold text-neutral-950"
           />
           <p className="truncate text-xs font-medium text-neutral-500">{agent.name}</p>

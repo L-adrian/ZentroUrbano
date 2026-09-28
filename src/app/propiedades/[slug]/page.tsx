@@ -188,7 +188,6 @@ export default async function PropertyDetailPage({
                     property={property}
                     className="mt-1 block text-3xl font-bold tracking-tight text-neutral-950 sm:text-4xl"
                   />
-                  {property.currency === "USD" && property.exchangeRate != null && <p className="exchange-rate-note">T/C del propietario: 1 USD = {property.exchangeRate.toLocaleString("es-BO", { maximumFractionDigits: 4 })} Bs</p>}
                 </div>
                 <a
                   href={`/api/propiedades/${property.slug}/whatsapp`}
@@ -357,16 +356,16 @@ function propertyQuickFacts(property: Property) {
     {
       label: costs ? "Costo de ingreso" : "Ingreso sin expensas",
       value:
-        costs ? (costs.entry === null ? "Consultar" : <PriceDisplay property={{...property,price:costs.entry}} showPeriod={false}/>) : entryMultiplier === null ? (
+        costs ? (costs.entry === null ? "Consultar" : <PriceDisplay property={{...property,price:costs.entry}} showPeriod={false} showExchangeRate={false}/>) : entryMultiplier === null ? (
           "Consultar"
         ) : (
-          <PriceDisplay property={{ ...property, price: property.price * entryMultiplier }} showPeriod={false} />
+          <PriceDisplay property={{ ...property, price: property.price * entryMultiplier }} showPeriod={false} showExchangeRate={false} />
         ),
       icon: <BadgeDollarSign className="h-4 w-4" />,
       highlighted: true,
     },
   ];
-  if (costs) facts.push({label:"Mensual con expensas",value:<PriceDisplay property={{...property,price:costs.monthly}}/>,icon:<BadgeDollarSign className="h-4 w-4"/>,highlighted:true});
+  if (costs) facts.push({label:"Mensual con expensas",value:<PriceDisplay property={{...property,price:costs.monthly}} showExchangeRate={false}/>,icon:<BadgeDollarSign className="h-4 w-4"/>,highlighted:true});
 
   const usedLabels = new Set<string>();
 
