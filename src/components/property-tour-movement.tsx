@@ -8,9 +8,10 @@ export default function TourMovement({ actions, limit }: { actions: RefObject<To
   const [pressed, setPressed] = useState<TourDirection | null>(null);
   const pointer = useRef<number | null>(null);
   const pointerClick = useRef(false);
+  const keyHeld = useRef(false);
   useEffect(() => {
     const controller = actions.current;
-    const cancel = () => { pointer.current = null; setPressed(null); controller?.stopMove(true); };
+    const cancel = () => { pointer.current = null; keyHeld.current = false; setPressed(null); controller?.stopMove(true); };
     const visibility = () => { if (document.hidden) cancel(); };
     window.addEventListener("blur", cancel);
     document.addEventListener("visibilitychange", visibility);
@@ -53,11 +54,24 @@ export default function TourMovement({ actions, limit }: { actions: RefObject<To
           setPressed(null);
           actions.current?.stopMove(true);
         }}
-        onKeyDown={event => { if (event.key === "Enter" || event.key === " ") pointerClick.current = false; }}
+        onKeyDown={event => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          if (event.repeat || keyHeld.current) return;
+          keyHeld.current = true; pointerClick.current = false; setPressed(direction);
+          actions.current?.startMove(direction);
+        }}
+        onKeyUp={event => {
+          if (!keyHeld.current || (event.key !== "Enter" && event.key !== " ")) return;
+          event.preventDefault(); keyHeld.current = false; setPressed(null); actions.current?.stopMove();
+        }}
+        onBlur={() => {
+          if (!keyHeld.current) return;
+          keyHeld.current = false; setPressed(null); actions.current?.stopMove(true);
+        }}
         onClick={() => {
           if (pointerClick.current) { pointerClick.current = false; return; }
-          actions.current?.startMove(direction);
-          actions.current?.stopMove();
+          actions.current?.nudge(direction);
         }}
         onContextMenu={event => event.preventDefault()}
       ><Icon size={21} aria-hidden="true" /></button>)}

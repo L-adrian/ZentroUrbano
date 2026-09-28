@@ -5,50 +5,98 @@ import { parseTourManifest, tourDecision, validTourFile, validTourRevision, vali
 import { limitedTourForm, MAX_TOUR_UPLOAD, validateTourAsset } from "../src/lib/property-tour-validation";
 import { sameOriginAdminMutation } from "../src/lib/admin-access";
 import { tourRenderQuality } from "../src/lib/property-tour-quality";
-import { TourMotion, tourDragSpeed } from "../src/lib/property-tour-motion";
+import { TourMotion, TOUR_DRAG_SPEED, tourKeyDirection } from "../src/lib/property-tour-motion";
+import * as THREE from "three";
+import { PackedSplats, SplatMesh } from "@sparkjsdev/spark";
+import { createTourCollider } from "../src/lib/property-tour-collider";
 
-test("Touch drags the scene while the mouse keeps its existing direction", () => {
-  assert.equal(tourDragSpeed("touch"), -0.3);
-  assert.equal(tourDragSpeed("mouse"), 0.3);
-  assert.equal(tourDragSpeed("pen"), 0.3);
+test("Collision mesh retains nearby and large opaque splats without changing the rendered model", async () => {
+  const packed = new PackedSplats();
+  for (const [x, scale, opacity] of [[0, 0.1, 1], [100, 0.1, 1], [0, 0.1, 0.1], [2, 0.5, 1]]) {
+    packed.pushSplat(new THREE.Vector3(x, 0, 0), new THREE.Vector3().setScalar(scale), new THREE.Quaternion(), opacity, new THREE.Color());
+  }
+  const mesh = new SplatMesh({ packedSplats: packed });
+  await mesh.initialized;
+  mesh.position.set(5, 1, -8); mesh.scale.setScalar(1.8); mesh.rotation.x = Math.PI; mesh.updateMatrixWorld(true);
+  const before = packed.packedArray!.slice();
+  const collider = await createTourCollider(mesh, mesh.position);
+  try {
+    assert.equal(collider.numSplats, 2);
+    assert.equal(collider.context.numSplats.value, 2);
+    assert.deepEqual(collider.matrixWorld.elements, mesh.matrixWorld.elements);
+    assert.deepEqual(collider.packedSplats!.splatEncoding, packed.splatEncoding);
+    assert.deepEqual(collider.packedSplats!.packedArray!.slice(0, 8), new Uint32Array([...before.slice(0, 4), ...before.slice(12, 16)]));
+    assert.deepEqual(packed.packedArray, before);
+    assert.equal(packed.numSplats, 4);
+  } finally { collider.dispose(); mesh.dispose(); }
 });
 
-test("Directional buttons accelerate continuously independent of frame rate", () => {
+test("Mouse and touch use the same natural scene-drag direction", () => {
+  assert.equal(TOUR_DRAG_SPEED, -0.3);
+  assert.equal(tourKeyDirection("KeyW"), "forward");
+  assert.equal(tourKeyDirection("ArrowLeft"), "left");
+  assert.equal(tourKeyDirection("Escape"), undefined);
+});
+
+test("Continuous movement covers the same distance at 30, 60 and 120 Hz", () => {
   const distances = [30, 60, 120].map(fps => {
     const motion = new TourMotion(); motion.start("forward");
     let total = 0;
     for (let frame = 0; frame < fps; frame++) {
       const step = motion.step(1 / fps)!;
-      assert.equal(step.direction, "forward");
-      assert.ok(step.distance > 0 && step.distance < 0.025);
-      total += step.distance;
+      assert.equal(step.right, 0);
+      assert.ok(step.forward > 0 && step.forward < 0.025);
+      total += step.forward;
     }
     return total;
   });
-  assert.ok(Math.max(...distances) - Math.min(...distances) < 0.007);
-  assert.ok(distances.every(distance => distance > 0.4 && distance < 0.45));
+  assert.ok(Math.max(...distances) - Math.min(...distances) < 0.000001);
+  assert.ok(distances.every(distance => distance > 0.6 && distance < 0.65));
 });
 
-test("Quick taps animate one small step; release and cancellation cannot leave movement stuck", () => {
-  const motion = new TourMotion(); motion.start("left"); motion.release();
+test("Holding WASD and holding a button produce identical motion without key-repeat", () => {
+  const keyboard = new TourMotion(), button = new TourMotion();
+  keyboard.press("KeyW", "forward"); button.start("forward");
+  for (let frame = 0; frame < 60; frame++) {
+    if (frame % 3 === 0) keyboard.press("KeyW", "forward");
+    assert.deepEqual(keyboard.step(1 / 60), button.step(1 / 60));
+  }
+  keyboard.release("KeyW"); button.release();
+  for (let frame = 0; frame < 60; frame++) assert.deepEqual(keyboard.step(1 / 60), button.step(1 / 60));
+  assert.equal(keyboard.step(1 / 60), null);
+});
+
+test("Diagonal movement is normalized; releasing one source keeps other keys held", () => {
+  const straight = new TourMotion(), diagonal = new TourMotion();
+  straight.press("KeyW", "forward");
+  diagonal.press("KeyW", "forward"); diagonal.press("KeyD", "right");
+  for (let frame = 0; frame < 60; frame++) {
+    const a = straight.step(1 / 60)!, b = diagonal.step(1 / 60)!;
+    assert.ok(Math.abs(a.forward - Math.hypot(b.right, b.forward)) < 0.000001);
+  }
+  diagonal.release("KeyD"); diagonal.start("left"); diagonal.cancel("button");
+  for (let frame = 0; frame < 60; frame++) diagonal.step(1 / 60);
+  const forward = diagonal.step(1 / 60)!;
+  assert.ok(forward.forward > 0.01 && Math.abs(forward.right) < 0.0001);
+  diagonal.press("KeyS", "back");
+  for (let frame = 0; frame < 60; frame++) diagonal.step(1 / 60);
+  assert.equal(diagonal.step(1 / 60), null);
+});
+
+test("Cancelled gestures and blur stop immediately; accessible clicks are bounded animations", () => {
+  const motion = new TourMotion(); motion.start("forward"); motion.step(0.04); motion.cancel("button");
+  assert.equal(motion.step(0.04), null);
+  motion.press("KeyA", "left"); motion.step(0.04); motion.cancel();
+  assert.equal(motion.step(0.04), null);
+  motion.pulse("right");
   let distance = 0;
-  for (let i = 0; i < 120; i++) distance += motion.step(1 / 60)?.distance ?? 0;
-  assert.ok(Math.abs(distance - 0.1) < 0.0002);
-  assert.equal(motion.step(1 / 60), null);
-  motion.start("right");
-  for (let i = 0; i < 60; i++) motion.step(1 / 60);
-  motion.release();
-  let coast = 0;
-  for (let i = 0; i < 120; i++) coast += motion.step(1 / 60)?.distance ?? 0;
-  assert.ok(coast > 0 && coast < 0.028);
-  motion.start("back"); motion.cancel();
-  assert.equal(motion.step(1), null);
-  motion.start("forward");
+  for (let frame = 0; frame < 120; frame++) distance += motion.step(1 / 60)?.right ?? 0;
+  assert.ok(distance > 0.08 && distance < 0.11);
+  assert.equal(motion.step(0.04), null);
   assert.equal(motion.step(NaN), null);
   assert.equal(motion.step(-1), null);
-  assert.ok(motion.step(10)!.distance < 0.025);
-  motion.start("back");
-  assert.equal(motion.step(1 / 60)!.direction, "back");
+  motion.start("forward");
+  assert.ok(motion.step(10)!.forward < 0.033);
 });
 
 test("Automatic tours keep full detail on high-density phones without data saving", () => {
