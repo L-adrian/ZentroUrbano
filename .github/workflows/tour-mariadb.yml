@@ -1,0 +1,52 @@
+name: Tour MariaDB compatibility
+
+on:
+  push:
+    branches: [codex/hostinger-glibc-compat]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tour:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      mariadb:
+        image: mariadb:11.8.9
+        env:
+          MARIADB_ROOT_PASSWORD: isolated-ci-only
+          MARIADB_DATABASE: zentro_tours_qa
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      DATABASE_URL: mysql://root:isolated-ci-only@127.0.0.1:3306/zentro_tours_qa
+      ZENTRO_URBANO_ADMIN_USER: tour-qa
+      ZENTRO_URBANO_ADMIN_PASSWORD: isolated-ci-admin
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Check actual production approval endpoint
+        shell: bash
+        run: |
+          npm run start:preview -- --hostname 127.0.0.1 --port 3000 > /tmp/zentro-tour.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl --silent --fail http://127.0.0.1:3000/api/session >/dev/null; then break; fi
+            sleep 1
+          done
+          node scripts/tour-database.test.mjs
+      - name: Read application diagnostics
+        if: failure()
+        run: test ! -f /tmp/zentro-tour.log || cat /tmp/zentro-tour.log
