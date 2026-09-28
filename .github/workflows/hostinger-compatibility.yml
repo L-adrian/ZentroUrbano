@@ -53,16 +53,19 @@ jobs:
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
           node <<'NODE'
-          const { setTimeout } = require('node:timers/promises');
+          const { setTimeout: delay } = require('node:timers/promises');
           (async () => {
             for (let attempt = 0; attempt < 30; attempt++) {
               try {
                 const response = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(3000) });
                 if (response.status === 200 && (await response.text()).includes('Zentro')) return;
               } catch {}
-              await setTimeout(1000);
+              await delay(1000);
             }
             throw new Error('Production server did not serve Zentro Urbano.');
           })().catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+      - name: Server diagnostics on failure
+        if: failure()
+        run: test ! -f /tmp/zentro-preview.log || cat /tmp/zentro-preview.log
 
