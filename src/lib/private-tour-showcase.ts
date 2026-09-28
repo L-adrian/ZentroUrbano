@@ -159,8 +159,13 @@ export function parsePrivateShowcaseManifest(value: unknown): PrivateShowcaseMan
   if (data.model !== "marble-1.1") throw new Error("Modelo no compatible.");
   const start = object(data.start);
   const connection = object(data.connection);
-  const rawRooms = object(data.rooms);
-  const roomInputs = [object(rawRooms.sala), object(rawRooms.cocina)];
+  const roomsValue = data.rooms;
+  const roomInputs = Array.isArray(roomsValue)
+    ? (["sala", "cocina"] as const).map(id => object(roomsValue.find((room: unknown) => object(room).id === id)))
+    : (() => {
+        const rawRooms = object(data.rooms);
+        return [object(rawRooms.sala), object(rawRooms.cocina)];
+      })();
   const rooms = roomInputs.map((room, index) => parseRoom(room, index === 0 ? "sala" : "cocina"));
   return {
     scope,
