@@ -123,15 +123,20 @@ function PrivateShowcaseScene({
     const direction = new THREE.Vector3();
     const start = new THREE.Vector3(...showcase.start.position);
     const rooms = new Map(showcase.rooms.map(room => [room.id, room]));
+    const loadedRooms = new Set<PrivateShowcaseRoom["id"]>();
+    const roomErrors = new Map<PrivateShowcaseRoom["id"], string>();
+    let pendingRoom: PrivateShowcaseRoom["id"] | undefined;
     camera.position.copy(start);
     const aim = () => camera.rotation.set(pitch, yaw, 0, "YXZ");
     const reset = () => {
+      pendingRoom = undefined;
       topView = false;
       pitch = 0;
       yaw = showcase.start.yaw * RAD;
       camera.position.copy(start);
       velocity.set(0, 0, 0);
       aim();
+      onStatus("");
     };
 
     const portal = showcase.connection;
@@ -219,12 +224,24 @@ function PrivateShowcaseScene({
     function go(id: string) {
       const room = rooms.get(id as PrivateShowcaseRoom["id"]);
       if (!room) return;
+      const error = roomErrors.get(room.id);
+      if (error) {
+        onStatus(`Error: ${error}`);
+        return;
+      }
+      if (!loadedRooms.has(room.id)) {
+        pendingRoom = room.id;
+        onStatus(`Cargando ${room.name.toLowerCase()}`);
+        return;
+      }
+      pendingRoom = undefined;
       topView = false;
       pitch = 0;
       yaw = room.yaw * RAD;
       camera.position.fromArray(room.viewPosition ?? [room.position[0], room.eyeHeight + room.position[1], room.position[2]]);
       velocity.set(0, 0, 0);
       aim();
+      onStatus("");
     }
 
     const keyMap: Record<string, Direction | undefined> = {
@@ -313,9 +330,9 @@ function PrivateShowcaseScene({
           updatePortal();
           renderer.render(scene, camera);
         });
-        for (const room of showcase.rooms) {
+        for (const [index, room] of showcase.rooms.entries()) {
           if (disposed) return;
-          onStatus(`Cargando ${room.name.toLowerCase()}`);
+          if (index === 0 || pendingRoom === room.id) onStatus(`Cargando ${room.name.toLowerCase()}`);
           const group = new THREE.Group();
           const frame = new THREE.Group();
           frame.rotation.x = Math.PI;
@@ -326,11 +343,19 @@ function PrivateShowcaseScene({
           scene.add(group);
           items.push(item);
           place(item);
-          await mesh.initialized;
-          if (disposed) { mesh.dispose(); return; }
-          if (!mesh.numSplats) throw new Error(`Escena vacía: ${room.name}`);
+          try {
+            await mesh.initialized;
+            if (disposed) { mesh.dispose(); return; }
+            if (!mesh.numSplats) throw new Error(`Escena vacía: ${room.name}`);
+            loadedRooms.add(room.id);
+            if (pendingRoom === room.id) go(room.id);
+            else if (index === 0) onStatus("");
+          } catch (error) {
+            const message = error instanceof Error ? error.message : `No se pudo cargar ${room.name.toLowerCase()}`;
+            roomErrors.set(room.id, message);
+            if (index === 0 || pendingRoom === room.id) onStatus(`Error: ${message}`);
+          }
         }
-        onStatus("");
       } catch (error) {
         if (!disposed) onStatus(`Error: ${error instanceof Error ? error.message : "no se pudo cargar el recorrido"}`);
       }
