@@ -16,6 +16,9 @@ export async function POST(request: Request, context: RouteContext<"/admin/recor
     return Response.json({ ok: true });
   } catch (error) {
     const databaseError = Boolean(error && typeof error === "object" && "code" in error);
-    return Response.json({ message: databaseError ? "No se pudo guardar la decisión. Actualiza antes de reintentar." : error instanceof Error ? error.message : "No se pudo guardar la decisión." }, { status: databaseError ? 503 : 400 });
+    const code = databaseError && typeof (error as { code: unknown }).code === "string"
+      ? (error as { code: string }).code : undefined;
+    if (databaseError) console.error("[ZENTRO_TOUR_REVIEW]", { code });
+    return Response.json({ message: databaseError ? "No se pudo guardar la decisión. Actualiza antes de reintentar." : error instanceof Error ? error.message : "No se pudo guardar la decisión.", code }, { status: databaseError ? 503 : 400 });
   }
 }
