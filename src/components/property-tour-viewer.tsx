@@ -1,9 +1,10 @@
 "use client";
 import Image from "next/image";
-import { AlertTriangle, ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Box, Images, LoaderCircle, MessageCircle, RotateCcw } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ArrowRight, Box, Images, LoaderCircle, MessageCircle, RotateCcw } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import { TOUR_DISCLAIMER, type PublicTour } from "@/lib/property-tour-contract";
 import TourScene, { type TourActions } from "./property-tour-scene";
+import TourMovement from "./property-tour-movement";
 
 export default function PropertyTourViewer({ tour, preview, onReady, onError }: { tour: PublicTour; preview: boolean; onReady: () => void; onError: () => void }) {
   const [original, setOriginal] = useState(false);
@@ -24,10 +25,10 @@ export default function PropertyTourViewer({ tour, preview, onReady, onError }: 
     </div>
     <div className="tour-canvas-area">
       {original ? <div className="tour-original"><Image src={tour.photos[index].src} alt={tour.photos[index].label} fill sizes="100vw" quality={74} /><div className="tour-photo-paging"><button className="tour-icon" title="Foto anterior" aria-label="Foto anterior" type="button" disabled={index === 0} onClick={() => setIndex(i => i - 1)}><ArrowLeft size={18} /></button><span>{index + 1} / {tour.photos.length}</span><button className="tour-icon" title="Foto siguiente" aria-label="Foto siguiente" type="button" disabled={index === tour.photos.length - 1} onClick={() => setIndex(i => i + 1)}><ArrowRight size={18} /></button></div></div> : <>
-        {status !== "error" && <TourScene key={`${attempt}-${quality}`} tour={tour} quality={quality} actionsRef={actions} onReady={ready} onError={fail} />}
+        {status !== "error" && <TourScene key={`${attempt}-${quality}`} tour={tour} quality={quality} actionsRef={actions} onReady={ready} onError={fail} onLimitChange={setLimit} />}
         {status === "loading" && <div className="tour-loading" role="status"><LoaderCircle className="tour-spin" />Cargando ambiente 3D</div>}
         {status === "error" && <div className="tour-error" role="alert"><AlertTriangle size={25} /><p>No se pudo abrir el recorrido en este dispositivo.</p><div><button className="zu-button zu-button-secondary" type="button" onClick={restart}><RotateCcw size={16} />Reintentar</button><button className="zu-button zu-button-primary" type="button" onClick={() => setOriginal(true)}><Images size={16} />Ver fotos</button></div></div>}
-        {status === "ready" && <div className="tour-movement"><span role="status">{limit ? "Límite del recorrido" : ""}</span><div role="group" aria-label="Desplazamiento de cámara">{([["left", "Mover a la izquierda", ArrowLeft], ["forward", "Avanzar", ArrowUp], ["back", "Retroceder", ArrowDown], ["right", "Mover a la derecha", ArrowRight]] as const).map(([direction, label, Icon]) => <button key={direction} className="tour-icon" type="button" title={label} aria-label={label} onClick={() => setLimit(actions.current?.move(direction) === false)}><Icon size={20} /></button>)}</div></div>}
+        {status === "ready" && <TourMovement actions={actions} limit={limit} />}
       </>}
     </div>
     <div className="tour-disclaimer"><AlertTriangle size={16} aria-hidden="true" /><p>{TOUR_DISCLAIMER}</p></div>

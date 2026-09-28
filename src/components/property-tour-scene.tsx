@@ -5,10 +5,11 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import type { PublicTour } from "@/lib/property-tour-contract";
 import { tourRenderQuality } from "@/lib/property-tour-quality";
+import { TourMotion, tourDragSpeed, type TourDirection } from "@/lib/property-tour-motion";
 
-export type TourActions = { reset: () => void; move: (direction: "forward" | "back" | "left" | "right") => boolean };
+export type TourActions = { reset: () => void; move: (direction: TourDirection) => boolean; startMove: (direction: TourDirection) => void; stopMove: (cancel?: boolean) => void };
 
-export default function TourScene({ tour, quality, actionsRef, onReady, onError }: { tour: PublicTour; quality: string; actionsRef: RefObject<TourActions | null>; onReady: () => void; onError: () => void }) {
+export default function TourScene({ tour, quality, actionsRef, onReady, onError, onLimitChange }: { tour: PublicTour; quality: string; actionsRef: RefObject<TourActions | null>; onReady: () => void; onError: () => void; onLimitChange: (limit: boolean) => void }) {
   const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const container = host.current!;
@@ -20,9 +21,14 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(65, 1, 0.02, 150);
     const anchor = new THREE.Vector3(0, tour.groundOffset, 0);
+    const motion = new TourMotion();
+    let lastFrame = 0;
     const deadline = setTimeout(() => abort.abort(), 45000);
-    const fail = () => { if (!disposed) { renderer?.setAnimationLoop(null); onError(); } };
-    const reset = () => { camera.position.copy(anchor); controls!.target.copy(anchor).add(new THREE.Vector3(0, 0, -0.001)); controls!.update(); inspectPixels = true; };
+    const fail = () => { if (!disposed) { motion.cancel(); renderer?.setAnimationLoop(null); onError(); } };
+    const reset = () => { motion.cancel(); camera.position.copy(anchor); controls!.target.copy(anchor).add(new THREE.Vector3(0, 0, -0.001)); controls!.update(); inspectPixels = true; };
+    const drag = (event: PointerEvent) => { if (controls) controls.rotateSpeed = tourDragSpeed(event.pointerType); };
+    const cancelMotion = () => motion.cancel();
+    const visibility = () => { if (document.hidden) motion.cancel(); lastFrame = 0; };
     async function start() {
       try {
         const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
@@ -34,6 +40,7 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
         renderer.domElement.dataset.asset = renderQuality.fileName;
         renderer.domElement.setAttribute("aria-label", "Recorrido 3D de la vivienda");
         renderer.domElement.addEventListener("webglcontextlost", fail);
+        renderer.domElement.addEventListener("pointerdown", drag, true);
         container.appendChild(renderer.domElement);
         controls = new OrbitControls(camera, renderer.domElement);
         controls.enableZoom = controls.enablePan = controls.enableDamping = false;
@@ -65,13 +72,11 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
         if (disposed) { mesh.dispose(); return; }
         if (!mesh.numSplats) throw new Error("Empty scene");
         scene.updateMatrixWorld(true);
-        actionsRef.current = {
-          reset,
-          move(direction) {
+        const move = (direction: TourDirection, distance: number) => {
             const forward = camera.getWorldDirection(new THREE.Vector3()); forward.y = 0; forward.normalize();
             const right = new THREE.Vector3().crossVectors(forward, camera.up).normalize();
             const heading = { forward, back: forward.clone().negate(), right, left: right.clone().negate() }[direction];
-            const delta = heading.clone().multiplyScalar(0.1);
+            const delta = heading.clone().multiplyScalar(distance);
             const next = camera.position.clone().add(delta);
             // Small exploration radius plus opaque-splat clearance; this is not a measured floor plan.
             if (next.distanceTo(anchor) > 0.6) return false;
@@ -82,13 +87,22 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
             }
             camera.position.copy(next); controls!.target.add(delta); controls!.update(); inspectPixels = true;
             return true;
-          },
         };
-        renderer.setAnimationLoop(() => {
+        actionsRef.current = {
+          reset,
+          move: direction => { motion.cancel(); return move(direction, 0.1); },
+          startMove: direction => { onLimitChange(false); motion.start(direction); },
+          stopMove: cancel => { if (cancel) motion.cancel(); else motion.release(); },
+        };
+        renderer.setAnimationLoop(time => {
           if (disposed || document.hidden) return;
+          const step = motion.step(lastFrame ? (time - lastFrame) / 1000 : 0);
+          lastFrame = time;
+          if (step && step.distance > 0 && !move(step.direction, step.distance)) { motion.cancel(); onLimitChange(true); }
           renderer!.render(scene, camera);
           const canvas = renderer!.domElement;
           canvas.dataset.camera = camera.position.toArray().map(v => v.toFixed(4)).join(",");
+          if (qa) canvas.dataset.direction = camera.getWorldDirection(new THREE.Vector3()).toArray().map(v => v.toFixed(4)).join(",");
           if (qa && inspectPixels) {
             const gl = renderer!.getContext(), rgba = new Uint8Array(4), samples: string[] = [];
             for (const x of [0.2, 0.5, 0.8]) for (const y of [0.2, 0.5, 0.8]) { gl.readPixels(Math.floor(canvas.width * x), Math.floor(canvas.height * y), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rgba); samples.push(Array.from(rgba).join(",")); }
@@ -103,13 +117,17 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
       if (direction && !event.ctrlKey && !event.metaKey && !event.altKey) { event.preventDefault(); actionsRef.current?.move(direction); }
     };
     container.addEventListener("keydown", key);
+    window.addEventListener("blur", cancelMotion);
+    document.addEventListener("visibilitychange", visibility);
     void start();
     return () => {
       disposed = true; clearTimeout(deadline); abort.abort(); actionsRef.current = null;
       container.removeEventListener("keydown", key); observer?.disconnect(); controls?.dispose();
+      window.removeEventListener("blur", cancelMotion); document.removeEventListener("visibilitychange", visibility);
+      renderer?.domElement.removeEventListener("pointerdown", drag, true);
       renderer?.setAnimationLoop(null); renderer?.domElement.removeEventListener("webglcontextlost", fail);
       if (mesh?.isInitialized) mesh.dispose(); spark?.dispose(); renderer?.dispose(); renderer?.domElement.remove();
     };
-  }, [tour.assetBase, tour.metricScale, tour.groundOffset, quality, actionsRef, onReady, onError]);
+  }, [tour.assetBase, tour.metricScale, tour.groundOffset, quality, actionsRef, onReady, onError, onLimitChange]);
   return <div className="tour-scene-host" ref={host} />;
 }

@@ -25,7 +25,15 @@
 .tour-movement { position: absolute; bottom: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
 .tour-movement>span { color: white; background: #202726d9; font-size: 12px; border-radius: 4px; }
 .tour-movement>span:not(:empty) { padding: 6px 10px; }
-.tour-movement>div, .tour-photo-paging { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 7px; background: var(--surface); color: var(--foreground); }
+.tour-photo-paging { display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 7px; background: var(--surface); color: var(--foreground); }
+.tour-direction-pad { display: grid; grid-template-columns: repeat(3, 44px); grid-template-rows: repeat(2, 44px); gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--foreground); }
+.tour-direction-pad .tour-icon { width: 44px; height: 44px; touch-action: none; user-select: none; -webkit-touch-callout: none; }
+.tour-direction-pad [data-direction="forward"] { grid-area: 1 / 2; }
+.tour-direction-pad [data-direction="left"] { grid-area: 2 / 1; }
+.tour-direction-pad [data-direction="back"] { grid-area: 2 / 2; }
+.tour-direction-pad [data-direction="right"] { grid-area: 2 / 3; }
+.tour-direction-pad .tour-icon[data-active="true"] { background: var(--accent, #087f70); color: #fff; border-color: currentColor; }
+.tour-direction-pad .tour-icon:focus-visible { outline: 2px solid var(--accent, #087f70); outline-offset: 2px; }
 .tour-photo-paging { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); font-size: 13px; }
 .tour-photo-paging span { min-width: 42px; text-align: center; }
 .tour-disclaimer { display: flex; gap: 8px; align-items: flex-start; padding: 10px 20px; font-size: 12px; line-height: 1.5; border-bottom: 1px solid var(--line); background: var(--subtle); }
