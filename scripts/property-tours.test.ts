@@ -21,11 +21,18 @@ test("Collision mesh retains nearby and large opaque splats without changing the
   const before = packed.packedArray!.slice();
   const collider = await createTourCollider(mesh, mesh.position);
   try {
-    assert.equal(collider.numSplats, 2);
-    assert.equal(collider.context.numSplats.value, 2);
-    assert.deepEqual(collider.matrixWorld.elements, mesh.matrixWorld.elements);
-    assert.deepEqual(collider.packedSplats!.splatEncoding, packed.splatEncoding);
-    assert.deepEqual(collider.packedSplats!.packedArray!.slice(0, 8), new Uint32Array([...before.slice(0, 4), ...before.slice(12, 16)]));
+    assert.equal(collider.mesh.numSplats, 2);
+    assert.equal(collider.mesh.context.numSplats.value, 2);
+    assert.deepEqual(collider.mesh.matrixWorld.elements, mesh.matrixWorld.elements);
+    assert.deepEqual(collider.mesh.packedSplats!.splatEncoding, packed.splatEncoding);
+    assert.deepEqual(collider.mesh.packedSplats!.packedArray!.slice(0, 8), new Uint32Array([...before.slice(0, 4), ...before.slice(12, 16)]));
+    collider.update(new THREE.Vector3(185, 1, -8));
+    assert.equal(collider.mesh.numSplats, 1, "Collision selection must follow the camera far beyond the initial position");
+    assert.deepEqual(collider.mesh.packedSplats!.packedArray!.slice(0, 4), before.slice(4, 8));
+    collider.update(new THREE.Vector3(500, 1, -8));
+    assert.equal(collider.mesh.numSplats, 0, "Empty space must not retain obstacles from the previous room");
+    collider.update(mesh.position);
+    assert.equal(collider.mesh.numSplats, 2, "Returning to the start restores its obstacle selection");
     assert.deepEqual(packed.packedArray, before);
     assert.equal(packed.numSplats, 4);
   } finally { collider.dispose(); mesh.dispose(); }

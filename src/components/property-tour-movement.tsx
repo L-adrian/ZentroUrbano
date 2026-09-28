@@ -23,7 +23,7 @@ export default function TourMovement({ actions, limit }: { actions: RefObject<To
   }, [actions]);
 
   return <div className="tour-movement">
-    <span role="status">{limit ? "Límite del recorrido" : ""}</span>
+    <span role="status">{limit ? "Obstáculo delante" : ""}</span>
     <div className="tour-direction-pad" role="group" aria-label="Desplazamiento de cámara">
       {([["forward", "Avanzar", ArrowUp], ["left", "Mover a la izquierda", ArrowLeft], ["back", "Retroceder", ArrowDown], ["right", "Mover a la derecha", ArrowRight]] as const).map(([direction, label, Icon]) => <button
         key={direction} className="tour-icon" data-direction={direction} data-active={pressed === direction}

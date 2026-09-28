@@ -1,7 +1,6 @@
 export type TourDirection = "forward" | "back" | "left" | "right";
 
 export const TOUR_DRAG_SPEED = -0.3;
-export const TOUR_RADIUS = 0.6;
 export const TOUR_CLEARANCE = 0.25;
 export const TOUR_HEIGHT_OFFSETS = [-0.15, 0, 0.15] as const;
 

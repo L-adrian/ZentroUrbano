@@ -5,7 +5,7 @@ import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import type { PublicTour } from "@/lib/property-tour-contract";
 import { tourRenderQuality } from "@/lib/property-tour-quality";
-import { TourMotion, TOUR_DRAG_SPEED, TOUR_RADIUS, TOUR_CLEARANCE, TOUR_HEIGHT_OFFSETS, tourKeyDirection, type TourDirection } from "@/lib/property-tour-motion";
+import { TourMotion, TOUR_DRAG_SPEED, TOUR_CLEARANCE, TOUR_HEIGHT_OFFSETS, tourKeyDirection, type TourDirection } from "@/lib/property-tour-motion";
 import { createTourCollider } from "@/lib/property-tour-collider";
 
 export type TourActions = { reset: () => void; startMove: (direction: TourDirection) => void; stopMove: (cancel?: boolean) => void; nudge: (direction: TourDirection) => void };
@@ -16,7 +16,8 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError,
     const container = host.current!;
     const abort = new AbortController();
     let disposed = false;
-    let renderer: THREE.WebGLRenderer | undefined, spark: SparkRenderer | undefined, mesh: SplatMesh | undefined, collider: SplatMesh | undefined, controls: OrbitControls | undefined, observer: ResizeObserver | undefined;
+    let renderer: THREE.WebGLRenderer | undefined, spark: SparkRenderer | undefined, mesh: SplatMesh | undefined, controls: OrbitControls | undefined, observer: ResizeObserver | undefined;
+    let collider: Awaited<ReturnType<typeof createTourCollider>> | undefined;
     let firstFrame = true, inspectPixels = true, lastPixelCheck = 0;
     const qa = ["localhost", "127.0.0.1"].includes(location.hostname) && new URLSearchParams(location.search).has("tourQA");
     const scene = new THREE.Scene();
@@ -91,12 +92,13 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError,
               probe.set(anchor.clone().add(new THREE.Vector3(x, height, z)), new THREE.Vector3(Math.sin(i * Math.PI / 4), 0, Math.cos(i * Math.PI / 4)));
               probe.near = 0.025; probe.far = TOUR_CLEARANCE;
               const begin = performance.now(), original = probe.intersectObject(mesh!, false), middle = performance.now();
-              const local = probe.intersectObject(collider!, false), end = performance.now();
+              collider!.update(probe.ray.origin);
+              const local = probe.intersectObject(collider!.mesh, false), end = performance.now();
               fullMs += middle - begin; localMs += end - middle; checked++;
               if (original.length) blocked++;
               if (Boolean(original.length) !== Boolean(local.length)) mismatches++;
             }
-            return { checked, blocked, mismatches, fullMs, localMs, fullSplats: mesh!.numSplats, collisionSplats: collider!.numSplats };
+            return { checked, blocked, mismatches, fullMs, localMs, fullSplats: mesh!.numSplats, collisionSplats: collider!.mesh.numSplats };
           };
         }
         const forward = new THREE.Vector3(), right = new THREE.Vector3(), delta = new THREE.Vector3(), next = new THREE.Vector3();
@@ -108,14 +110,13 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError,
           right.crossVectors(forward, camera.up).normalize();
           delta.copy(forward).multiplyScalar(step.forward).addScaledVector(right, step.right);
           next.copy(camera.position).add(delta);
-          // Small exploration radius plus opaque-splat clearance; this is not a measured floor plan.
-          if (next.distanceTo(anchor) > TOUR_RADIUS) return false;
+          collider!.update(camera.position);
           heading.copy(delta).normalize();
           for (const offset of TOUR_HEIGHT_OFFSETS) {
             origin.copy(camera.position); origin.y += offset;
             ray.set(origin, heading); ray.near = 0.025; ray.far = TOUR_CLEARANCE;
             hits.length = 0;
-            ray.intersectObject(collider!, false, hits);
+            ray.intersectObject(collider!.mesh, false, hits);
             if (hits.length) return false;
           }
           camera.position.copy(next); controls!.target.add(delta); inspectPixels = true;
@@ -138,7 +139,7 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError,
           canvas.dataset.camera = camera.position.toArray().map(v => v.toFixed(4)).join(",");
           if (qa) {
             canvas.dataset.direction = camera.getWorldDirection(forward).toArray().map(v => v.toFixed(4)).join(",");
-            canvas.dataset.collisionSplats = String(collider!.numSplats);
+            canvas.dataset.collisionSplats = String(collider!.mesh.numSplats);
           }
           if (qa && inspectPixels && (firstFrame || time - lastPixelCheck > 500)) {
             const gl = renderer!.getContext(), rgba = new Uint8Array(4), samples: string[] = [];
