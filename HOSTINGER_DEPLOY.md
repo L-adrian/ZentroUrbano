@@ -106,6 +106,21 @@ Una migracion nueva requiere respaldo y ejecucion explicita de db:migrate;
 no se ejecuta al hacer push, build ni start. No ejecutes db:seed en produccion.
 Volver a una version del codigo no revierte automaticamente cambios en MySQL.
 
+### Compatibilidad SWC y glibc del build worker
+
+El worker de Hostinger reporto GLIBC_2.29 ausente al cargar SWC nativo de
+Next.js 16.3.6. Se conserva la version con parches de seguridad: npm run build
+usa next build --webpack y @next/swc-wasm-nodejs queda fijado a la misma version
+de Next para permitir el fallback WebAssembly sin descargarlo durante el build.
+next.config.mjs se carga como ESM sin necesitar compilar TypeScript primero.
+No instalar paquetes musl manualmente sobre un servidor glibc, ni bajar Next
+a una version vulnerable para ocultar el problema.
+
+La comprobacion .github/workflows/hostinger-compatibility.yml reproduce el fallo
+nativo en Rocky Linux 8 / glibc 2.28, comprueba el fallback WASM y ejecuta pruebas,
+build y arranque. No usa secretos ni datos de produccion. El comando del panel
+sigue siendo npm run build; no sustituirlo por next build sin --webpack.
+
 ### Error de Corepack antes de instalar dependencias
 
 Si Hostinger muestra MODULE_NOT_FOUND para pnpm.cjs al preparar el entorno,

@@ -7,11 +7,12 @@ $output = Join-Path $root 'output/hostinger'
 [IO.Directory]::CreateDirectory($output) | Out-Null
 $destination = Join-Path $output ('zentro-urbano-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
 $paths = @(
-    'package-lock.json', '.npmrc', 'next.config.ts',
+    'package-lock.json', '.npmrc', 'next.config.mjs',
     'next-env.d.ts', 'tsconfig.json', 'postcss.config.mjs', 'eslint.config.mjs',
     'HOSTINGER_DEPLOY.md', 'CONFIGURACION.env.example',
     'scripts/database-cli.mjs', 'scripts/database-migrations.mjs', 'scripts/start-hostinger.mjs',
     'scripts/runtime-environment.mjs',
+    'scripts/prepare-swc-wasm.mjs',
     'database/mysql/001_zentro_urbano_core.sql',
     'database/mysql/002_property_exchange_rate.sql',
     'database/mysql/003_publication_review.sql'

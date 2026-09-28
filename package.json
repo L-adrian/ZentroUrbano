@@ -8,7 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "prebuild": "node scripts/prepare-swc-wasm.mjs",
+    "build": "next build --webpack",
     "start": "node scripts/start-hostinger.mjs",
     "start:preview": "next start",
     "lint": "eslint",
@@ -20,6 +21,7 @@
     "db:seed": "tsx scripts/seed-mysql.ts"
   },
   "dependencies": {
+    "@next/swc-wasm-nodejs": "16.3.6",
     "@sparkjsdev/spark": "2.2.0",
     "bcryptjs": "3.0.3",
     "leaflet": "1.9.4",

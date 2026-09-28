@@ -55,6 +55,28 @@ test("production uses the database preflight for GitHub and ZIP", () => {
   }
 });
 
+test("Hostinger builds with Webpack and a pinned SWC WebAssembly fallback", async () => {
+  const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+  const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
+  assert.equal(pkg.scripts.build, "next build --webpack");
+  assert.equal(pkg.scripts.prebuild, "node scripts/prepare-swc-wasm.mjs");
+  assert.equal(pkg.dependencies["@next/swc-wasm-nodejs"], pkg.dependencies.next);
+  assert.equal(lock.packages["node_modules/@next/swc-wasm-nodejs"].version, pkg.dependencies.next);
+  assert.equal(existsSync("next.config.ts"), false);
+  const { default: config } = await import("../next.config.mjs");
+  assert.equal(config.experimental.proxyClientMaxBodySize, 21 * 1024 * 1024);
+  assert.ok(config.images.remotePatterns.length > 0);
+  assert.ok((await config.redirects()).length > 0);
+  assert.match(readFileSync("scripts/package-hostinger.ps1", "utf8"), /next\.config\.mjs/);
+  assert.match(readFileSync("scripts/package-hostinger.ps1", "utf8"), /prepare-swc-wasm\.mjs/);
+  const prepared = spawnSync(process.execPath, ["scripts/prepare-swc-wasm.mjs"], {
+    encoding: "utf8", windowsHide: true, timeout: 10000,
+  });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const cached = JSON.parse(readFileSync("node_modules/next/wasm/@next/swc-wasm-nodejs/package.json", "utf8"));
+  assert.equal(cached.version, pkg.dependencies.next);
+});
+
 test("production fails closed before connecting when credentials are missing", () => {
   for (const config of [
     { DATABASE_URL: "", ZENTRO_URBANO_ADMIN_USER: "", ZENTRO_URBANO_ADMIN_PASSWORD: "" },

@@ -1,0 +1,68 @@
+name: Hostinger glibc compatibility
+
+on:
+  push:
+    branches: [main, codex/hostinger-glibc-compat]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: rockylinux:8
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - name: Prepare glibc 2.28 container
+        run: dnf install -y git tar gzip xz findutils libstdc++
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - name: Match Hostinger toolchain
+        run: |
+          test "$(getconf GNU_LIBC_VERSION)" = 'glibc 2.28'
+          npm install --global npm@11.10.0
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Install locked dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Reproduce native incompatibility and verify WASM fallback
+        run: |
+          npm run prebuild
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          assert.throws(() => require('@next/swc-linux-x64-gnu'), /GLIBC_2\.29/);
+          require('next/dist/build/swc').loadBindings().then(bindings => {
+            assert.equal(bindings.isWasm, true);
+            console.log('Native incompatibility reproduced; SWC WASM fallback loaded.');
+          }).catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+      - name: Tests
+        run: npm test
+      - name: Production build on glibc 2.28
+        run: npm run build
+      - name: Smoke test production server
+        shell: bash
+        run: |
+          npm run start:preview -- --hostname 127.0.0.1 --port 3000 > /tmp/zentro-preview.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node <<'NODE'
+          const { setTimeout } = require('node:timers/promises');
+          (async () => {
+            for (let attempt = 0; attempt < 30; attempt++) {
+              try {
+                const response = await fetch('http://127.0.0.1:3000/', { signal: AbortSignal.timeout(3000) });
+                if (response.status === 200 && (await response.text()).includes('Zentro')) return;
+              } catch {}
+              await setTimeout(1000);
+            }
+            throw new Error('Production server did not serve Zentro Urbano.');
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+          NODE
+
