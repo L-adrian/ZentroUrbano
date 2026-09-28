@@ -4,6 +4,16 @@ import { gzipSync } from "node:zlib";
 import { parseTourManifest, tourDecision, validTourFile, validTourRevision, validTourSlug } from "../src/lib/property-tour-contract";
 import { limitedTourForm, MAX_TOUR_UPLOAD, validateTourAsset } from "../src/lib/property-tour-validation";
 import { sameOriginAdminMutation } from "../src/lib/admin-access";
+import { tourRenderQuality } from "../src/lib/property-tour-quality";
+
+test("Automatic tours keep full detail on high-density phones without data saving", () => {
+  assert.deepEqual(tourRenderQuality("auto", false, 3), { fileName: "world.spz", pixelRatio: 2 });
+  assert.deepEqual(tourRenderQuality("auto", false, 1), { fileName: "world.spz", pixelRatio: 1 });
+  assert.deepEqual(tourRenderQuality("auto", true, 3), { fileName: "mobile.spz", pixelRatio: 1.5 });
+  assert.deepEqual(tourRenderQuality("high", true, 3), { fileName: "world.spz", pixelRatio: 2 });
+  assert.deepEqual(tourRenderQuality("mobile", false, 3), { fileName: "mobile.spz", pixelRatio: 1.5 });
+  for (const density of [0, -1, NaN, Infinity]) assert.equal(tourRenderQuality("auto", false, density).pixelRatio, 1);
+});
 
 const manifest = { scope: "Cocina y estar", model: "marble-1.1", metricScale: 1.83, groundOffset: 1.54, photoIndices: [1, 4, 10, 11] };
 test("Tour manifest only exposes known fields and original property photos", () => {

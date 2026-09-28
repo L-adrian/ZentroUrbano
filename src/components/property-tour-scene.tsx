@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 import { SparkRenderer, SplatMesh } from "@sparkjsdev/spark";
 import type { PublicTour } from "@/lib/property-tour-contract";
+import { tourRenderQuality } from "@/lib/property-tour-quality";
 
 export type TourActions = { reset: () => void; move: (direction: "forward" | "back" | "left" | "right") => boolean };
 
@@ -24,10 +25,13 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
     const reset = () => { camera.position.copy(anchor); controls!.target.copy(anchor).add(new THREE.Vector3(0, 0, -0.001)); controls!.update(); inspectPixels = true; };
     async function start() {
       try {
+        const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
+        const renderQuality = tourRenderQuality(quality, Boolean(connection?.saveData), devicePixelRatio);
         renderer = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: qa });
-        renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+        renderer.setPixelRatio(renderQuality.pixelRatio);
         renderer.setClearColor("#242826");
         renderer.domElement.tabIndex = 0;
+        renderer.domElement.dataset.asset = renderQuality.fileName;
         renderer.domElement.setAttribute("aria-label", "Recorrido 3D de la vivienda");
         renderer.domElement.addEventListener("webglcontextlost", fail);
         container.appendChild(renderer.domElement);
@@ -46,9 +50,7 @@ export default function TourScene({ tour, quality, actionsRef, onReady, onError 
         observer.observe(container);
         spark = new SparkRenderer({ renderer });
         scene.add(spark);
-        const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
-        const light = quality === "mobile" || (quality === "auto" && (matchMedia("(max-width: 600px)").matches || connection?.saveData));
-        const response = await fetch(tour.assetBase + (light ? "mobile.spz" : "world.spz"), { signal: abort.signal });
+        const response = await fetch(tour.assetBase + renderQuality.fileName, { signal: abort.signal });
         if (!response.ok) throw new Error("Unavailable tour");
         const bytes = await response.arrayBuffer();
         if (disposed) return;
