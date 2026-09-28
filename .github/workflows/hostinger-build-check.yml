@@ -1,0 +1,42 @@
+name: Compare Hostinger builds on Linux
+
+on:
+  push:
+    branches: [codex/hostinger-build-check]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - version: last-successful
+            ref: 8f813938cbe01dab7ff8e30953214572118b6966
+          - version: marble
+            ref: ac98de36917fb2abb6f7effb17e0bfff1791114f
+    name: ${{ matrix.version }} / Node 24.6.0
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24.6.0'
+      - name: Match npm version
+        run: npm install --global npm@11.10.0
+      - name: Clean install
+        id: install
+        run: npm ci --no-audit --no-fund
+      - name: Tests
+        run: npm test
+      - name: Production build
+        if: ${{ !cancelled() && steps.install.outcome != 'failure' }}
+        run: npm run build
