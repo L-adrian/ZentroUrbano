@@ -3,6 +3,10 @@ import { NextResponse } from "next/server";
 import { authenticatedAdmin, configuredAdminPassword } from "@/lib/admin-access";
 
 export function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/propiedades/muestra-privada-")) {
+    return noIndex(NextResponse.next());
+  }
+
   if (
     request.nextUrl.pathname.startsWith("/admin") ||
     request.nextUrl.pathname.startsWith("/api/contact-leads")
@@ -47,5 +51,5 @@ function noIndex(response: NextResponse) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/contact-leads/:path*"],
+  matcher: ["/admin/:path*", "/api/contact-leads/:path*", "/propiedades/muestra-privada-:path*"],
 };

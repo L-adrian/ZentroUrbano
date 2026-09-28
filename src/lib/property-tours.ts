@@ -31,6 +31,7 @@ export async function listTours(): Promise<AdminTour[]> {
       SUM(event_type='property_tour_open') opens,SUM(event_type='property_tour_error') errors,
       SUM(event_type='property_tour_whatsapp_click') contacts
       FROM tracking_events WHERE created_at >= DATE_SUB(UTC_TIMESTAMP(),INTERVAL 30 DAY) GROUP BY property_slug) e ON e.property_slug=t.property_slug
+    WHERE t.status <> 'showcase'
     ORDER BY t.updated_at DESC`);
   return (rows || []).map(r => ({ slug: r.property_slug, title: r.title, revision: r.revision, status: r.status, scope: parseJson(r.manifest).scope, opens: Number(r.opens), errors: Number(r.errors), contacts: Number(r.contacts) }));
 }

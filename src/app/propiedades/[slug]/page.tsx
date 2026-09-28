@@ -40,6 +40,8 @@ import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
+import { getPrivateTourShowcase } from "@/lib/private-tour-showcase";
+import { PrivateTourShowcaseViewer } from "@/components/private-tour-showcase";
 
 // Prices and availability must not survive edits in an external CDN cache.
 export const dynamic = "force-dynamic";
@@ -50,6 +52,15 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
+  const privateShowcase = await getPrivateTourShowcase(slug);
+
+  if (privateShowcase) {
+    return {
+      title: privateShowcase.title,
+      description: "Muestra privada de un recorrido 3D experimental.",
+      robots: { index: false, follow: false, noarchive: true },
+    };
+  }
   const property = await getPropertyBySlugData(slug);
 
   if (!property || !isDirectRental(property)) {
@@ -85,6 +96,11 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
+  const privateShowcase = await getPrivateTourShowcase(slug);
+
+  if (privateShowcase) {
+    return <PrivateTourShowcaseViewer showcase={privateShowcase} />;
+  }
   const property = await getPropertyBySlugData(slug);
 
   if (!property || !isDirectRental(property)) {
