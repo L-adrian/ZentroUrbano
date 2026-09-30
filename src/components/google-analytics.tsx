@@ -19,15 +19,6 @@ export function GoogleAnalytics({ measurementId }: GoogleAnalyticsProps) {
         src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(gaId)}`}
         strategy="afterInteractive"
       />
-      <Script id="google-analytics" strategy="afterInteractive">
-        {`
-          window.dataLayer = window.dataLayer || [];
-          function gtag(){window.dataLayer.push(arguments);}
-          window.gtag = gtag;
-          gtag('js', new Date());
-          gtag('config', ${JSON.stringify(gaId)}, { send_page_view: false });
-        `}
-      </Script>
       <Suspense fallback={null}>
         <GoogleAnalyticsPageView measurementId={gaId} />
       </Suspense>

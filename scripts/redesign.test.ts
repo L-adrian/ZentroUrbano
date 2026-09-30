@@ -110,3 +110,25 @@ test("robots allows public pages and excludes private flows without blocking sta
   assert.ok(rule.disallow?.includes("/cliente"));
   assert.equal(rule.disallow?.includes("/_next/"), false);
 });
+
+test("Google Analytics initializes before hydration and tracks App Router page views", async () => {
+  const instrumentation = await readFile(
+    new URL("../src/instrumentation-client.ts", import.meta.url),
+    "utf8",
+  );
+  const analyticsComponent = await readFile(
+    new URL("../src/components/google-analytics.tsx", import.meta.url),
+    "utf8",
+  );
+  const pageViewComponent = await readFile(
+    new URL("../src/components/google-analytics-page-view.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(instrumentation, /NEXT_PUBLIC_GA_MEASUREMENT_ID/);
+  assert.match(instrumentation, /window\.dataLayer/);
+  assert.match(instrumentation, /window\.gtag\("config"/);
+  assert.match(analyticsComponent, /googletagmanager\.com\/gtag\/js/);
+  assert.doesNotMatch(analyticsComponent, /id="google-analytics"/);
+  assert.match(pageViewComponent, /trackAnalyticsEvent\("page_view"/);
+});
