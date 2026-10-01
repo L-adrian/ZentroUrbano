@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { directRentalDemoProperties } from "../src/lib/direct-rental-demo";
+import { curatedRentalProperties } from "../src/lib/curated-rentals";
 import { publishedProperties, type Property } from "../src/lib/properties";
 import { getDirectRentals, isDirectRental, isRentalPropertyType } from "../src/lib/rentals";
 import { getOperationSeoRoutes, getDepartmentSeoRoutes } from "../src/lib/seo-routes";
@@ -44,6 +45,9 @@ test("legacy data is preserved while rental examples remain eligible", () => {
   assert.ok(catalog.length > 0);
   assert.ok(catalog.every(isDirectRental));
   assert.ok(directRentalDemoProperties.every(isDirectRental));
+  assert.ok(curatedRentalProperties.every(isDirectRental));
+  assert.ok(curatedRentalProperties.every(property => property.isSeeded === false));
+  assert.ok(curatedRentalProperties.every(property => property.images.length >= 5));
   assert.ok(publishedProperties.some((property) => !isDirectRental(property)));
   assert.deepEqual(publishedProperties, before);
 });

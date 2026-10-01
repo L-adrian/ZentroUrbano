@@ -7,6 +7,10 @@ import {
   directRentalDemoProperties,
   getDirectRentalDemoBySlug,
 } from "@/lib/direct-rental-demo";
+import {
+  curatedRentalProperties,
+  getCuratedRentalBySlug,
+} from "@/lib/curated-rentals";
 import { hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { isDirectRental } from "@/lib/rentals";
 import { parsePropertyExchangeRate } from "@/lib/currency";
@@ -69,21 +73,27 @@ export async function getPublishedPropertiesData() {
     const storedProperties = data ? data.map(mapPropertyRow) : publishedProperties;
 
     const retired = await getRetiredDemoSlugs();
-    return mergeProperties(directRentalDemoProperties, storedProperties)
+    return mergeProperties(
+      directRentalDemoProperties,
+      mergeProperties(curatedRentalProperties, storedProperties),
+    )
       .filter(property => !retired.has(property.slug) && isDirectRental(property))
       .sort(sortPropertiesByVisibility);
   } catch {
-    if (hasDatabaseConfig()) return [];
+    if (hasDatabaseConfig()) {
+      return curatedRentalProperties.filter(isDirectRental).sort(sortPropertiesByVisibility);
+    }
     return mergeProperties(
       directRentalDemoProperties,
-      hasDatabaseConfig() ? [] : publishedProperties,
+      mergeProperties(curatedRentalProperties, publishedProperties),
     ).filter(isDirectRental).sort(sortPropertiesByVisibility);
   }
 }
 
 export async function getPropertyBySlugData(slug: string) {
   const demoFallback = getDirectRentalDemoBySlug(slug);
-  const candidate = demoFallback ?? getPropertyBySlug(slug);
+  const curatedFallback = getCuratedRentalBySlug(slug);
+  const candidate = curatedFallback ?? demoFallback ?? getPropertyBySlug(slug);
   const fallback = candidate && isDirectRental(candidate) ? candidate : undefined;
 
   try {
@@ -95,7 +105,7 @@ export async function getPropertyBySlugData(slug: string) {
 
     if (!data) {
       if (hasDatabaseConfig()) {
-        return demoFallback;
+        return curatedFallback ?? demoFallback;
       }
 
       return fallback;
@@ -104,7 +114,7 @@ export async function getPropertyBySlugData(slug: string) {
     const property = mapPropertyRow(data);
     return isDirectRental(property) ? property : undefined;
   } catch {
-    return hasDatabaseConfig() ? undefined : fallback;
+    return curatedFallback ?? (hasDatabaseConfig() ? undefined : fallback);
   }
 }
 
@@ -130,7 +140,7 @@ export async function getFeaturedPropertiesData() {
 }
 
 export function mapPropertyRow(row: PropertyRow): Property {
-  const fallback = getDirectRentalDemoBySlug(row.slug) ?? getPropertyBySlug(row.slug);
+  const fallback = getCuratedRentalBySlug(row.slug) ?? getDirectRentalDemoBySlug(row.slug) ?? getPropertyBySlug(row.slug);
   const coordinates = parseCoordinates(row.coordinates, fallback?.coordinates);
   const owner = parseJson(row.owner_profile) as {name:string;email:string;phone:string;avatar:string;verified:boolean}|null;
 
