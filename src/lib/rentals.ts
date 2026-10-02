@@ -23,3 +23,8 @@ export function getRentalZones(properties: Property[]) {
     .filter(Boolean)
     .sort((first, second) => first.localeCompare(second, "es"));
 }
+
+// Catalog and map payloads are serialized into the page; contact emails are only needed on the listing page.
+export function withoutContactEmail(properties: Property[]) {
+  return properties.map((property) => ({ ...property, agent: { ...property.agent, email: "" } }));
+}

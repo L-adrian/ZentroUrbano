@@ -1,9 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { safeAuthNext } from "@/lib/auth-navigation";
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url);
-  const nextParam = requestUrl.searchParams.get("next");
-  const next = nextParam?.startsWith("/") ? nextParam : "/cliente";
+  const next = safeAuthNext(new URL(request.url).searchParams.get("next"));
 
   return NextResponse.redirect(new URL(next, request.url));
 }

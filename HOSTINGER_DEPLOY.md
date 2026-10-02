@@ -73,9 +73,12 @@ Alternativa si solo tienes phpMyAdmin: selecciona la base correcta e importa, en
 - database/mysql/001_zentro_urbano_core.sql
 - database/mysql/002_property_exchange_rate.sql
 - database/mysql/003_publication_review.sql
+- database/mysql/004_owner_username.sql
+- database/mysql/005_demo_replacements.sql
+- database/mysql/006_property_tours.sql
 
 Para una base recien creada y VACIA, npm run db:export prepara un unico archivo
-output/hostinger-private/zentro-urbano-inicial.sql con las tres migraciones y sus
+output/hostinger-private/zentro-urbano-inicial.sql con todas las migraciones y sus
 checksums. Selecciona la base en phpMyAdmin > Importar y carga ese archivo una sola vez.
 No incluye cuentas ni fichas de prueba. No utilizarlo para actualizar una base con datos;
 las actualizaciones usan db:migrate con respaldo y confirmacion del nombre.

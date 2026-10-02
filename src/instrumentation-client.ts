@@ -14,6 +14,8 @@ if (measurementId) {
   try {
     window.dataLayer ??= [];
     window.gtag ??= function gtag() {
+      // gtag.js only recognizes the native arguments object; rest parameters would silently break GA.
+      // eslint-disable-next-line prefer-rest-params
       window.dataLayer?.push(arguments);
     };
 

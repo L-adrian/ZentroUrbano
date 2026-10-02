@@ -1,19 +1,8 @@
 import { headers } from "next/headers";
 import { executeQuery, hasDatabaseConfig } from "@/lib/mysql";
+import type { TrackingEventType } from "@/lib/tracking-events";
 
-export type TrackingEventType =
-  | "property_view"
-  | "property_card_click"
-  | "property_whatsapp_click"
-  | "property_share_click"
-  | "property_map_view"
-  | "property_gallery_open"
-  | "property_tour_open"
-  | "property_tour_ready"
-  | "property_tour_error"
-  | "property_tour_whatsapp_click"
-  | "ad_impression"
-  | "ad_click";
+export type { TrackingEventType };
 
 export type TrackingPayload = {
   eventType: TrackingEventType;
@@ -41,22 +30,29 @@ export async function trackServerEvent(payload: TrackingPayload) {
         (:eventType, :propertySlug, :adId, :path, :referrer, :userAgent, :metadata)`,
       {
         eventType: payload.eventType,
-        propertySlug: payload.propertySlug ?? null,
-        adId: payload.adId ?? null,
-        path: payload.path ?? requestHeaders.get("referer") ?? null,
-        referrer: requestHeaders.get("referer"),
-        userAgent: requestHeaders.get("user-agent"),
+        propertySlug: clip(payload.propertySlug, 180),
+        adId: clip(payload.adId, 120),
+        path: clip(payload.path ?? requestHeaders.get("referer"), 500),
+        referrer: clip(requestHeaders.get("referer"), 500),
+        userAgent: clip(requestHeaders.get("user-agent"), 500),
         metadata: JSON.stringify(payload.metadata ?? {}),
       },
     );
   } catch (error) {
+    // Database errors stay in the server log; clients only learn that the event was not stored.
+    console.error("tracking_events insert failed", error);
     return {
       stored: false,
-      reason: error instanceof Error ? error.message : "No se pudo guardar el evento.",
+      reason: "No se pudo guardar el evento.",
     };
   }
 
   return {
     stored: true,
   };
+}
+
+// Column widths from tracking_events; longer values would make strict-mode inserts fail.
+function clip(value: string | null | undefined, length: number) {
+  return typeof value === "string" && value ? value.slice(0, length) : null;
 }
