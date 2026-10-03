@@ -2,7 +2,8 @@ name: Hostinger glibc compatibility
 
 on:
   push:
-    branches: [main, codex/hostinger-glibc-compat]
+    branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -42,6 +43,12 @@ jobs:
             console.log('Native incompatibility reproduced; SWC WASM fallback loaded.');
           }).catch(error => { console.error(error); process.exitCode = 1; });
           NODE
+      - name: Lint
+        run: npm run lint
+      - name: Typecheck
+        run: |
+          npx next typegen
+          npx tsc --noEmit
       - name: Tests
         run: npm test
       - name: Production build on glibc 2.28

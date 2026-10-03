@@ -80,6 +80,7 @@ export async function generateMetadata({
     image: `/propiedades/${property.slug}/opengraph-image`,
     imageAlt: `${property.title} en ${property.zone}, ${property.city}`,
     type: "article",
+    noIndex: property.isSeeded,
     keywords: [
       property.title,
       `${property.type} en ${property.zone}`,

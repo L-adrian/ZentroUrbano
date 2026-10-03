@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
+import { withoutContactEmail } from "@/lib/rentals";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { filterPropertiesBySeoRoute } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -29,6 +30,7 @@ export async function generateMetadata({
     title: `Alquiler directo en ${zoneName}`,
     description: `Casas y departamentos en alquiler directo con el propietario en ${zoneName}, Santa Cruz. Sin comisión inmobiliaria.`,
     path: `/${operation}/${city}/${zone}`,
+    noIndex: properties.every((property) => property.isSeeded),
     keywords: [
       `alquiler en ${zoneName}`,
       `alquiler directo ${zoneName}`,
@@ -67,7 +69,7 @@ export default async function OperationZonePage({
           Viviendas sin intermediarios ni comisión inmobiliaria.
         </p>
       </div>
-      <DirectRentalExplorer properties={properties} initialZone={zoneName} />
+      <DirectRentalExplorer properties={withoutContactEmail(properties)} initialZone={zoneName} />
     </main>
   );
 }

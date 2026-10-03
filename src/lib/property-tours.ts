@@ -73,8 +73,9 @@ export async function reviewTour(slug: string, input: unknown, admin: string) {
   });
 }
 
-export async function tourAsset(slug: string, revision: string, name: TourFile, preview = false) {
+export async function tourAsset(slug: string, revision: string, name: TourFile, preview = false, withData = true) {
   const tour = await readTour(slug, preview);
   if (!tour || tour.revision !== revision) return null;
-  return queryOne<{ data: Buffer; sha256: string }>("SELECT a.data,a.sha256 FROM property_tour_assets a JOIN property_tours t ON t.property_slug=a.property_slug WHERE a.property_slug=:slug AND a.filename=:name AND t.revision=:revision AND (:preview=1 OR (t.status='published' AND t.owner_approved_at IS NOT NULL))", { slug, name, revision, preview: preview ? 1 : 0 });
+  // Revalidations only need the hash, so the up-to-10 MiB scene stays in MySQL for a 304.
+  return queryOne<{ data?: Buffer; sha256: string }>(`SELECT ${withData ? "a.data," : ""}a.sha256 FROM property_tour_assets a JOIN property_tours t ON t.property_slug=a.property_slug WHERE a.property_slug=:slug AND a.filename=:name AND t.revision=:revision AND (:preview=1 OR (t.status='published' AND t.owner_approved_at IS NOT NULL))`, { slug, name, revision, preview: preview ? 1 : 0 });
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getDirectRentals } from "@/lib/rentals";
+import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function MapPage() {
           Compara ubicaciones y contacta directamente al propietario.
         </p>
       </div>
-      <DirectRentalExplorer properties={properties} initialView="map" />
+      <DirectRentalExplorer properties={withoutContactEmail(properties)} initialView="map" />
     </main>
   );
 }

@@ -1,3 +1,5 @@
+import { isServerTrackedEvent } from "@/lib/tracking-events";
+
 type AnalyticsWindow = Window & {
   gtag?: (...args: unknown[]) => void;
 };
@@ -14,7 +16,9 @@ export function trackAnalyticsEvent(eventName: string, params?: Record<string, u
     gtag("event", eventName, sanitizedParams);
   }
 
-  queueServerTracking(eventName, sanitizedParams);
+  if (isServerTrackedEvent(eventName)) {
+    queueServerTracking(eventName, sanitizedParams);
+  }
 }
 
 function sanitizeAnalyticsParams(params?: Record<string, unknown>) {

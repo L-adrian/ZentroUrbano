@@ -5,6 +5,7 @@ import { isRentalPropertyType } from "@/lib/rentals";
 import { isDisplayCurrency, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import { revalidatePath } from "next/cache";
 import { getPropertyVideoUrl } from "@/lib/property-video";
+import { allowedOwnerImage, ownerMapUrl, ownerWhatsapp, parseJsonArray } from "@/lib/owner-listing-edit";
 
 export async function PATCH(
   request: NextRequest,
@@ -65,9 +66,20 @@ export async function PATCH(
     return NextResponse.json({ ok: false, stored: false, message: "Revisa la moneda y el tipo de cambio: debe ser mayor a 0 y de hasta 1000 Bs por USD." }, { status: 400 });
   }
 
+  let whatsapp: string | null | undefined;
+  let mapUrl: string | null | undefined;
   try {
-    const current=await queryOne<{currency:string;requirements:unknown;rental_details:unknown}>("SELECT currency,requirements,rental_details FROM properties WHERE slug=:slug",{slug});
+    const current=await queryOne<{currency:string;requirements:unknown;rental_details:unknown;images:unknown;whatsapp:string|null;map_url:string|null}>("SELECT currency,requirements,rental_details,images,whatsapp,map_url FROM properties WHERE slug=:slug",{slug});
     if (!current) return NextResponse.json({ok:false,stored:false,message:"Ficha no encontrada."},{status:404});
+    const currentImages=parseJsonArray(current.images);
+    if ((payload.images as string[]).some(image=>!allowedOwnerImage(image,currentImages))) {
+      return NextResponse.json({ok:false,stored:false,message:"Las fotos nuevas deben subirse con una nueva solicitud para revisión."},{status:400});
+    }
+    whatsapp=ownerWhatsapp(payload.whatsapp,current.whatsapp);
+    mapUrl=ownerMapUrl(payload.mapUrl,current.map_url);
+    if (whatsapp===undefined || mapUrl===undefined) {
+      return NextResponse.json({ok:false,stored:false,message:"Revisa el WhatsApp (8 dígitos que empiecen por 6 o 7, con o sin +591) y el enlace del mapa (https)."},{status:400});
+    }
     const requirements=typeof current.requirements === "string" ? JSON.parse(current.requirements) : current.requirements;
     if (current.rental_details && (current.currency !== currency || JSON.stringify(requirements) !== JSON.stringify(payload.requirements))) {
       return NextResponse.json({ok:false,stored:false,message:"Los cambios de moneda o condiciones de ingreso requieren una nueva solicitud para revisión. Puedes actualizar el precio y el tipo de cambio aquí."},{status:400});
@@ -136,8 +148,8 @@ export async function PATCH(
       requirements: json(payload.requirements, []),
       images: json(payload.images, []),
       video: nullableText(payload.video),
-      mapUrl: nullableText(payload.mapUrl),
-      whatsapp: nullableText(payload.whatsapp),
+      mapUrl,
+      whatsapp,
       idealFor: json(payload.idealFor, []),
       tags: json(payload.tags, []),
       coordinates: json(payload.coordinates, null),
@@ -179,3 +191,4 @@ function boolean(value: unknown) {
 function json(value: unknown, fallback: unknown) {
   return JSON.stringify(value ?? fallback);
 }
+

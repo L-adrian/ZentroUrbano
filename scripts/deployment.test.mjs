@@ -69,6 +69,13 @@ test("Hostinger builds with Webpack and a pinned SWC WebAssembly fallback", asyn
   assert.ok((await config.redirects()).length > 0);
   assert.match(readFileSync("scripts/package-hostinger.ps1", "utf8"), /next\.config\.mjs/);
   assert.match(readFileSync("scripts/package-hostinger.ps1", "utf8"), /prepare-swc-wasm\.mjs/);
+  // The ZIP must carry every migration, or start-hostinger refuses to boot on a fresh database.
+  assert.match(readFileSync("scripts/package-hostinger.ps1", "utf8"), /database\/mysql'\) -Filter '\*\.sql'/);
+  const securityHeaders = (await config.headers()).find(rule => rule.source === "/:path*")?.headers.map(header => header.key);
+  for (const key of ["Strict-Transport-Security", "X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy"]) {
+    assert.ok(securityHeaders?.includes(key), `Missing security header: ${key}`);
+  }
+  assert.equal(config.poweredByHeader, false);
   const prepared = spawnSync(process.execPath, ["scripts/prepare-swc-wasm.mjs"], {
     encoding: "utf8", windowsHide: true, timeout: 10000,
   });

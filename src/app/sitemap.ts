@@ -26,7 +26,10 @@ const staticRoutes = [
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date();
-  const publishedProperties = getDirectRentals(await getPublishedPropertiesData());
+  // Demo listings ("Ficha de prueba") are noindex and stay out of the sitemap and zone routes.
+  const publishedProperties = getDirectRentals(await getPublishedPropertiesData()).filter(
+    (property) => !property.isSeeded,
+  );
 
   return [
     ...staticRoutes.map((route) => ({

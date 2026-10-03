@@ -3,9 +3,25 @@
 const nextConfig = {
   allowedDevOrigins: ["127.0.0.1", "192.168.*.*"],
   devIndicators: false,
+  poweredByHeader: false,
   experimental: {
     // The admin importer accepts two SPZ scenes plus a small manifest.
     proxyClientMaxBodySize: 21 * 1024 * 1024,
+  },
+  async headers() {
+    // Baseline headers that do not restrict scripts or embeds; a CSP should start in Report-Only.
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), payment=(), usb=()" },
+        ],
+      },
+    ];
   },
   async redirects() {
     return [

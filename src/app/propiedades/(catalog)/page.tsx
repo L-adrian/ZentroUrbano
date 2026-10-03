@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import type { PropertyType } from "@/lib/properties";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getDirectRentals } from "@/lib/rentals";
+import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +52,7 @@ export default async function PropertiesPage({
       </div>
 
       <DirectRentalExplorer
-        properties={directRentals}
+        properties={withoutContactEmail(directRentals)}
         initialQuery={q}
         initialZone={zone}
         initialPropertyType={propertyType}

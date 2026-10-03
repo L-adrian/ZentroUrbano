@@ -12,11 +12,11 @@ $paths = @(
     'HOSTINGER_DEPLOY.md', 'CONFIGURACION.env.example',
     'scripts/database-cli.mjs', 'scripts/database-migrations.mjs', 'scripts/start-hostinger.mjs',
     'scripts/runtime-environment.mjs',
-    'scripts/prepare-swc-wasm.mjs',
-    'database/mysql/001_zentro_urbano_core.sql',
-    'database/mysql/002_property_exchange_rate.sql',
-    'database/mysql/003_publication_review.sql'
+    'scripts/prepare-swc-wasm.mjs'
 )
+# Every migration ships: start-hostinger refuses to boot when a later schema step is missing.
+$paths += Get-ChildItem -LiteralPath (Join-Path $root 'database/mysql') -Filter '*.sql' -File |
+    Sort-Object Name | ForEach-Object { 'database/mysql/' + $_.Name }
 foreach ($folder in @('src', 'public')) {
     $paths += Get-ChildItem -LiteralPath (Join-Path $root $folder) -Recurse -File |
         ForEach-Object { $_.FullName.Substring($root.Length + 1).Replace('\', '/') }
@@ -62,7 +62,7 @@ try {
 $check = [IO.Compression.ZipFile]::OpenRead($destination)
 try {
     $names = @($check.Entries | ForEach-Object { $_.FullName })
-    foreach ($required in @('package.json', 'package-lock.json', '.npmrc', 'src/app/page.tsx', 'src/app/api/publication-requests/route.ts', 'src/app/admin/solicitudes/[id]/decision/route.ts', 'database/mysql/003_publication_review.sql', 'scripts/database-cli.mjs', 'scripts/start-hostinger.mjs', 'CONFIGURACION.env.example', 'public/images/family-rental/family-atlas.webp')) {
+    foreach ($required in @('package.json', 'package-lock.json', '.npmrc', 'src/app/page.tsx', 'src/app/api/publication-requests/route.ts', 'src/app/admin/solicitudes/[id]/decision/route.ts', 'database/mysql/003_publication_review.sql', 'database/mysql/006_property_tours.sql', 'scripts/database-cli.mjs', 'scripts/start-hostinger.mjs', 'CONFIGURACION.env.example', 'public/images/family-rental/family-atlas.webp')) {
         if ($required -notin $names) { throw "Missing ZIP entry: $required" }
     }
     if ($names.Count -ne ($paths.Count + 1)) { throw 'ZIP entry count mismatch' }
