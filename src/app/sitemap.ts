@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import {
+  getCitySeoRoutes,
   getDepartmentSeoRoutes,
   getOperationSeoRoutes,
 } from "@/lib/seo-routes";
@@ -43,6 +44,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "weekly" as const,
       priority: 0.8,
+    })),
+    ...getCitySeoRoutes(publishedProperties).map((route) => ({
+      url: absoluteUrl(`/${route.operation}/${route.city}`),
+      lastModified: now,
+      changeFrequency: "daily" as const,
+      priority: 0.9,
     })),
     ...getOperationSeoRoutes(publishedProperties).map((route) => ({
       url: absoluteUrl(`/${route.operation}/${route.city}/${route.zone}`),

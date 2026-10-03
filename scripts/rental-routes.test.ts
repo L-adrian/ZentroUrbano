@@ -100,3 +100,15 @@ test("directions exist in server HTML without waiting for Leaflet", options, asy
   assert.equal(url.searchParams.get("api"), "1");
   assert.equal(url.searchParams.get("destination"), "-17.7587,-63.1968");
 });
+
+test("Santa Cruz rental landing page is indexable and old keyword URLs redirect to it", options, async () => {
+  const response = await request("/alquiler/santa-cruz-de-la-sierra");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<h1[^>]*>Alquiler en (<!-- -->)?Santa Cruz de la Sierra(<!-- -->)?, directo con el dueño<\/h1>/);
+  assert.match(html, /"@type":"BreadcrumbList"/);
+  assert.doesNotMatch(html, /noindex/);
+  const redirect = await request("/alquiler-santa-cruz", { redirect: "manual" });
+  assert.equal(redirect.status, 308);
+  assert.match(redirect.headers.get("location") ?? "", /\/alquiler\/santa-cruz-de-la-sierra$/);
+});
