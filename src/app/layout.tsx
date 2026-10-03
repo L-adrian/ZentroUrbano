@@ -8,6 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { themeScript } from "@/lib/theme";
 import { absoluteUrl, siteConfig } from "@/lib/site";
+import { jsonLdScript, organizationJsonLd, websiteJsonLd } from "@/lib/structured-data";
 import "./globals.css";
 import "./redesign.css";
 
@@ -20,7 +21,7 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {
-    default: "Zentro Urbano | Alquiler directo en Bolivia",
+    default: "Zentro Urbano | Alquiler directo con dueños en Santa Cruz",
     template: "%s | Zentro Urbano",
   },
   description: siteConfig.description,
@@ -37,7 +38,7 @@ export const metadata: Metadata = {
     canonical: absoluteUrl("/"),
   },
   openGraph: {
-    title: "Zentro Urbano | Alquiler directo en Bolivia",
+    title: "Zentro Urbano | Alquiler directo con dueños en Santa Cruz",
     description: siteConfig.description,
     url: siteConfig.url,
     siteName: siteConfig.name,
@@ -54,7 +55,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Zentro Urbano | Alquiler directo en Bolivia",
+    title: "Zentro Urbano | Alquiler directo con dueños en Santa Cruz",
     description: siteConfig.description,
     images: [absoluteUrl("/opengraph-image")],
   },
@@ -62,6 +63,8 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  // Google Search Console ownership check; set NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION on the server.
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION ? { verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION } } : {}),
 };
 
 export const viewport: Viewport = {
@@ -72,8 +75,8 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="es" className={`${geistSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /></head>
+    <html lang="es-BO" className={`${geistSans.variable} h-full antialiased`} suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /><script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript([organizationJsonLd(), websiteJsonLd()])} /></head>
       <body className="flex min-h-full flex-col">
         <SiteHeader />
         {children}

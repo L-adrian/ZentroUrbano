@@ -94,3 +94,34 @@ export function filterDepartmentsByZone(
       zoneSlug(property) === zoneSlugParam,
   );
 }
+
+export function filterPropertiesByCity({
+  operationSlugParam,
+  citySlugParam,
+  properties = publishedProperties,
+}: {
+  operationSlugParam: string;
+  citySlugParam: string;
+  properties?: Property[];
+}) {
+  const operation = operationRouteMap[operationSlugParam];
+
+  if (!operation) {
+    return [];
+  }
+
+  return properties.filter(
+    (property) => isDirectRental(property) && property.operation === operation && citySlug(property) === citySlugParam,
+  );
+}
+
+export function getCitySeoRoutes(properties: Property[] = publishedProperties) {
+  const uniqueRoutes = new Map<string, { operation: string; city: string }>();
+
+  properties.filter(isDirectRental).forEach((property) => {
+    const route = { operation: operationSlug(property.operation), city: citySlug(property) };
+    uniqueRoutes.set(`${route.operation}/${route.city}`, route);
+  });
+
+  return Array.from(uniqueRoutes.values());
+}

@@ -47,27 +47,27 @@ const nextConfig = {
       },
       {
         source: "/alquiler-scz",
-        destination: "/propiedades?operation=Alquiler",
+        destination: "/alquiler/santa-cruz-de-la-sierra",
         permanent: true,
       },
       {
         source: "/alquiler-santa-cruz",
-        destination: "/propiedades?operation=Alquiler",
+        destination: "/alquiler/santa-cruz-de-la-sierra",
         permanent: true,
       },
       {
         source: "/alquileres-scz",
-        destination: "/propiedades?operation=Alquiler",
+        destination: "/alquiler/santa-cruz-de-la-sierra",
         permanent: true,
       },
       {
         source: "/alquileres-santa-cruz",
-        destination: "/propiedades?operation=Alquiler",
+        destination: "/alquiler/santa-cruz-de-la-sierra",
         permanent: true,
       },
       {
         source: "/alquiler-santa-cruz-bolivia",
-        destination: "/propiedades?operation=Alquiler",
+        destination: "/alquiler/santa-cruz-de-la-sierra",
         permanent: true,
       },
     ];

@@ -12,9 +12,9 @@ import { buildSeoMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Alquileres directos en Santa Cruz",
-  description: "Casas, departamentos y monoambientes en alquiler. Contacta directamente al propietario, sin intermediarios ni comisiones.",
-  path: "/", keywords: ["alquiler SCZ", "alquiler directo Santa Cruz", "departamentos en alquiler Santa Cruz", "casas en alquiler Santa Cruz"],
+  title: "Alquiler directo con dueños en Santa Cruz de la Sierra",
+  description: "Casas, departamentos y monoambientes en alquiler en Santa Cruz de la Sierra, directo con el dueño. Sin inmobiliarias ni comisiones.",
+  path: "/", keywords: ["alquiler Santa Cruz de la Sierra", "alquiler dueño directo Santa Cruz", "alquiler directo Santa Cruz", "alquiler SCZ", "departamentos en alquiler Santa Cruz", "casas en alquiler Santa Cruz"],
 });
 const categories = [
   { label: "Todos", href: "/propiedades", icon: SlidersHorizontal },
@@ -31,7 +31,7 @@ export default async function HomePage() {
     <section className="rental-heading">
       <div className="zu-container">
         <div className="rental-heading-row">
-          <div><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquileres de viviendas. De propietario a inquilino.</p></div>
+          <div><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquiler de casas y departamentos en Santa Cruz de la Sierra, directo con el dueño.</p></div>
           <div className="rental-heading-art"><PixelNeighborhood /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
         </div>
         <HomeRentalSearch zones={getRentalZones(rentals)} />

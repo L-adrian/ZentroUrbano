@@ -36,6 +36,8 @@ import {
   getSimilarPropertiesData,
 } from "@/lib/property-data";
 import { buildSeoMetadata } from "@/lib/seo";
+import { citySlug, operationSlug, zoneSlug } from "@/lib/seo-routes";
+import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
 import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
@@ -75,9 +77,11 @@ export async function generateMetadata({
     };
   }
 
+  const seoTitle = /alquiler/i.test(property.title) ? property.title : `Alquiler: ${property.title}`;
+  const seoDescription = `Alquiler directo con el dueño en ${property.zone}, ${property.city}. ${property.shortDescription}`.slice(0, 300);
   return buildSeoMetadata({
-    title: property.title,
-    description: property.shortDescription,
+    title: seoTitle,
+    description: seoDescription,
     path: `/propiedades/${property.slug}`,
     image: `/propiedades/${property.slug}/opengraph-image`,
     imageAlt: `${property.title} en ${property.zone}, ${property.city}`,
@@ -87,7 +91,8 @@ export async function generateMetadata({
       property.title,
       `${property.type} en ${property.zone}`,
       `${property.operation} en ${property.city}`,
-      "propiedades Bolivia",
+      `alquiler en ${property.zone}`,
+      "alquiler dueño directo Santa Cruz",
       "Zentro Urbano",
     ],
   });
@@ -129,6 +134,13 @@ export default async function PropertyDetailPage({
     },
     url: absoluteUrl(`/propiedades/${property.slug}`),
   };
+  const cityPath = `/${operationSlug(property.operation)}/${citySlug(property)}`;
+  const breadcrumbs = breadcrumbJsonLd([
+    { name: "Inicio", path: "/" },
+    { name: `Alquiler en ${property.city}`, path: cityPath },
+    { name: property.zone, path: `${cityPath}/${zoneSlug(property)}` },
+    { name: property.title, path: `/propiedades/${property.slug}` },
+  ]);
 
   const similarProperties = await getSimilarPropertiesData(property);
   const tour = await publishedTour(property.slug);
@@ -145,6 +157,7 @@ export default async function PropertyDetailPage({
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
       />
+      <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumbs)} />
       <section className="bg-neutral-50 py-6 sm:py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
