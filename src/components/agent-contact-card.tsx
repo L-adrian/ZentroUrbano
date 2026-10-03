@@ -3,6 +3,7 @@ import Image from "next/image";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { PublisherBadge } from "@/components/publisher-badge";
 import { getPropertyContactCopy, isExternalContactUrl } from "@/lib/property-contact";
+import { SafetyNotice } from "@/components/safety-notice";
 import type { Property } from "@/lib/properties";
 
 type AgentContactCardProps = {
@@ -118,9 +119,7 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
           {contactCopy.label}
         </a>
         <PropertyShareButton property={property} />
-        <p className="text-center text-xs leading-5 text-neutral-500">
-          Confirma disponibilidad, garantía y condiciones directamente antes de visitar.
-        </p>
+        <SafetyNotice slug={property.slug} />
       </div>
     </div>
   );

@@ -44,6 +44,10 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
       </button>
       {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><Image src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
     </div>}
+    {photoCount > 1 && <div className="gallery-strip" aria-label="Más fotos">{property.images.slice(1, 5).map((src, index) => {
+      const remaining = photoCount - 5;
+      return <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={index === 3 && remaining > 0 ? `Ver ${remaining + 1} fotos más` : `Ver foto ${index + 2}`}><Image src={src} alt="" fill sizes="25vw" quality={68} />{index === 3 && remaining > 0 && <span className="gallery-strip-more">+{remaining + 1}</span>}</button>;
+    })}</div>}
     {(videoUrl || tour) && <div className="gallery-media-actions">{videoUrl && <button type="button" className="zu-button zu-button-secondary" onClick={() => open(photoCount)}><Play size={16} aria-hidden="true" />Ver video</button>}{tour && <PropertyTourButton tour={tour} />}</div>}
     {property.rentalDetails?.mediaNote && <p className="gallery-media-note">{property.rentalDetails.mediaNote}</p>}
     <dialog ref={dialog} className="gallery-dialog" onCancel={() => setActive(null)} onClose={() => setActive(null)} aria-modal="true" aria-label={`Galería: ${property.title}`} onKeyDown={event => {

@@ -28,6 +28,7 @@ import { PropertyCard } from "@/components/property-card";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { PropertyViewTracker } from "@/components/property-view-tracker";
 import { PublisherBadge } from "@/components/publisher-badge";
+import { SafetyNotice } from "@/components/safety-notice";
 import { toSafeMobileImageUrl } from "@/components/safe-mobile-image";
 import type { Property } from "@/lib/properties";
 import {
@@ -38,6 +39,7 @@ import { buildSeoMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
+import { getAvailabilityLabel, getEntryCost, getGuaranteeLabel } from "@/lib/listing-summary";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
 import { getPrivateTourShowcase } from "@/lib/private-tour-showcase";
@@ -158,7 +160,7 @@ export default async function PropertyDetailPage({
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950"
                 label="Compartir"
               />
-              <span className="rounded-full bg-[#eef7ef] px-4 py-2 text-sm font-semibold text-[#285340]">
+              <span className="hidden rounded-full bg-[#eef7ef] px-4 py-2 text-sm font-semibold text-[#285340] sm:inline-flex">
                 {property.isSeeded
                   ? "Ficha de prueba"
                   : property.listingPlan === "featured"
@@ -227,6 +229,8 @@ export default async function PropertyDetailPage({
                   {getAvailabilityLabel(property)}
                 </span>
               </div>
+              <EntryCostBreakdown property={property} />
+              <SafetyNotice slug={property.slug} className="mt-4" />
             </div>
 
             <div className="quick-facts border-y border-neutral-200 py-3 sm:py-4">
@@ -330,8 +334,8 @@ function QuickFact({
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-5 text-neutral-950">{value}</p>
-        <p className="truncate text-xs font-medium leading-4 text-neutral-500">{label}</p>
+        <p className={`text-sm font-semibold leading-5 text-neutral-950 [overflow-wrap:anywhere] ${value === "Consultar" ? "quick-fact-unknown" : ""}`}>{value}</p>
+        <p className="text-xs font-medium leading-4 text-neutral-500">{label}</p>
       </div>
     </div>
   );
@@ -396,28 +400,6 @@ function propertyQuickFacts(property: Property) {
   });
 }
 
-function getGuaranteeLabel(property: Property) {
-  const requirement = property.requirements.find((item) => /garant[ií]a/i.test(item));
-
-  if (!requirement) {
-    return "Consultar";
-  }
-
-  if (/sin garant[ií]a/i.test(requirement)) {
-    return "Sin garantía";
-  }
-
-  if (/2\s*mes/i.test(requirement)) {
-    return "2 meses";
-  }
-
-  if (/1\s*mes|un mes|equivalente a un mes/i.test(requirement)) {
-    return "1 mes";
-  }
-
-  return "Consultar";
-}
-
 function getEntryCostMultiplier(property: Property) {
   const guarantee = getGuaranteeLabel(property);
 
@@ -434,21 +416,6 @@ function getEntryCostMultiplier(property: Property) {
   }
 
   return null;
-}
-
-function getAvailabilityLabel(property: Property) {
-  if (!property.availabilityConfirmedAt) {
-    return "Confirma disponibilidad antes de visitar";
-  }
-
-  const confirmedAt = new Date(property.availabilityConfirmedAt);
-  const days = Math.max(0, Math.floor((Date.now() - confirmedAt.getTime()) / 86_400_000));
-
-  if (days === 0) {
-    return "Confirmado hoy";
-  }
-
-  return `Confirmado hace ${days} ${days === 1 ? "día" : "días"}`;
 }
 
 function hasKnownBathrooms(property: Property) {
@@ -524,4 +491,21 @@ function featureList(property: Property) {
   ];
 
   return features.filter((feature) => feature.enabled);
+}
+
+function EntryCostBreakdown({ property }: { property: Property }) {
+  const entry = getEntryCost(property);
+  if (!entry || entry.total <= property.price) return null;
+  const price = (amount: number) => <PriceDisplay property={{ ...property, price: amount }} showPeriod={false} showExchangeRate={false} />;
+  return (
+    <section className="entry-cost mt-4" aria-labelledby="entry-cost-title">
+      <h2 id="entry-cost-title">Costo para entrar</h2>
+      <dl>
+        <div><dt>Primer mes</dt><dd>{price(entry.rent)}</dd></div>
+        {entry.expenses > 0 && <div><dt>Expensas del mes</dt><dd>{price(entry.expenses)}</dd></div>}
+        <div><dt>Garantía</dt><dd>{entry.deposit > 0 ? price(entry.deposit) : "Sin garantía"}</dd></div>
+        <div className="total"><dt>Total al firmar</dt><dd>{price(entry.total)}</dd></div>
+      </dl>
+    </section>
+  );
 }
