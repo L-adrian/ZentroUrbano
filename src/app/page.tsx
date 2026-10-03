@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { HomeRentalSearch } from "@/components/home-rental-search";
 import { PropertyCard } from "@/components/property-card";
-import { RentalMotion } from "@/components/rental-motion";
+import { PixelNeighborhood } from "@/components/pixel-neighborhood";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { getDirectRentals, getRentalZones } from "@/lib/rentals";
@@ -32,7 +32,7 @@ export default async function HomePage() {
       <div className="zu-container">
         <div className="rental-heading-row">
           <div><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquileres de viviendas. De propietario a inquilino.</p></div>
-          <div className="rental-heading-art"><RentalMotion /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
+          <div className="rental-heading-art"><PixelNeighborhood /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
         </div>
         <HomeRentalSearch zones={getRentalZones(rentals)} />
         <div className="home-welcome">

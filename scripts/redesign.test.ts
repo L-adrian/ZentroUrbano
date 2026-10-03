@@ -38,6 +38,15 @@ test("money inputs preserve thousands and distinguish decimal cents", () => {
   assert.equal(formatPriceInCurrency({price:3400,currency:"BOB",operation:"Alquiler"},"BOB"),"Bs 3.400/mes");
 });
 
+test("pixel neighborhood scene is light, accessible and respects reduced motion", async () => {
+  const svg = await readFile(new URL("../public/images/pixel/barrio-zentro.svg", import.meta.url), "utf8");
+  assert.ok(svg.length < 60_000);
+  assert.match(svg, /^<svg[^>]+viewBox="0 0 124 60"/);
+  assert.match(svg, /role="img" aria-label="[^"]+"/);
+  assert.match(svg, /@media \(prefers-reduced-motion:reduce\)/);
+  assert.doesNotMatch(svg, /<script|href=|url\(/i);
+});
+
 test("family illustration is static, transparent and sharp at 3x its largest display size", async () => {
   const image = await readFile(new URL("../public/images/family-rental/family-scene-v2.webp", import.meta.url));
   const metadata = await sharp(image).metadata();

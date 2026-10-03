@@ -4,7 +4,7 @@ import { ArrowRight, Check, Home, KeyRound, MapPin, Search } from "lucide-react"
 import { OwnerWelcome } from "@/components/owner-welcome";
 import { CommissionExamples } from "@/components/commission-examples";
 import { RentalFaqItem } from "@/components/rental-faq-item";
-import { RentalMotion } from "@/components/rental-motion";
+import { PixelNeighborhood } from "@/components/pixel-neighborhood";
 import { PropertyCard } from "@/components/property-card";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
@@ -45,7 +45,7 @@ export default async function WelcomePage() {
           <Link className="zu-button zu-button-secondary" href="/publicar"><Home size={18} />Publicar mi vivienda</Link>
         </div>
         <p className="welcome-login">¿Ya tienes una cuenta? <Link href="/login">Iniciar sesión <ArrowRight size={13} /></Link></p>
-        <RentalMotion welcome />
+        <PixelNeighborhood hero />
       </div>
     </section>
 
