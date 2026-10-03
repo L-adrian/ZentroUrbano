@@ -141,3 +141,11 @@ test("Google Analytics initializes before hydration and tracks App Router page v
   assert.doesNotMatch(analyticsComponent, /id="google-analytics"/);
   assert.match(pageViewComponent, /trackAnalyticsEvent\("page_view"/);
 });
+
+test("gallery photos cannot be selected, so quick double clicks on the arrows never cover them with the selection color", async () => {
+  const css = await readFile(new URL("../src/app/redesign.css", import.meta.url), "utf8");
+  const rule = css.match(/^\.property-gallery, \.gallery-strip, \.gallery-dialog \{([^}]*)\}/m);
+  assert.ok(rule, "gallery user-select rule is missing");
+  assert.match(rule[1], /(^|;)\s*user-select: none;/);
+  assert.match(rule[1], /-webkit-user-select: none;/);
+});
