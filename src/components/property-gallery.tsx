@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Images, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Home, Images, Play, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Property } from "@/lib/properties";
 import { getPropertyVideoUrl } from "@/lib/property-video";
@@ -17,6 +17,23 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
   const showingVideo = Boolean(videoUrl && active === photoCount);
   const [videoFailed, setVideoFailed] = useState(false);
   const opened = active !== null;
+  // Full-size photos are mounted (hidden) once the page is idle, so they are already
+  // downloaded when the gallery opens and switching photos never shows a black screen.
+  const [warm, setWarm] = useState(false);
+  const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set());
+  useEffect(() => {
+    if (photoCount < 1) return;
+    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+    if (connection?.saveData || connection?.effectiveType?.includes("2g")) return;
+    const start = () => setWarm(true);
+    if ("requestIdleCallback" in window) {
+      const id = window.requestIdleCallback(start, { timeout: 4000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = setTimeout(start, 2000);
+    return () => clearTimeout(id);
+  }, [photoCount]);
+  function markLoaded(index: number) { setLoaded(current => current.has(index) ? current : new Set(current).add(index)); }
   useEffect(() => {
     if (!opened) return;
     const node = dialog.current;
@@ -62,17 +79,25 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }
     }}>
-      {active !== null && <>
-        <div className="gallery-toolbar"><div><p>{property.title}</p><span aria-live="polite">{showingVideo ? "Video de la vivienda" : `Foto ${active + 1} de ${photoCount}`}</span></div><button type="button" onClick={() => setActive(null)} aria-label="Cerrar galería" title="Cerrar galería"><X size={23} /></button></div>
-        <div className={`gallery-full-image${showingVideo ? " gallery-showing-video" : ""}`}>
+      {active !== null && <div className="gallery-toolbar"><div><p>{property.title}</p><span aria-live="polite">{showingVideo ? "Video de la vivienda" : `Foto ${active + 1} de ${photoCount}`}</span></div><button type="button" onClick={() => setActive(null)} aria-label="Cerrar galería" title="Cerrar galería"><X size={23} /></button></div>}
+      {(opened || warm) && <div className={`gallery-full-image${showingVideo ? " gallery-showing-video" : ""}`}>
           {showingVideo ? <div className="gallery-video-container">
             <video key={videoUrl} src={videoUrl!} controls playsInline preload="metadata" aria-label={`Video: ${property.title}`} onError={() => setVideoFailed(true)} />
             {videoFailed && <p role="alert">No se pudo reproducir el video. <a href={videoUrl!} target="_blank" rel="noreferrer">Abrir video</a></p>}
-          </div> : <Image key={property.images[active]} src={property.images[active]} alt={`${property.title}, foto ${active + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={74} loading="eager" className="gallery-full-photo" />}
-          {count > 1 && <><button type="button" className="gallery-prev" onClick={() => move(-1)} aria-label={videoUrl ? "Contenido anterior" : "Foto anterior"} title="Anterior"><ChevronLeft size={24} /></button><button type="button" className="gallery-next" onClick={() => move(1)} aria-label={videoUrl ? "Siguiente contenido" : "Siguiente foto"} title="Siguiente"><ChevronRight size={24} /></button></>}
-        </div>
-        <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>
-      </>}
+          </div> : null}
+          {photoCount > 0 && <div className="gallery-slides" hidden={showingVideo}>{property.images.map((src, index) => {
+            const current = active === index;
+            return <div key={src + index} className={`gallery-slide${current ? " is-active" : ""}`} aria-hidden={!current}>
+              {current && !loaded.has(index) && <>
+                <Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="gallery-slide-placeholder" />
+                <span className="gallery-loader" role="status"><span className="gallery-loader-mark"><Home size={22} strokeWidth={2.2} aria-hidden="true" /></span><span>Cargando foto…</span></span>
+              </>}
+              <Image src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={74} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} className="gallery-full-photo" />
+            </div>;
+          })}</div>}
+          {opened && count > 1 && <><button type="button" className="gallery-prev" onClick={() => move(-1)} aria-label={videoUrl ? "Contenido anterior" : "Foto anterior"} title="Anterior"><ChevronLeft size={24} /></button><button type="button" className="gallery-next" onClick={() => move(1)} aria-label={videoUrl ? "Siguiente contenido" : "Siguiente foto"} title="Siguiente"><ChevronRight size={24} /></button></>}
+        </div>}
+      {opened && <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>}
     </dialog>
   </>;
 }
