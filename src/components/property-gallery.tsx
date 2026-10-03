@@ -27,7 +27,7 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
     if (connection?.saveData || connection?.effectiveType?.includes("2g")) return;
     const start = () => setWarm(true);
     if ("requestIdleCallback" in window) {
-      const id = window.requestIdleCallback(start, { timeout: 4000 });
+      const id = window.requestIdleCallback(start, { timeout: 1500 });
       return () => window.cancelIdleCallback(id);
     }
     const id = setTimeout(start, 2000);
@@ -90,7 +90,7 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
             return <div key={src + index} className={`gallery-slide${current ? " is-active" : ""}`} aria-hidden={!current}>
               {current && !loaded.has(index) && <>
                 <Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="gallery-slide-placeholder" />
-                <span className="gallery-loader" role="status"><span className="gallery-loader-mark"><Home size={22} strokeWidth={2.2} aria-hidden="true" /></span><span>Cargando foto…</span></span>
+                <span className="gallery-loader" role="status"><span className="gallery-loader-mark"><Home size={18} strokeWidth={2.2} aria-hidden="true" /></span><span>Cargando foto…</span></span>
               </>}
               <Image src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={74} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} className="gallery-full-photo" />
             </div>;
