@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isExternalContactUrl } from "@/lib/property-contact";
+import { absoluteUrl } from "@/lib/site";
 import { getPropertyBySlugData } from "@/lib/property-data";
 import { trackServerEvent } from "@/lib/tracking";
 
@@ -32,7 +33,7 @@ export async function GET(
 
   const agent = property.agent;
   const message = encodeURIComponent(
-    `Hola ${agent.name}, quiero recibir mas informacion sobre ${property.title} en Zentro Urbano.`,
+    `Hola ${agent.name}, quiero recibir más información sobre ${property.title} en Zentro Urbano: ${absoluteUrl(`/propiedades/${property.slug}`)}`,
   );
 
   return NextResponse.redirect(`https://wa.me/${agent.whatsapp}?text=${message}`);
