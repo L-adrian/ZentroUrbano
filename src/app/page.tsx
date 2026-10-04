@@ -1,4 +1,4 @@
-import { ArrowRight, BookOpen, Building2, Car, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Building2, Car, Check, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HomeRentalSearch } from "@/components/home-rental-search";
@@ -32,16 +32,20 @@ const homeListingLimit = 8;
 export default async function HomePage() {
   const rentals = getDirectRentals(await getPublishedPropertiesData());
   return <main id="contenido" className="home-page">
-    <section className="rental-heading">
+    <section className="rental-heading home-hero">
       <div className="zu-container">
-        <div className="rental-heading-row">
-          <div><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquiler de casas y departamentos en Santa Cruz de la Sierra, directo con el dueño.</p></div>
-          <div className="rental-heading-art"><PixelNeighborhood /><span><KeyRound size={15} /> Tu próximo hogar empieza aquí</span></div>
+        <div className="home-hero-top">
+          <div className="home-hero-lead"><p className="zu-eyebrow"><MapPin size={14} /> SANTA CRUZ, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquiler de casas y departamentos en Santa Cruz de la Sierra, directo con el dueño.</p></div>
+          <div className="home-hero-scene"><PixelNeighborhood scene /></div>
         </div>
-        <HomeRentalSearch zones={getRentalZones(rentals)} />
-        <div className="home-welcome">
-          <p>Alquiler directo. Sin comisiones.</p>
-          <Link href="/bienvenida" className="zu-button zu-button-secondary home-welcome-link"><BookOpen size={17} />Conoce Zentro Urbano<ArrowRight size={16} /></Link>
+        <div className="home-hero-bottom">
+          <HomeRentalSearch zones={getRentalZones(rentals)} />
+          <ul className="home-trust">
+            <li><Check size={15} />Sin comisiones</li>
+            <li><Check size={15} />Hablas con el dueño por WhatsApp</li>
+            <li><Check size={15} />Disponibilidad confirmada cada 21 días</li>
+            <li><Link href="/bienvenida">Conoce Zentro Urbano<ArrowRight size={15} /></Link></li>
+          </ul>
         </div>
       </div>
     </section>

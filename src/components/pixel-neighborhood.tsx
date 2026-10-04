@@ -2,8 +2,9 @@ import Image from "next/image";
 
 // Animated pixel-art scene: a Santa Cruz street from day to night as new tenants move in.
 // The animation lives inside the SVG (CSS keyframes) and stays still with prefers-reduced-motion.
-export function PixelNeighborhood({ hero = false }: { hero?: boolean }) {
-  return <div className={`pixel-neighborhood ${hero ? "is-hero" : ""}`}>
+// `scene` drops the card look so the drawing can blend into the home header.
+export function PixelNeighborhood({ hero = false, scene = false }: { hero?: boolean; scene?: boolean }) {
+  return <div className={`pixel-neighborhood ${hero ? "is-hero" : ""} ${scene ? "is-scene" : ""}`}>
     <Image
       src="/images/pixel/barrio-zentro.svg"
       alt="Un barrio de Santa Cruz del día a la noche: llegan una familia, una pareja con su perrito y una mudanza, y el propietario les entrega la llave"
