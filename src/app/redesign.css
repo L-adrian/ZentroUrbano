@@ -472,3 +472,17 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .listing-views { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .listing-views svg { flex-shrink: 0; margin-top: 2px; }
 .listing-views small { display: block; font-size: 12px; }
+
+/* Help button: smaller, light and round, so it is not mistaken for the owner's WhatsApp. */
+.support-whatsapp-floating { min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--surface); color: var(--foreground); border: 1px solid var(--line); font-size: 13px; }
+.support-whatsapp-floating:hover { background: var(--subtle); }
+.support-whatsapp-floating svg { width: 17px; height: 17px; color: #087c65; }
+.dark .support-whatsapp-floating { background: var(--surface); color: var(--foreground); border-color: var(--line); }
+.dark .support-whatsapp-floating:hover { background: var(--subtle); }
+.safety-list { display: grid; gap: 8px; margin-top: 10px; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.6; color: var(--muted); }
+.safety-questions { display: grid; gap: 18px; max-width: 850px; margin-block: 32px; }
+.safety-questions h2 { font-size: 17px; font-weight: 650; }
+.safety-questions p { margin-top: 6px; font-size: 14px; line-height: 1.7; color: var(--muted); }
+.support-about { max-width: 850px; margin-top: 40px; display: grid; gap: 10px; }
+.support-about h2 { font-size: 20px; font-weight: 650; }
+.support-about p { font-size: 14px; line-height: 1.75; color: var(--muted); }
