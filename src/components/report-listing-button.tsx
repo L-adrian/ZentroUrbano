@@ -14,10 +14,18 @@ import { absoluteUrl, whatsappUrl } from "@/lib/site";
 type Status = "idle" | "sending" | "sent" | "error";
 
 // Reports are stored so the admin sees them; five "ya se alquiló" mark the listing as unconfirmed.
-export function ReportListingButton({ slug }: { slug: string }) {
+export function ReportListingButton({
+  slug,
+  label = "Reportar este anuncio",
+  initialReason = "",
+}: {
+  slug: string;
+  label?: string;
+  initialReason?: ReportReason | "";
+}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const titleId = useId();
-  const [reason, setReason] = useState<ReportReason | "">("");
+  const [reason, setReason] = useState<ReportReason | "">(initialReason);
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
@@ -66,7 +74,7 @@ export function ReportListingButton({ slug }: { slug: string }) {
   return (
     <>
       <button type="button" className="report-listing-trigger" onClick={open}>
-        Reportar este anuncio
+        {label}
       </button>
       {openRequests > 0 ? createPortal(<dialog ref={dialog} className="report-dialog" aria-labelledby={titleId} onClick={(event) => event.target === dialog.current && dialog.current?.close()}>
         <div className="report-dialog-body">

@@ -3,13 +3,15 @@ import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
+import { getAvailabilityState, getEntryCost } from "@/lib/listing-summary";
 
 type MobileStickyContactProps = {
   property: Property;
 };
 
 export function MobileStickyContact({ property }: MobileStickyContactProps) {
-  const agent = property.agent;
+  const entry = getEntryCost(property);
+  const availability = getAvailabilityState(property);
   const contactCopy = getPropertyContactCopy(property);
   const contactUsesReference = isExternalContactUrl(property.whatsapp);
 
@@ -22,7 +24,13 @@ export function MobileStickyContact({ property }: MobileStickyContactProps) {
             showExchangeRate={false}
             className="block truncate text-sm font-semibold text-neutral-950"
           />
-          <p className="truncate text-xs font-medium text-neutral-500">{agent.name}</p>
+          <p className="truncate text-xs font-medium text-neutral-500" suppressHydrationWarning>
+            {entry && entry.total > property.price ? (
+              <>Para entrar: <PriceDisplay property={{ ...property, price: entry.total }} showPeriod={false} showExchangeRate={false} /></>
+            ) : (
+              availability.shortLabel
+            )}
+          </p>
         </div>
         <PropertyShareButton
           property={property}

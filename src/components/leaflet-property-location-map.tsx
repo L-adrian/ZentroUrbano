@@ -3,7 +3,7 @@
 import L from "leaflet";
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
 import { ResilientMapTiles } from "@/components/resilient-map-tiles";
 import {
   BOLIVIA_MAP_BOUNDS,
@@ -20,9 +20,16 @@ type LeafletPropertyLocationMapProps = {
   property: Property;
 };
 
+// The circle covers the area around the point Zentro entered; only the owner's confirmation shows a pin.
+const approximateRadiusMeters = 300;
+
 export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocationMapProps) {
   const [map, setMap] = useState<L.Map | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number | null>(null);
+  const approximate = !property.locationConfirmedAt;
+  // On phones one finger scrolls the page; the map moves with two fingers.
+  const [touchHint, setTouchHint] = useState(false);
+  const [coarsePointer] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   const hasCoordinates = hasValidPropertyCoordinates(property);
   const position: [number, number] = hasCoordinates
     ? [property.coordinates.lat, property.coordinates.lng]
@@ -47,6 +54,23 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
       map.off("zoomlevelschange", updateZoomLevel);
     };
   }, [map]);
+
+  useEffect(() => {
+    if (!map || !coarsePointer) return;
+    const container = map.getContainer();
+    let hideHint: number | undefined;
+    const onTouchMove = (event: TouchEvent) => {
+      if (event.touches.length !== 1) return;
+      setTouchHint(true);
+      window.clearTimeout(hideHint);
+      hideHint = window.setTimeout(() => setTouchHint(false), 1400);
+    };
+    container.addEventListener("touchmove", onTouchMove, { passive: true });
+    return () => {
+      container.removeEventListener("touchmove", onTouchMove);
+      window.clearTimeout(hideHint);
+    };
+  }, [map, coarsePointer]);
 
   if (!hasCoordinates) {
     return (
@@ -136,7 +160,7 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
         touchZoom
         doubleClickZoom
         boxZoom
-        dragging
+        dragging={!coarsePointer}
         zoomControl={false}
         attributionControl
         zoomAnimation={false}
@@ -145,12 +169,27 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
       >
         <ResilientMapTiles />
         <LocationMapBridge onReady={setMap} />
-        <Marker position={position} icon={createLocationIcon(property)}>
-          <Tooltip direction="top" offset={[0, -46]} opacity={1} permanent>
-            <span className="text-xs font-semibold">{property.title}</span>
-          </Tooltip>
-        </Marker>
+        {approximate ? (
+          <Circle
+            center={position}
+            radius={approximateRadiusMeters}
+            pathOptions={{ color: "#176b4d", weight: 2, fillColor: "#176b4d", fillOpacity: 0.14 }}
+          >
+            <Tooltip direction="center" opacity={1} permanent>
+              <span className="text-xs font-semibold">Zona aproximada</span>
+            </Tooltip>
+          </Circle>
+        ) : (
+          <Marker position={position} icon={createLocationIcon(property)} title={property.title} alt={property.title}>
+            <Tooltip direction="top" offset={[0, -46]} opacity={1} permanent>
+              <span className="text-xs font-semibold">{property.title}</span>
+            </Tooltip>
+          </Marker>
+        )}
       </MapContainer>
+      {touchHint ? (
+        <p className="location-map-touch-hint" role="status">Usa dos dedos para mover el mapa</p>
+      ) : null}
 
     </div>
   );
