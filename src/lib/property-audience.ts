@@ -143,9 +143,23 @@ export async function getListingFunnel30() {
         group by property_slug, source`,
     ),
   ]);
+  // Titles of every listing in the table, also the hidden ones.
+  const slugs = Array.from(new Set((counts ?? []).map((row) => String(row.slug)))).slice(0, 500);
+  const values: Record<string, DbQueryValue> = {};
+  const placeholders = slugs.map((slug, index) => {
+    values[`s${index}`] = slug;
+    return `:s${index}`;
+  });
+  const listings = slugs.length
+    ? await queryRows<{ slug: string; title: string; published: number | boolean }>(
+        `select slug, title, published from properties where slug in (${placeholders.join(",")})`,
+        values,
+      )
+    : [];
   return {
     counts: (counts ?? []).map((row) => ({ slug: String(row.slug), viewed: Number(row.viewed), gallery: Number(row.gallery), shared: Number(row.shared), whatsapp: Number(row.whatsapp) })),
     sources: (sources ?? []).map((row) => ({ slug: String(row.slug), source: String(row.source ?? "otro"), people: Number(row.people) })),
+    listings: (listings ?? []).map((row) => ({ slug: String(row.slug), title: String(row.title), published: Boolean(Number(row.published)) })),
   };
 }
 

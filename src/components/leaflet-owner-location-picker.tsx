@@ -10,11 +10,12 @@ export type OwnerLocationPickerProps = {
   initial: { lat: number; lng: number };
   onMove: (point: { lat: number; lng: number }) => void;
   onReady: (map: L.Map) => void;
+  onTilesFailed?: (failed: boolean) => void;
 };
 
 // The pin stays in the middle and the owner moves the map under it: easier than dragging a small
 // marker with a finger. Tapping a spot also brings it under the pin.
-export function LeafletOwnerLocationPicker({ initial, onMove, onReady }: OwnerLocationPickerProps) {
+export function LeafletOwnerLocationPicker({ initial, onMove, onReady, onTilesFailed }: OwnerLocationPickerProps) {
   return (
     <div className="owner-location-map">
       <MapContainer
@@ -37,7 +38,7 @@ export function LeafletOwnerLocationPicker({ initial, onMove, onReady }: OwnerLo
         fadeAnimation={false}
         markerZoomAnimation={false}
       >
-        <ResilientMapTiles />
+        <ResilientMapTiles errorMessage="El mapa no pudo cargar. Revisa tu conexión y toca reintentar." onFailedChange={onTilesFailed} />
         <CenterTracker onMove={onMove} onReady={onReady} />
       </MapContainer>
       <span className="owner-location-pin" aria-hidden="true">

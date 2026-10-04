@@ -638,9 +638,11 @@ function LocationRow({ property, onVerify }: { property: Property; onVerify: () 
             <MapPin className="h-4 w-4 shrink-0 text-amber-900" aria-hidden="true" />
           )}
           {status.label}
-          {property.locationConfirmedAt ? <span className="font-normal text-neutral-600">· {formatBoliviaDay(property.locationConfirmedAt)}</span> : null}
         </p>
-        <p className="mt-1 text-sm leading-6 text-neutral-700">{status.detail}</p>
+        <p className="mt-1 text-sm leading-6 text-neutral-700">
+          {status.detail}
+          {property.locationConfirmedAt ? ` Confirmada el ${formatBoliviaDay(property.locationConfirmedAt)}.` : ""}
+        </p>
       </div>
       <button
         type="button"

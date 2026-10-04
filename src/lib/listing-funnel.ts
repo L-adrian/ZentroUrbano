@@ -15,6 +15,7 @@ export type FunnelCountsRow = { slug: string; viewed: number; gallery: number; s
 export type FunnelSourceRow = { slug: string; source: string; people: number };
 export type ListingFunnelRow = FunnelCountsRow & {
   title: string;
+  hidden: boolean;
   whatsappBySource: { source: string; label: string; people: number }[];
 };
 
@@ -25,6 +26,7 @@ export function buildListingFunnel(
   sources: FunnelSourceRow[],
   titles: Map<string, string>,
   limit = 60,
+  hidden: ReadonlySet<string> = new Set(),
 ): ListingFunnelRow[] {
   const bySlug = new Map<string, Map<string, number>>();
   for (const row of sources) {
@@ -40,6 +42,7 @@ export function buildListingFunnel(
       return {
         ...row,
         title: titles.get(row.slug) ?? row.slug,
+        hidden: hidden.has(row.slug),
         whatsappBySource: funnelWhatsappSources
           .map(([source, label]) => ({ source, label, people: found?.get(source) ?? 0 }))
           .filter((item) => item.people > 0),

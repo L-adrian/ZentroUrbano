@@ -30,8 +30,11 @@ export default async function AdminPage() {
     }),
   ]);
   const health = await getAdminListingHealth(properties);
-  const titles = new Map(properties.map((property) => [property.slug, property.title]));
-  const funnelRows = funnel ? buildListingFunnel(funnel.counts, funnel.sources, titles) : null;
+  // Listings written in the site's code are not in the table of properties; their titles come from here.
+  const titles = new Map([...properties.map((property) => [property.slug, property.title] as const), ...(funnel?.listings ?? []).map((listing) => [listing.slug, listing.title] as const)]);
+  const live = new Set(properties.map((property) => property.slug));
+  const hidden = new Set((funnel?.listings ?? []).filter((listing) => !live.has(listing.slug)).map((listing) => listing.slug));
+  const funnelRows = funnel ? buildListingFunnel(funnel.counts, funnel.sources, titles, 60, hidden) : null;
 
   return (
     <main className="bg-neutral-50">

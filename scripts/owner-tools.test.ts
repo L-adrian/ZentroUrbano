@@ -150,10 +150,13 @@ test("admin funnel counts people per listing and groups WhatsApp by source", () 
       { slug: "uno", source: "desconocido", people: 1 },
     ],
     new Map([["uno", "Casa en Urbari"]]),
+    60,
+    new Set(["dos"]),
   );
   assert.deepEqual(rows.map((row) => row.slug), ["dos", "uno"]);
   assert.equal(rows[1].title, "Casa en Urbari");
   assert.equal(rows[0].title, "dos");
+  assert.deepEqual(rows.map((row) => row.hidden), [true, false]);
   assert.deepEqual(rows[1].whatsappBySource.map((item) => `${item.label} ${item.people}`), ["Ficha 3", "Barra inferior 2", "Otro 1"]);
   assert.equal(funnelShare(12, 40), "30%");
   assert.equal(funnelShare(1, 0), "");

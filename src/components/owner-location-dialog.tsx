@@ -24,6 +24,8 @@ export function OwnerLocationDialog({
   const [attempt, setAttempt] = useState(0);
   const [point, setPoint] = useState<Point>(property.coordinates);
   const [map, setMap] = useState<L.Map | null>(null);
+  // Without the map's streets the owner cannot see where the pin is, so confirming waits for it.
+  const [tilesFailed, setTilesFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [locating, setLocating] = useState(false);
   const [error, setError] = useState("");
@@ -110,7 +112,7 @@ export function OwnerLocationDialog({
           </p>
           <div className="owner-location-frame relative isolate overflow-hidden rounded-[20px] border border-black/10">
             {Picker ? (
-              <Picker initial={property.coordinates} onMove={setPoint} onReady={onReady} />
+              <Picker initial={property.coordinates} onMove={setPoint} onReady={onReady} onTilesFailed={setTilesFailed} />
             ) : (
               <div className="owner-location-map grid place-items-center">
                 {loadError ? (
@@ -150,6 +152,11 @@ export function OwnerLocationDialog({
           <p className="text-sm leading-6 text-neutral-600">
             Al confirmar, tu anuncio mostrará este punto exacto en el mapa con «Ubicación confirmada por el dueño». No pasa por una nueva revisión.
           </p>
+          {tilesFailed ? (
+            <p role="status" className="rounded-[16px] bg-amber-50 p-3 text-sm leading-6 text-amber-950 ring-1 ring-amber-200">
+              Podrás confirmar cuando el mapa muestre las calles. Toca reintentar en el mapa o vuelve más tarde.
+            </p>
+          ) : null}
           {error ? <p role="alert" className="auth-error">{error}</p> : null}
 
           <div className="flex flex-col gap-3 border-t border-black/10 pt-4 sm:flex-row sm:justify-end">
@@ -164,7 +171,7 @@ export function OwnerLocationDialog({
             <button
               type="button"
               onClick={confirm}
-              disabled={saving || !map}
+              disabled={saving || !map || tilesFailed}
               className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white transition hover:bg-[#21352b] disabled:cursor-wait disabled:opacity-60"
             >
               {saving ? <LoaderCircle className="zu-spin h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}

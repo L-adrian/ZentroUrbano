@@ -21,6 +21,21 @@ export function trackAnalyticsEvent(eventName: string, params?: Record<string, u
   }
 }
 
+// Like trackAnalyticsEvent, but resolves once the server answered (or failed). The first answer
+// sets the anonymous device cookie, so an event sent right after it counts as the same person.
+export function trackAnalyticsEventThen(eventName: string, params?: Record<string, unknown>): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  const sanitizedParams = sanitizeAnalyticsParams(params);
+  (window as AnalyticsWindow).gtag?.("event", eventName, sanitizedParams);
+  if (!isServerTrackedEvent(eventName)) return Promise.resolve();
+  return fetch("/api/track", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ eventName, params: sanitizedParams, path: window.location.pathname }),
+    keepalive: true,
+  }).then(() => undefined, () => undefined);
+}
+
 function sanitizeAnalyticsParams(params?: Record<string, unknown>) {
   if (!params) {
     return {};

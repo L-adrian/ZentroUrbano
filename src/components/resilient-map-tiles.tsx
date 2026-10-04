@@ -14,10 +14,21 @@ import {
 const MAX_TILE_ERRORS_BEFORE_FALLBACK = 4;
 
 // The message fits the page: the catalog adds that the results are still in the list; a listing's
-// own map does not talk about "resultados".
-export function ResilientMapTiles({ errorMessage = "El mapa no pudo cargar. Revisa tu conexión e inténtalo de nuevo." }: { errorMessage?: string }) {
+// own map does not talk about "resultados". onFailedChange lets "Verificar ubicación" in Mi cuenta
+// refuse to confirm a point on a map that did not load.
+export function ResilientMapTiles({
+  errorMessage = "El mapa no pudo cargar. Revisa tu conexión e inténtalo de nuevo.",
+  onFailedChange,
+}: {
+  errorMessage?: string;
+  onFailedChange?: (failed: boolean) => void;
+} = {}) {
   const [providerIndex, setProviderIndex] = useState(0);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailedState] = useState(false);
+  const setFailed = (value: boolean) => {
+    setFailedState(value);
+    onFailedChange?.(value);
+  };
   const [attempt, setAttempt] = useState(0);
   const tileErrorCount = useRef(0);
   const provider = MAP_TILE_PROVIDERS[providerIndex];

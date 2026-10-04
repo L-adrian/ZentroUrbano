@@ -36,9 +36,14 @@ export function AdminListingFunnel({ rows }: { rows: ListingFunnelRow[] | null }
               {rows.map((row) => (
                 <tr key={row.slug}>
                   <th scope="row">
-                    <Link href={`/propiedades/${row.slug}`} className="font-semibold text-neutral-950 underline-offset-4 hover:underline [overflow-wrap:anywhere]">
-                      {row.title}
-                    </Link>
+                    {row.hidden ? (
+                      <span className="font-semibold text-neutral-950 [overflow-wrap:anywhere]">{row.title}</span>
+                    ) : (
+                      <Link href={`/propiedades/${row.slug}`} className="font-semibold text-neutral-950 underline-offset-4 hover:underline [overflow-wrap:anywhere]">
+                        {row.title}
+                      </Link>
+                    )}
+                    {row.hidden ? <span className="listing-funnel-hidden">Oculto</span> : null}
                   </th>
                   <td className="num">{row.viewed}</td>
                   <td className="num">
