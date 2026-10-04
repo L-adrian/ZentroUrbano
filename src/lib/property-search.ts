@@ -1103,7 +1103,7 @@ export function buildRentalSearchParams(
   if (query) params.set("q", query);
   if (filters.zone) params.set("zone", filters.zone);
   else if (defaults.zone) params.set("zone", "");
-  if (filters.type) params.set("type", filters.type);
+  if (filters.type) for (const type of getRentalTypes(filters.type)) params.append("type", type);
   else if (defaults.type) params.set("type", "");
   if (min) params.set("minPrice", inCurrency(min));
   if (max) params.set("maxPrice", inCurrency(max));

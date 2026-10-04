@@ -249,7 +249,7 @@ test("several home types can be checked at once and travel in the link", () => {
 
   const read = readRentalSearchParams(new URLSearchParams("type=Departamento,Casa,Oficina"));
   assert.equal(read.type, "Casa,Departamento");
-  assert.equal(buildRentalSearchParams(read, "BOB").get("type"), "Casa,Departamento");
+  assert.deepEqual(buildRentalSearchParams(read, "BOB").getAll("type"), ["Casa", "Departamento"]);
   assert.equal(readRentalSearchParams(new URLSearchParams("type=Casa&type=Monoambiente")).type, "Casa,Monoambiente");
   assert.equal(readRentalSearchParams(new URLSearchParams("type=Oficina")).type, "");
   assert.equal(describeRentalFilter("type", read, "BOB"), "Casa o Departamento");
