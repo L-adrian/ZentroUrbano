@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { isSameSiteRequest } from "@/lib/request-origin";
 import { cleanAlertParams, createSearchAlert } from "@/lib/search-alerts";
 import { normalizeAlertEmail, normalizeAlertWhatsapp, searchAlertLimits } from "@/lib/search-alert-input";
 import { getOrCreateVisitorId } from "@/lib/visitor-id";
@@ -6,8 +7,7 @@ import { getOrCreateVisitorId } from "@/lib/visitor-id";
 // "Avísame cuando haya una así": stores a contact with consent. The team writes by hand when
 // a matching home is published; nothing is sent automatically.
 export async function POST(request: NextRequest) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!isSameSiteRequest(request)) {
     return NextResponse.json({ ok: false, message: "Origen no permitido." }, { status: 403 });
   }
   let body: { name?: unknown; whatsapp?: unknown; email?: unknown; params?: unknown; summary?: unknown; consent?: unknown };
