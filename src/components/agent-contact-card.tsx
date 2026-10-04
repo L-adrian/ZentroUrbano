@@ -4,10 +4,12 @@ import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { ReportListingButton } from "@/components/report-listing-button";
 import { SafetyNotice } from "@/components/safety-notice";
+import { WhatsappQuestionsButton } from "@/components/whatsapp-questions-button";
 import type { AvailabilityState } from "@/lib/listing-summary";
 import { getEntryCost } from "@/lib/listing-summary";
 import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
+import { suggestedQuestions } from "@/lib/whatsapp-questions";
 
 type AgentContactCardProps = {
   property: Property;
@@ -20,6 +22,9 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
   const contactCopy = getPropertyContactCopy(property);
   const contactUsesReference = isExternalContactUrl(property.whatsapp);
   const entry = getEntryCost(property);
+  const questions = contactUsesReference ? null : (
+    <WhatsappQuestionsButton slug={property.slug} source="ficha" suggested={suggestedQuestions(property)} />
+  );
   const agentInitials = agent.name
     .split(" ")
     .map((part) => part[0])
@@ -59,6 +64,7 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
           )}
           {contactCopy.label}
         </a>
+        {questions}
       </div>
 
       <div className="owner-card-person mt-0 lg:mt-5 lg:border-t lg:border-neutral-200 lg:pt-4">
@@ -125,6 +131,7 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
           )}
           {contactCopy.label}
         </a>
+        <div className="lg:hidden">{questions}</div>
         <PropertyShareButton property={property} />
         <div className="hidden lg:block">
           <SafetyNotice slug={property.slug} />

@@ -562,3 +562,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dark .admin-alert-contact a { color: #08291e; }
 .admin-alert-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .admin-alert-actions button:disabled { opacity: 0.6; }
+
+/* Optional questions added to the first WhatsApp message. */
+.whatsapp-questions-trigger { display: inline-flex; align-items: center; justify-content: center; width: 100%; min-height: 44px; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--brand); text-decoration: underline; text-underline-offset: 2px; background: none; border: 0; cursor: pointer; }
+.whatsapp-questions-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.report-dialog-note select { font: inherit; font-weight: 400; min-height: 44px; border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 8px 10px; background: var(--surface); color: inherit; }
+.whatsapp-questions-preview { padding: 10px 12px; border-radius: 8px; background: var(--subtle); font-size: 13px; }
+.whatsapp-questions-preview ul { margin-top: 4px; padding-left: 18px; list-style: disc; }
+.whatsapp-questions-send { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.whatsapp-questions-skip { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; font-size: 14px; font-weight: 600; color: var(--muted); text-decoration: underline; text-underline-offset: 2px; }
+@media (max-width: 420px) { .whatsapp-questions-row { grid-template-columns: 1fr; } }

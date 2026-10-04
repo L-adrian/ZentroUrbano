@@ -5,6 +5,7 @@ import type { Property } from "../src/lib/properties";
 import { buildOwnerWhatsappMessage, ownerFirstName } from "../src/lib/property-contact";
 import { countReportsSince } from "../src/lib/property-reports";
 import { isSameSiteRequest, visibleOrigin } from "../src/lib/request-origin";
+import { questionLines, questionsQuery, readQuestionChoices, suggestedQuestions } from "../src/lib/whatsapp-questions";
 
 const day = 86_400_000;
 
@@ -79,4 +80,30 @@ test("same-site check uses the address people see, not the server's own address"
   assert.equal(visibleOrigin(behindProxy({})), "https://zentrourbano.com");
   const direct = new Request("http://localhost:3112/api/x", { method: "POST", headers: { host: "127.0.0.1:3112", origin: "http://127.0.0.1:3112" } });
   assert.equal(isSameSiteRequest(direct), true);
+});
+
+test("optional WhatsApp questions travel as codes and become plain lines", () => {
+  const query = questionsQuery({ questions: ["garantia", "desde"], people: 3, pet: true, moveIn: "proximo-mes" });
+  assert.equal(query, "preguntas=garantia%2Cdesde&personas=3&mascota=1&mudanza=proximo-mes");
+  const choices = readQuestionChoices(new URLSearchParams(query));
+  assert.deepEqual(questionLines(choices), [
+    "Seríamos 3 personas.",
+    "Tengo una mascota, ¿la aceptan?",
+    "Me mudaría el próximo mes.",
+    "¿Cuánto es la garantía?",
+    "¿Desde qué fecha se puede entrar?",
+  ]);
+  // Unknown codes, repeated codes and odd values are dropped, never echoed into the message.
+  const tampered = readQuestionChoices(new URLSearchParams("preguntas=garantia,garantia,hola&personas=40&mascota=si&mudanza=ayer"));
+  assert.deepEqual(tampered, { questions: ["garantia"], people: null, pet: false, moveIn: null });
+  const base = { requirements: ["Garantía: consultar"], rentalDetails: undefined, bathrooms: 0 };
+  assert.deepEqual(suggestedQuestions(base), ["garantia", "expensas", "banos", "servicios", "desde", "contrato"]);
+  assert.deepEqual(suggestedQuestions({ ...base, requirements: ["Garantía de 1 mes"], bathrooms: 2 }), ["expensas", "servicios", "desde", "contrato"]);
+  const message = buildOwnerWhatsappMessage(
+    { agent: { name: "Luis" }, type: "Departamento", zone: "Equipetrol" } as Property,
+    "Bs 3.500/mes",
+    "u",
+    ["Seríamos 2 personas."],
+  );
+  assert.equal(message, "Hola Luis, vi en Zentro Urbano tu departamento en Equipetrol a Bs 3.500/mes: u\n¿Sigue disponible? Me gustaría coordinar una visita.\nSeríamos 2 personas.");
 });

@@ -42,10 +42,15 @@ export function buildOwnerWhatsappMessage(
   property: Pick<Property, "agent" | "type" | "zone" | "rentalDetails">,
   price: string,
   url: string,
+  extraLines: string[] = [],
 ) {
   const firstName = ownerFirstName(property.agent.name);
   const kind = (property.rentalDetails?.type ?? property.type).toLocaleLowerCase("es");
-  return `${firstName ? `Hola ${firstName}` : "Hola"}, vi en Zentro Urbano tu ${kind} en ${property.zone} a ${price}: ${url}\n¿Sigue disponible? Me gustaría coordinar una visita.`;
+  return [
+    `${firstName ? `Hola ${firstName}` : "Hola"}, vi en Zentro Urbano tu ${kind} en ${property.zone} a ${price}: ${url}`,
+    "¿Sigue disponible? Me gustaría coordinar una visita.",
+    ...extraLines,
+  ].join("\n");
 }
 
 export const whatsappContactSources = ["ficha", "tarjeta", "barra", "galeria", "recorrido", "mapa"] as const;
