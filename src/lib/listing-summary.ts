@@ -1,6 +1,6 @@
 import { parseCurrencyAmount } from "@/lib/currency";
 import type { Property } from "@/lib/properties";
-import { getPublicationCosts } from "@/lib/publication-costs";
+import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
 
 // Facts shared by listing cards and the listing page, so both always agree.
 
@@ -80,7 +80,8 @@ export function getGuaranteeLabel(property: Pick<Property, "requirements">) {
   return "Consultar";
 }
 
-export type EntryCost = { rent: number; expenses: number; deposit: number; total: number };
+// advanceMonths is set only when the owner asked for more than the first month in advance.
+export type EntryCost = { rent: number; expenses: number; deposit: number; total: number; advanceMonths?: number };
 
 // What a tenant pays at signing: first month (with expenses) plus the guarantee. Null when unknown.
 export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" | "requirements">): EntryCost | null {
@@ -91,9 +92,11 @@ export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" 
       commonExpenses: String(details.commonExpenses),
       guarantee: details.guarantee,
       guaranteeAmount: details.guaranteeAmount === null ? "" : String(details.guaranteeAmount),
+      advanceMonths: details.advanceMonths,
     });
     if (costs.deposit === null || costs.entry === null) return null;
-    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry };
+    const months = advanceRentMonths(details.advanceMonths);
+    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry, ...(months > 1 ? { advanceMonths: months } : {}) };
   }
   const guarantee = getGuaranteeLabel(property);
   const months = guarantee === "Sin garantía" ? 0 : guarantee === "1 mes" ? 1 : guarantee === "2 meses" ? 2 : null;

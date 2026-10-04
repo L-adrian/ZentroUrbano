@@ -11,7 +11,7 @@ export const metadata: Metadata = buildSeoMetadata({
 const sections = [
   {
     title: "Cuenta y borradores",
-    body: "Para publicar necesitas una cuenta. La solicitud se guarda asociada a esa cuenta con sus datos de contacto y fotos. Si ingresas con Google, recibimos los datos de perfil que autorices. Los campos del borrador se guardan en el almacenamiento de este navegador, separados por cuenta; las fotos deben adjuntarse nuevamente al recargar. Puedes borrar esos campos desde el formulario. La sesión y tus preferencias de tema o moneda también utilizan cookies o almacenamiento del navegador.",
+    body: "Para publicar necesitas una cuenta. La solicitud se guarda asociada a esa cuenta con sus datos de contacto y fotos. Si ingresas con Google, recibimos los datos de perfil que autorices. Los campos del borrador, las fotos y el ambiente de cada una se guardan en el almacenamiento de este navegador, separados por cuenta, para que no se pierdan si recargas. Antes de guardarlas y enviarlas, el navegador achica cada foto (hasta 1920 px por lado); conservamos esa copia más liviana. Puedes borrar el borrador y sus fotos desde el formulario. La sesión y tus preferencias de tema o moneda también utilizan cookies o almacenamiento del navegador.",
   },
   {
     title: "Datos que podemos recibir",
@@ -23,7 +23,7 @@ const sections = [
   },
   {
     title: "Vistas y avisos de anuncios",
-    body: "Para mostrar cuántas personas vieron cada anuncio, guardamos una cookie con un número aleatorio que identifica tu navegador, no a ti. No contiene tu nombre, teléfono ni correo, y dura un año. Con ella contamos cada teléfono o computadora una sola vez. Si reportas un anuncio, guardamos el motivo, el detalle que escribas y ese mismo número aleatorio, para revisar el aviso y evitar repeticiones.",
+    body: "Para mostrar cuántas personas vieron cada anuncio, guardamos una cookie con un número aleatorio que identifica tu navegador, no a ti. No contiene tu nombre, teléfono ni correo, y dura un año. Con ella contamos cada teléfono o computadora una sola vez. Con el mismo número contamos también si abriste las fotos de un anuncio, si llegaste desde un enlace compartido y desde qué botón abriste el WhatsApp del dueño; el equipo ve esos totales por anuncio, nunca quién fue. Si reportas un anuncio, guardamos el motivo, el detalle que escribas y ese mismo número aleatorio, para revisar el aviso y evitar repeticiones.",
   },
   {
     title: "Alertas de búsqueda",

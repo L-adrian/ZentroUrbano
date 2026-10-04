@@ -117,6 +117,38 @@ export async function getListingAudience(slugs: string[]) {
   return audience;
 }
 
+// /admin: last 30 days per listing, in people. See listing-funnel.ts for the table.
+export async function getListingFunnel30() {
+  if (!hasDatabaseConfig()) return null;
+  const [counts, sources] = await Promise.all([
+    queryRows<{ slug: string; viewed: number | string; gallery: number | string; shared: number | string; whatsapp: number | string }>(
+      `select property_slug as slug,
+              count(distinct case when event_type = 'property_view' then ${personKey} end) as viewed,
+              count(distinct case when event_type = 'property_gallery_open' then ${personKey} end) as gallery,
+              count(distinct case when event_type = 'property_shared_visit' then ${personKey} end) as shared,
+              count(distinct case when event_type = 'property_whatsapp_click' then ${personKey} end) as whatsapp
+         from tracking_events
+        where created_at >= now() - interval 30 day and property_slug is not null
+          and event_type in ('property_view', 'property_gallery_open', 'property_shared_visit', 'property_whatsapp_click')
+          and ${humansOnly}
+        group by property_slug`,
+    ),
+    queryRows<{ slug: string; source: string | null; people: number | string }>(
+      `select property_slug as slug,
+              coalesce(json_unquote(json_extract(metadata, '$.source')), 'otro') as source,
+              count(distinct ${personKey}) as people
+         from tracking_events
+        where created_at >= now() - interval 30 day and property_slug is not null
+          and event_type = 'property_whatsapp_click' and ${humansOnly}
+        group by property_slug, source`,
+    ),
+  ]);
+  return {
+    counts: (counts ?? []).map((row) => ({ slug: String(row.slug), viewed: Number(row.viewed), gallery: Number(row.gallery), shared: Number(row.shared), whatsapp: Number(row.whatsapp) })),
+    sources: (sources ?? []).map((row) => ({ slug: String(row.slug), source: String(row.source ?? "otro"), people: Number(row.people) })),
+  };
+}
+
 // "Ya no está disponible" reports: the latest report time of each person, per listing.
 export const getUnavailableReportTimes = cached(
   60_000,

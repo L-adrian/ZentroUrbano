@@ -384,7 +384,7 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
     reports: [],
     listings,
     // Older decided requests stay in /cliente/solicitudes.
-    requests: recentOwnerRequests(requests).map((request) => ({
+    requests: recentOwnerRequests(markCorrected(requests)).map((request) => ({
       id: request.id,
       kind: request.kind === "republish" ? "republish" as const : "new" as const,
       title: request.listing?.title || request.details?.title || "Vivienda sin título",
@@ -393,9 +393,16 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
       reviewedAt: request.reviewedAt ?? null,
       reason: request.reviewReason ?? null,
       slug: request.propertySlug ?? null,
+      corrected: request.corrected,
     })),
     audienceUnavailable: audience === null,
   };
+}
+
+// "Corregir y reenviar": a request with a newer copy that corrects it.
+function markCorrected<T extends { id: string; correctionOf?: string }>(requests: T[]) {
+  const corrected = new Set(requests.map((request) => request.correctionOf).filter(Boolean));
+  return requests.map((request) => ({ ...request, corrected: corrected.has(request.id) }));
 }
 
 const emptyAudience = { views7: 0, views30: 0, viewsTotal: 0, contacts7: 0, contacts30: 0, contactsTotal: 0 };

@@ -21,6 +21,14 @@ export function PropertyViewTracker({
       city,
       zone,
     });
+    // Links shared from the listing or from Mi cuenta end in ?desde=compartido.
+    try {
+      if (new URLSearchParams(window.location.search).get("desde") === "compartido") {
+        trackAnalyticsEvent("property_shared_visit", { property_slug: propertySlug });
+      }
+    } catch {
+      // Counting never gets in the way of the page.
+    }
   }, [city, operation, propertySlug, zone]);
 
   return null;

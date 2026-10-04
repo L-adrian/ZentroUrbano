@@ -1,3 +1,5 @@
+import { fitWithin, maxSelectedPhotoBytes, needsShrinking, shrunkFileName, uploadJpegQuality, uploadMaxSide } from "@/lib/photo-resize";
+
 export const photoCategories = [
   { value: "exterior", label: "Exterior / fachada" },
   { value: "living", label: "Sala / comedor" },
@@ -25,6 +27,84 @@ export type PhotoAnalysis = {
 
 const allowedImageTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
 const maxFileSize = 10 * 1024 * 1024;
+
+export type PreparedPhoto = { file: File; analysis: PhotoAnalysis; preview: Blob | null };
+
+// One decode per photo: quality checks, a small preview and, when needed, the lighter copy that
+// is uploaded (longest side 1920 px, JPEG). If the browser cannot shrink it, the original is sent
+// and the server shrinks it instead.
+export async function preparePhotoFile(file: File): Promise<PreparedPhoto> {
+  if (!allowedImageTypes.has(file.type)) {
+    return { file, preview: null, analysis: emptyAnalysis(["Formato no compatible. Usa JPG, PNG o WebP."]) };
+  }
+  if (file.size > maxSelectedPhotoBytes) {
+    return { file, preview: null, analysis: emptyAnalysis(["La foto supera 30 MB. Elige otra o achícala antes de subirla."]) };
+  }
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadBrowserImage(objectUrl);
+    const sample = readImageSample(image);
+    const issues = qualityIssues(image, sample);
+    const preview = await drawToJpeg(image, 720, 0.8).catch(() => null);
+    let upload = file;
+    let { naturalWidth: width, naturalHeight: height } = image;
+    if (needsShrinking(file, width, height)) {
+      const smaller = await drawToJpeg(image, uploadMaxSide, uploadJpegQuality).catch(() => null);
+      if (smaller && (Math.max(width, height) > uploadMaxSide || smaller.size < file.size)) {
+        upload = new File([smaller], shrunkFileName(file.name), { type: "image/jpeg", lastModified: file.lastModified });
+        ({ width, height } = fitWithin(width, height));
+      }
+    }
+    image.src = "";
+    return {
+      file: upload,
+      preview,
+      analysis: {
+        width,
+        height,
+        brightness: sample.brightness,
+        contrast: sample.contrast,
+        sharpness: sample.sharpness,
+        issues,
+        blockingIssues: upload.size > maxFileSize ? ["La foto pesa más de 10 MB y no pudimos achicarla. Elige otra."] : [],
+      },
+    };
+  } catch {
+    return { file, preview: null, analysis: emptyAnalysis(["No pudimos leer esta imagen. Prueba con otro archivo."]) };
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function qualityIssues(image: HTMLImageElement, sample: { brightness: number; contrast: number; sharpness: number }) {
+  const issues: string[] = [];
+  const shortestSide = Math.min(image.naturalWidth, image.naturalHeight);
+  const longestSide = Math.max(image.naturalWidth, image.naturalHeight);
+  if (shortestSide < 600 || longestSide < 900) issues.push("Resolución baja; recomendamos al menos 900 x 600 px.");
+  if (sample.brightness < 42) issues.push("La foto está muy oscura.");
+  else if (sample.brightness > 225) issues.push("La foto está sobreexpuesta.");
+  if (sample.contrast < 18) issues.push("La imagen tiene poco contraste.");
+  if (sample.sharpness < 7) issues.push("La foto podría estar borrosa.");
+  return issues;
+}
+
+async function drawToJpeg(image: HTMLImageElement, maxSide: number, quality: number) {
+  const size = fitWithin(image.naturalWidth, image.naturalHeight, maxSide);
+  const canvas = document.createElement("canvas");
+  canvas.width = size.width;
+  canvas.height = size.height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("canvas_unavailable");
+  // JPEG has no transparency: PNG backgrounds become white instead of black.
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  canvas.width = 0;
+  canvas.height = 0;
+  if (!blob) throw new Error("encode_failed");
+  return blob;
+}
 
 export async function analyzePhotoFile(file: File, objectUrl: string): Promise<PhotoAnalysis> {
   const blockingIssues: string[] = [];

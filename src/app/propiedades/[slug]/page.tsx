@@ -21,6 +21,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AgentContactCard } from "@/components/agent-contact-card";
+import { BeforeVisitBlock } from "@/components/before-visit-block";
 import { PriceDisplay } from "@/components/currency-preference";
 import { MobileStickyContact } from "@/components/mobile-sticky-contact";
 import { PropertyGallery } from "@/components/property-gallery";
@@ -258,6 +259,7 @@ export default async function PropertyDetailPage({
                 </p>
               ) : null}
               <CostsBlock property={property} />
+              <BeforeVisitBlock property={property} />
               {/* On desktop the same notice sits in the contact card beside the gallery. */}
               <div className="lg:hidden">
                 <SafetyNotice slug={property.slug} className="mt-4" />
@@ -520,7 +522,7 @@ function CostsBlock({ property }: { property: Property }) {
       {entry ? (
         <p className="entry-cost-note">
           {details
-            ? `Primer mes${details.commonExpenses > 0 ? ", expensas" : ""} y garantía.`
+            ? `${entry.advanceMonths ? `${entry.advanceMonths} meses de adelanto` : "Primer mes"}${details.commonExpenses > 0 ? ", expensas" : ""} y garantía.`
             : "Primer mes y garantía. Las expensas, si hay, se consultan con el dueño."}
         </p>
       ) : null}

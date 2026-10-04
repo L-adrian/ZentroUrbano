@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { ChevronLeft, ChevronRight, ExternalLink, Home, Images, MessageCircle, Play, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { trackAnalyticsEvent } from "@/lib/analytics-events";
 import { PriceDisplay } from "@/components/currency-preference";
 import type { Property } from "@/lib/properties";
 import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
@@ -60,7 +61,17 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
       trigger.current?.focus();
     };
   }, [opened]);
-  function open(index: number) { trigger.current = document.activeElement as HTMLElement; setVideoFailed(false); setActive(index); }
+  // Counted once per page load: /admin shows how many people opened the photos.
+  const galleryReported = useRef(false);
+  function open(index: number) {
+    trigger.current = document.activeElement as HTMLElement;
+    setVideoFailed(false);
+    setActive(index);
+    if (!galleryReported.current) {
+      galleryReported.current = true;
+      trackAnalyticsEvent("property_gallery_open", { property_slug: property.slug });
+    }
+  }
   function move(direction: number) { setActive(index => index === null ? null : (index + direction + count) % count); }
   // Horizontal swipes change the photo on phones; vertical drags and pinch zoom are left alone.
   const swipe = useRef<{ x: number; y: number } | null>(null);

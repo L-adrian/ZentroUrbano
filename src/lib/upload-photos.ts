@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { createHash } from "node:crypto";
+import { fitWithin, uploadJpegQuality, uploadMaxSide } from "./photo-resize";
 
 import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "./photo-upload-limits";
 export { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "./photo-upload-limits";
@@ -26,4 +27,31 @@ export async function validateUploadPhotos(photos: File[]) {
     } catch { return fail(415, "No pudimos leer una foto o supera 40 megapixeles. Exportala de nuevo como JPG, PNG o WebP."); }
   }
   return { ok: true as const };
+}
+
+// Lighter photos (P9): what is stored for a new request is a copy no larger than 1920 px on its
+// longest side. Photos already that small are kept byte for byte (the browser usually shrank them).
+// Photos stored before this change are never rewritten.
+export type StoredUploadPhoto = { bytes: Buffer; type: string; extension: "jpg" | "png" | "webp"; size: number; resized: boolean };
+
+const extensions: Record<string, StoredUploadPhoto["extension"]> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+export async function shrinkUploadPhoto(photo: File): Promise<StoredUploadPhoto> {
+  const original = Buffer.from(await photo.arrayBuffer());
+  const keep = { bytes: original, type: photo.type, extension: extensions[photo.type] ?? "jpg", size: original.length, resized: false };
+  try {
+    const metadata = await sharp(original, { limitInputPixels: 40_000_000 }).metadata();
+    // EXIF orientations 5-8 swap width and height; the longest side is the same either way.
+    if (!fitWithin(metadata.width ?? 0, metadata.height ?? 0).scaled) return keep;
+    const bytes = await sharp(original, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize({ width: uploadMaxSide, height: uploadMaxSide, fit: "inside", withoutEnlargement: true })
+      .flatten({ background: "#ffffff" })
+      .jpeg({ quality: Math.round(uploadJpegQuality * 100), mozjpeg: true })
+      .toBuffer();
+    return { bytes, type: "image/jpeg", extension: "jpg", size: bytes.length, resized: true };
+  } catch {
+    // Already validated; if shrinking fails the photo is kept as it came.
+    return keep;
+  }
 }

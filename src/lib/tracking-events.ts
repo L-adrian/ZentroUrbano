@@ -6,12 +6,18 @@ export const serverTrackedEvents = [
   "property_share_click",
   "property_map_view",
   "property_gallery_open",
+  // A visit that came from a shared link (?desde=compartido).
+  "property_shared_visit",
   "property_tour_open",
   "property_tour_ready",
   "property_tour_error",
   "property_tour_whatsapp_click",
   "ad_impression",
   "ad_click",
+  // Accepted for the catalog; nothing sends them yet.
+  "catalog_card_click",
+  "search_empty",
+  "search_share",
 ] as const;
 
 // Stored only by server routes that validate them; the beacon cannot send these.
