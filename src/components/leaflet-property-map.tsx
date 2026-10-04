@@ -9,6 +9,7 @@ import {
   Navigation,
   Plus,
   Route,
+  ScanSearch,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -19,6 +20,7 @@ import { PriceDisplay, useCurrencyPreference } from "@/components/currency-prefe
 import { LifestyleTag } from "@/components/lifestyle-tag";
 import { PublisherBadge } from "@/components/publisher-badge";
 import { ResilientMapTiles } from "@/components/resilient-map-tiles";
+import type { MapArea } from "@/lib/catalog-geo";
 import { formatPriceInCurrency, type DisplayCurrency } from "@/lib/currency";
 import {
   BOLIVIA_MAP_BOUNDS,
@@ -44,7 +46,17 @@ type LeafletPropertyMapProps = {
   headerClassName?: string;
   mapClassName?: string;
   showZoneShortcuts?: boolean;
+  onSearchArea?: (area: MapArea) => void;
+  preserveView?: boolean;
 };
+
+// Moves made by the map itself (fit to results, fly to a selected home) must not offer
+// "Buscar en esta zona del mapa"; only the person's own drag or zoom does.
+const programmaticMoveUntil = new WeakMap<L.Map, number>();
+
+function markProgrammaticMove(map: L.Map, durationMs = 1200) {
+  programmaticMoveUntil.set(map, Math.max(programmaticMoveUntil.get(map) ?? 0, Date.now() + durationMs));
+}
 
 type PropertyPointProperties = {
   property: Property;
@@ -70,6 +82,8 @@ export function LeafletPropertyMap({
   headerClassName = "mb-6 flex flex-col gap-5 px-1 sm:flex-row sm:items-end sm:justify-between",
   mapClassName = "relative min-h-[690px] overflow-hidden rounded-[34px] border border-black/10 bg-[#e9ece3] shadow-none sm:min-h-[760px] sm:shadow-[0_30px_100px_rgba(20,20,20,0.13)] lg:min-h-[820px]",
   showZoneShortcuts = true,
+  onSearchArea,
+  preserveView = false,
 }: LeafletPropertyMapProps) {
   const mapProperties = useMemo(
     () => getDirectRentals(properties).filter(hasValidPropertyCoordinates),
@@ -78,27 +92,30 @@ export function LeafletPropertyMap({
   const [selectedSlug, setSelectedSlug] = useState(mapProperties[0]?.slug);
   const [map, setMap] = useState<L.Map | null>(null);
   const [isCardMinimized, setIsCardMinimized] = useState(true);
+  const [movedByPerson, setMovedByPerson] = useState(false);
   const displayCurrency = useCurrencyPreference();
   const quickZoneProperties = useMemo(() => getUniqueZoneProperties(mapProperties), [mapProperties]);
   const selected =
     mapProperties.find((property) => property.slug === selectedSlug) ?? mapProperties[0];
   const bounds = useMemo(() => getBounds(mapProperties), [mapProperties]);
-  const previousSelectedSlug = useRef(selected?.slug);
 
-  useEffect(() => {
-    if (!selected) {
-      return;
-    }
-
-    if (previousSelectedSlug.current !== selected.slug) {
-      previousSelectedSlug.current = selected.slug;
-      setIsCardMinimized(false);
-    }
-  }, [selected]);
-
+  // The card opens when the person picks a home; a selection that changes only because the
+  // results changed (filters, map area) leaves the card and the view as they are.
   function selectProperty(slug: string) {
     setSelectedSlug(slug);
     setIsCardMinimized(false);
+  }
+
+  function searchThisArea() {
+    if (!map || !onSearchArea) return;
+    const visible = map.getBounds();
+    onSearchArea({
+      south: visible.getSouth(),
+      west: visible.getWest(),
+      north: visible.getNorth(),
+      east: visible.getEast(),
+    });
+    setMovedByPerson(false);
   }
 
   if (!selected) {
@@ -166,6 +183,13 @@ export function LeafletPropertyMap({
             Santa Cruz, Bolivia
           </div>
 
+          {onSearchArea && movedByPerson ? (
+            <button type="button" onClick={searchThisArea} className="map-area-search">
+              <ScanSearch aria-hidden="true" />
+              Buscar en esta zona del mapa
+            </button>
+          ) : null}
+
           <MapControls
             map={map}
             bounds={bounds}
@@ -202,9 +226,10 @@ export function LeafletPropertyMap({
             zoomControl={false}
             attributionControl
           >
-            <ResilientMapTiles />
+            <ResilientMapTiles errorMessage="El mapa no pudo cargar. Tus resultados siguen disponibles en la lista." />
             <MapInstanceBridge onReady={setMap} />
-            <FitMapToProperties bounds={bounds} selected={selected} />
+            <FitMapToProperties bounds={bounds} selected={selected} chosenSlug={selectedSlug} preserveView={preserveView} />
+            {onSearchArea ? <PersonMoveWatcher onMove={() => setMovedByPerson(true)} /> : null}
             <ClusteredPropertyMarkers
               properties={mapProperties}
               selected={selected}
@@ -268,7 +293,7 @@ export function LeafletPropertyMap({
                 </span>
                 {selected.listingPlan === "featured" ? (
                   <span className="absolute right-2 top-2 rounded-full bg-[#d6a16b] px-2 py-1 text-[11px] font-bold text-neutral-950 backdrop-blur sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
-                    Destacada
+                    Destacada · servicio pagado
                   </span>
                 ) : null}
               </div>
@@ -421,7 +446,7 @@ function ClusteredPropertyMarkers({
             >
               <Tooltip direction="top" offset={[0, -34]} opacity={1}>
                 <span className="text-xs font-semibold">
-                  {pointCount} propiedades
+                  {pointCount} alquileres
                 </span>
               </Tooltip>
             </Marker>
@@ -596,6 +621,7 @@ function MapInstanceBridge({ onReady }: { onReady: (map: L.Map) => void }) {
     onReady(map);
 
     const invalidateMapSize = () => {
+      markProgrammaticMove(map, 400);
       map.invalidateSize({ animate: false });
     };
     const frameId = window.requestAnimationFrame(invalidateMapSize);
@@ -616,18 +642,22 @@ function MapInstanceBridge({ onReady }: { onReady: (map: L.Map) => void }) {
 function FitMapToProperties({
   bounds,
   selected,
+  chosenSlug,
+  preserveView,
 }: {
   bounds: LatLngBoundsExpression | undefined;
   selected: Property;
+  chosenSlug: string | undefined;
+  preserveView: boolean;
 }) {
   const map = useMap();
   const previousSelectedSlug = useRef(selected.slug);
 
   useEffect(() => {
-    if (bounds) {
+    if (bounds && !preserveView) {
       fitMapToBounds(map, bounds);
     }
-  }, [bounds, map]);
+  }, [bounds, map, preserveView]);
 
   useEffect(() => {
     if (previousSelectedSlug.current === selected.slug) {
@@ -635,7 +665,12 @@ function FitMapToProperties({
     }
 
     previousSelectedSlug.current = selected.slug;
+    // Only fly to a home the person picked, not to the first result after a filter change.
+    if (selected.slug !== chosenSlug) {
+      return;
+    }
     const nextZoom = Math.min(Math.max(map.getZoom(), 13), MAP_MAX_ZOOM);
+    markProgrammaticMove(map);
 
     if (shouldReduceMapAnimation()) {
       map.setView([selected.coordinates.lat, selected.coordinates.lng], nextZoom, {
@@ -647,7 +682,24 @@ function FitMapToProperties({
     map.flyTo([selected.coordinates.lat, selected.coordinates.lng], nextZoom, {
       duration: 0.55,
     });
-  }, [map, selected]);
+  }, [chosenSlug, map, selected]);
+
+  return null;
+}
+
+function PersonMoveWatcher({ onMove }: { onMove: () => void }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const handleMoveEnd = () => {
+      if ((programmaticMoveUntil.get(map) ?? 0) > Date.now()) return;
+      onMove();
+    };
+    map.on("moveend", handleMoveEnd);
+    return () => {
+      map.off("moveend", handleMoveEnd);
+    };
+  }, [map, onMove]);
 
   return null;
 }
@@ -693,6 +745,7 @@ function isClusterFeature(
 function fitMapToBounds(map: L.Map, bounds: LatLngBoundsExpression) {
   const isDesktop = window.innerWidth >= 768 && !shouldReduceMapAnimation();
 
+  markProgrammaticMove(map);
   map.fitBounds(bounds, {
     paddingTopLeft: [70, 70],
     paddingBottomRight: isDesktop ? [470, 170] : [70, 280],
@@ -730,17 +783,17 @@ function createPropertyIcon(
       ? `${escapeHtml(price)}<span class="morada-marker-boost">Destacada</span>`
       : escapeHtml(price);
 
+  // Colors come from the brand green in redesign.css (light and dark). The hidden text names the
+  // marker for screen readers (the price label is hidden on phones).
   return L.divIcon({
     className: "morada-marker",
     html: `
-      <span
-        class="morada-marker-root${featuredClass}${compactClass}"
-        style="--morada-marker-bg:${property.publisher.brandColor};--morada-marker-fg:${property.publisher.brandTextColor};"
-      >
+      <span class="morada-marker-root${featuredClass}${compactClass}">
+        <span class="sr-only">${escapeHtml(property.title)}, ${escapeHtml(price)}${property.listingPlan === "featured" ? ", destacada, servicio pagado" : ""}</span>
         <span class="morada-marker-pin${selectedClass}${featuredClass}${logoClass}" aria-hidden="true">
           <span class="morada-marker-logo">${publisherLogo}</span>
         </span>
-        <span class="morada-marker-label${selectedClass}${featuredClass}">${markerLabel}</span>
+        <span class="morada-marker-label${selectedClass}${featuredClass}" aria-hidden="true">${markerLabel}</span>
       </span>
     `,
     iconAnchor: [18, 44],
@@ -765,7 +818,7 @@ function createClusterIcon(pointCount: number, featuredCount: number) {
     className: "morada-cluster",
     html: `
       <span class="morada-cluster-root${featuredClass}">
-        <span class="morada-cluster-count">${pointCount}</span>
+        <span class="morada-cluster-count">${pointCount}<span class="sr-only"> alquileres, acercar</span></span>
       </span>
     `,
     iconAnchor: [34, 34],

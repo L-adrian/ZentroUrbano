@@ -11,7 +11,9 @@ export type PublicationRequest = {
   status: string; contactName: string; sourceText: string;
   whatsapp: string; details?: PublicationDetails;
   propertySlug?:string|null; reviewReason?:string|null; reviewedBy?:string|null; reviewedAt?:string|null;
-  photos: { storedName: string; originalName: string; type: string }[];
+  photos: { storedName: string; originalName: string; type: string; category?: string }[];
+  // Set when this request corrects an earlier one ("Corregir y reenviar").
+  correctionOf?: string;
   // "republish": a hidden listing its owner wants to show again. It goes live only after approval.
   kind?: "republish";
   listing?: { title: string; zone: string; price: number; currency: string; images: string[]; previousStatus: string; availabilityConfirmedAt: string | null };

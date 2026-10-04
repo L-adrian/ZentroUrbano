@@ -1,5 +1,4 @@
 import {
-  BadgeDollarSign,
   Bath,
   BedDouble,
   Building2,
@@ -11,6 +10,7 @@ import {
   MapPin,
   MessageCircle,
   PawPrint,
+  Ruler,
   ShieldCheck,
   Sofa,
   Trees,
@@ -21,6 +21,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AgentContactCard } from "@/components/agent-contact-card";
+import { BeforeVisitBlock } from "@/components/before-visit-block";
 import { PriceDisplay } from "@/components/currency-preference";
 import { MobileStickyContact } from "@/components/mobile-sticky-contact";
 import { PropertyGallery } from "@/components/property-gallery";
@@ -28,26 +29,22 @@ import { PropertyLocationMap } from "@/components/property-location-map";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { PropertyViewTracker } from "@/components/property-view-tracker";
+import { ListingSaveButton } from "@/components/save-listing-button";
 import { PublisherBadge } from "@/components/publisher-badge";
 import { SafetyNotice } from "@/components/safety-notice";
 import { toSafeMobileImageUrl } from "@/components/safe-mobile-image";
 import type { Property } from "@/lib/properties";
-import {
-  getPropertyBySlugData,
-  getSimilarPropertiesData,
-} from "@/lib/property-data";
+import { findListingPage } from "@/lib/listing-page-lookup";
+import { getPublishedPropertiesData, getSimilarPropertiesData } from "@/lib/property-data";
 import { buildSeoMetadata } from "@/lib/seo";
-import { citySlug, operationSlug, zoneSlug } from "@/lib/seo-routes";
+import { citySlug, filterPropertiesByCity, filterPropertiesBySeoRoute, operationSlug, zoneSlug } from "@/lib/seo-routes";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
 import { absoluteUrl } from "@/lib/site";
-import { isDirectRental } from "@/lib/rentals";
-import { getPublicationCosts } from "@/lib/publication-costs";
 import { getAvailabilityState, getEntryCost, getGuaranteeLabel } from "@/lib/listing-summary";
 import { getPublicViewStats } from "@/lib/property-audience";
 import { whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
-import { getPrivateTourShowcase } from "@/lib/private-tour-showcase";
 import { PrivateTourShowcaseViewer } from "@/components/private-tour-showcase";
 
 // Prices and availability must not survive edits in an external CDN cache.
@@ -59,27 +56,26 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const privateShowcase = await getPrivateTourShowcase(slug);
+  const found = await findListingPage(slug);
 
-  if (privateShowcase) {
+  if (found?.kind === "showcase") {
     return {
-      title: privateShowcase.title,
+      title: found.showcase.title,
       description: "Muestra privada de un recorrido 3D experimental.",
       robots: { index: false, follow: false, noarchive: true },
     };
   }
-  const property = await getPropertyBySlugData(slug);
-
-  if (!property || !isDirectRental(property)) {
+  if (found?.kind !== "listing") {
     return {
-      title: "Propiedad no encontrada | Zentro Urbano",
+      title: found ? `Ya no está disponible: ${found.property.title}` : "Vivienda no encontrada",
       robots: {
         index: false,
-        follow: false,
+        follow: true,
       },
     };
   }
 
+  const property = found.property;
   const seoTitle = /alquiler/i.test(property.title) ? property.title : `Alquiler: ${property.title}`;
   const seoDescription = `Alquiler directo con el dueño en ${property.zone}, ${property.city}. ${property.shortDescription}`.slice(0, 300);
   return buildSeoMetadata({
@@ -107,16 +103,26 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const privateShowcase = await getPrivateTourShowcase(slug);
+  const found = await findListingPage(slug);
 
-  if (privateShowcase) {
-    return <PrivateTourShowcaseViewer showcase={privateShowcase} />;
+  if (!found) notFound();
+  if (found.kind === "showcase") {
+    return <PrivateTourShowcaseViewer showcase={found.showcase} />;
   }
-  const property = await getPropertyBySlugData(slug);
-
-  if (!property || !isDirectRental(property)) {
-    notFound();
+  if (found.kind === "retired") {
+    const retired = found.property;
+    const [similar, published] = await Promise.all([getSimilarPropertiesData(retired, 3), getPublishedPropertiesData()]);
+    // The zone page answers 404 once its last listing leaves, so link the city instead (or nothing).
+    const route = { operationSlugParam: operationSlug(retired.operation), citySlugParam: citySlug(retired), properties: published };
+    const cityPath = `/${route.operationSlugParam}/${route.citySlugParam}`;
+    const browse = filterPropertiesBySeoRoute({ ...route, zoneSlugParam: zoneSlug(retired) }).length > 0
+      ? { href: `${cityPath}/${zoneSlug(retired)}`, label: `Ver alquileres en ${retired.zone}` }
+      : filterPropertiesByCity(route).length > 0
+        ? { href: cityPath, label: `Ver alquileres en ${retired.city}` }
+        : null;
+    return <RetiredListing property={retired} similar={similar} browse={browse} />;
   }
+  const property = found.property;
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -165,7 +171,7 @@ export default async function PropertyDetailPage({
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, "\\u003c") }}
       />
       <script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript(breadcrumbs)} />
-      <section className="bg-neutral-50 py-6 sm:py-10">
+      <section className="listing-layout py-6 sm:py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <Link
@@ -175,6 +181,7 @@ export default async function PropertyDetailPage({
               Volver al catálogo
             </Link>
             <div className="flex items-center gap-2">
+              <ListingSaveButton slug={property.slug} title={property.title} />
               <PropertyShareButton
                 property={property}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950"
@@ -183,13 +190,9 @@ export default async function PropertyDetailPage({
             </div>
           </div>
 
-          <PropertyGallery property={property} tour={tour} />
-        </div>
-      </section>
-
-      <section className="py-8 sm:py-14">
-        <div className="mx-auto grid max-w-7xl gap-8 px-4 sm:px-6 lg:grid-cols-[1fr_380px] lg:px-8">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="min-w-0 space-y-10">
+            <PropertyGallery property={property} tour={tour} />
             <div>
               <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-neutral-100 px-3 py-1 text-sm font-semibold text-neutral-700">
@@ -199,8 +202,8 @@ export default async function PropertyDetailPage({
                   {property.type}
                 </span>
                 {property.listingPlan === "featured" ? (
-                  <span className="rounded-full bg-[#fff2d6] px-3 py-1 text-sm font-semibold text-[#8b4b31]">
-                    Destacada
+                  <span className="listing-featured-chip rounded-full px-3 py-1 text-sm font-semibold">
+                    Destacada · servicio pagado
                   </span>
                 ) : null}
               </div>
@@ -213,7 +216,7 @@ export default async function PropertyDetailPage({
                 {property.address}
               </p>
 
-              <div className="mt-6 flex flex-col gap-4 border-y border-neutral-200 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-6 flex flex-col gap-4 border-y border-neutral-200 py-5 sm:flex-row sm:items-center sm:justify-between lg:hidden">
                 <div>
                   <p className="text-xs font-semibold uppercase text-neutral-500">Alquiler mensual</p>
                   <PriceDisplay
@@ -225,7 +228,7 @@ export default async function PropertyDetailPage({
                   href={whatsappContactPath(property.slug, "ficha")}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-12 items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
+                  className="zu-whatsapp-cta inline-flex h-12 items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
                 >
                   <MessageCircle className="h-4 w-4" aria-hidden="true" />
                   Contactar por WhatsApp
@@ -256,8 +259,12 @@ export default async function PropertyDetailPage({
                   </span>
                 </p>
               ) : null}
-              <EntryCostBreakdown property={property} />
-              <SafetyNotice slug={property.slug} className="mt-4" />
+              <CostsBlock property={property} />
+              <BeforeVisitBlock property={property} />
+              {/* On desktop the same notice sits in the contact card beside the gallery. */}
+              <div className="lg:hidden">
+                <SafetyNotice slug={property.slug} className="mt-4" />
+              </div>
             </div>
 
             <div className="quick-facts border-y border-neutral-200 py-3 sm:py-4">
@@ -268,7 +275,6 @@ export default async function PropertyDetailPage({
                     icon={fact.icon}
                     label={fact.label}
                     value={fact.value}
-                    highlighted={fact.highlighted}
                   />
                 ))}
               </div>
@@ -315,22 +321,33 @@ export default async function PropertyDetailPage({
             </ContentSection>
 
             <ContentSection title="Ubicación">
+              {property.neighborhoodHighlights.length > 0 ? (
+                <p className="listing-nearby">
+                  <strong>Cerca de:</strong> {property.neighborhoodHighlights.join(" · ")}
+                </p>
+              ) : null}
               <PropertyLocationMap property={property} />
             </ContentSection>
           </div>
 
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <AgentContactCard property={property} />
+            <AgentContactCard property={property} availability={availability} />
           </aside>
+        </div>
         </div>
       </section>
 
       {similarProperties.length > 0 ? (
         <section className="bg-neutral-50 py-16">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-            <h2 className="text-3xl font-semibold tracking-tight text-neutral-950">
-              Propiedades similares
-            </h2>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <h2 className="text-3xl font-semibold tracking-tight text-neutral-950">
+                Otras opciones parecidas
+              </h2>
+              <Link href={`${cityPath}/${zoneSlug(property)}`} className="text-sm font-semibold text-[#176b4d] hover:underline">
+                Ver alquileres en {property.zone}
+              </Link>
+            </div>
             <div className="mt-8 grid gap-5 md:grid-cols-3">
               {similarProperties.map((similar) => (
                 <PropertyCard key={similar.slug} property={similar} compact />
@@ -356,7 +373,7 @@ function QuickFact({
   highlighted?: boolean;
 }) {
   return (
-    <div className="flex min-w-0 items-center gap-3 border border-neutral-200 bg-white px-3 py-2.5">
+    <div className="quick-fact flex min-w-0 items-center gap-3 border border-neutral-200 bg-white px-3 py-2.5">
       <div className={`shrink-0 ${highlighted ? "text-[#21352b]" : "text-[#58745f]"}`}>
         {icon}
       </div>
@@ -369,10 +386,7 @@ function QuickFact({
 }
 
 function propertyQuickFacts(property: Property) {
-  const guarantee = getGuaranteeLabel(property);
-  const entryMultiplier = getEntryCostMultiplier(property);
   const details = property.rentalDetails;
-  const costs = details ? getPublicationCosts({price:String(property.price),commonExpenses:String(details.commonExpenses),guarantee:details.guarantee,guaranteeAmount:details.guaranteeAmount === null ? "" : String(details.guaranteeAmount)}) : null;
   const facts = [
     {
       label: details?.type === "Monoambiente" ? "Distribución" : "Dormitorios",
@@ -386,6 +400,9 @@ function propertyQuickFacts(property: Property) {
           icon: <Bath className="h-4 w-4" />,
         }
       : getBathroomReplacementFact(property),
+    ...(property.area > 0
+      ? [{ label: "Superficie", value: `${property.area} m²`, icon: <Ruler className="h-4 w-4" /> }]
+      : []),
     {
       label: "Parqueo",
       value: getPropertyParkingLabel(property),
@@ -396,24 +413,7 @@ function propertyQuickFacts(property: Property) {
       value: property.pets ? "Permitidas" : details?.petsPolicy === "not_allowed" ? "No acepta" : "Consultar",
       icon: <PawPrint className="h-4 w-4" />,
     },
-    {
-      label: "Garantía",
-      value: guarantee,
-      icon: <ShieldCheck className="h-4 w-4" />,
-    },
-    {
-      label: costs ? "Costo de ingreso" : "Ingreso sin expensas",
-      value:
-        costs ? (costs.entry === null ? "Consultar" : <PriceDisplay property={{...property,price:costs.entry}} showPeriod={false} showExchangeRate={false}/>) : entryMultiplier === null ? (
-          "Consultar"
-        ) : (
-          <PriceDisplay property={{ ...property, price: property.price * entryMultiplier }} showPeriod={false} showExchangeRate={false} />
-        ),
-      icon: <BadgeDollarSign className="h-4 w-4" />,
-      highlighted: true,
-    },
   ];
-  if (costs) facts.push({label:"Mensual con expensas",value:<PriceDisplay property={{...property,price:costs.monthly}} showExchangeRate={false}/>,icon:<BadgeDollarSign className="h-4 w-4"/>,highlighted:true});
 
   const usedLabels = new Set<string>();
 
@@ -425,24 +425,6 @@ function propertyQuickFacts(property: Property) {
     usedLabels.add(fact.label);
     return true;
   });
-}
-
-function getEntryCostMultiplier(property: Property) {
-  const guarantee = getGuaranteeLabel(property);
-
-  if (guarantee === "Sin garantía") {
-    return 1;
-  }
-
-  if (guarantee === "1 mes") {
-    return 2;
-  }
-
-  if (guarantee === "2 meses") {
-    return 3;
-  }
-
-  return null;
 }
 
 function hasKnownBathrooms(property: Property) {
@@ -520,19 +502,65 @@ function featureList(property: Property) {
   return features.filter((feature) => feature.enabled);
 }
 
-function EntryCostBreakdown({ property }: { property: Property }) {
+// One cost summary with the same names as the cards; anything the owner didn't give stays pending.
+function CostsBlock({ property }: { property: Property }) {
+  const details = property.rentalDetails;
   const entry = getEntryCost(property);
-  if (!entry || entry.total <= property.price) return null;
+  const guarantee = getGuaranteeLabel(property);
   const price = (amount: number) => <PriceDisplay property={{ ...property, price: amount }} showPeriod={false} showExchangeRate={false} />;
+  const pending = <span className="entry-cost-pending">Pendiente de consulta</span>;
+  const expenses = details ? (details.commonExpenses > 0 ? price(details.commonExpenses) : "No se cobran aparte") : pending;
+  const deposit = entry ? (entry.deposit > 0 ? price(entry.deposit) : "Sin garantía") : guarantee === "Consultar" ? pending : guarantee;
   return (
     <section className="entry-cost mt-4" aria-labelledby="entry-cost-title">
-      <h2 id="entry-cost-title">Costo para entrar</h2>
+      <h2 id="entry-cost-title">Costos</h2>
       <dl>
-        <div><dt>Primer mes</dt><dd>{price(entry.rent)}</dd></div>
-        {entry.expenses > 0 && <div><dt>Expensas del mes</dt><dd>{price(entry.expenses)}</dd></div>}
-        <div><dt>Garantía</dt><dd>{entry.deposit > 0 ? price(entry.deposit) : "Sin garantía"}</dd></div>
-        <div className="total"><dt>Total al firmar</dt><dd>{price(entry.total)}</dd></div>
+        <div><dt>Alquiler mensual</dt><dd>{price(property.price)}</dd></div>
+        <div><dt>Expensas al mes</dt><dd>{expenses}</dd></div>
+        <div><dt>Garantía</dt><dd>{deposit}</dd></div>
+        <div className="total"><dt>Para entrar</dt><dd>{entry ? price(entry.total) : pending}</dd></div>
       </dl>
+      {entry ? (
+        <p className="entry-cost-note">
+          {details
+            ? `${entry.advanceMonths ? `${entry.advanceMonths} meses de adelanto` : "Primer mes"}${details.commonExpenses > 0 ? ", expensas" : ""} y garantía.`
+            : "Primer mes y garantía. Las expensas, si hay, se consultan con el dueño."}
+        </p>
+      ) : null}
     </section>
+  );
+}
+
+function RetiredListing({ property, similar, browse }: { property: Property; similar: Property[]; browse: { href: string; label: string } | null }) {
+  const kind = (property.rentalDetails?.type ?? property.type).toLocaleLowerCase("es");
+  return (
+    <main id="contenido" className="property-detail bg-white py-10 sm:py-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <p className="text-sm font-semibold uppercase tracking-[0.12em] text-neutral-500">Anuncio retirado</p>
+        <h1 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-neutral-950 sm:text-5xl">
+          {`${kind === "casa" ? "Esta" : "Este"} ${kind} en ${property.zone} ya no está disponible`}
+        </h1>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-neutral-600">
+          El dueño lo retiró, normalmente porque ya se alquiló. Estas opciones se le parecen.
+        </p>
+        {similar.length > 0 ? (
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {similar.map((item) => (
+              <PropertyCard key={item.slug} property={item} compact />
+            ))}
+          </div>
+        ) : null}
+        <div className="mt-8 flex flex-wrap gap-3">
+          {browse ? (
+            <Link href={browse.href} className="zu-button zu-button-primary">
+              {browse.label}
+            </Link>
+          ) : null}
+          <Link href="/propiedades" className={`zu-button ${browse ? "zu-button-secondary" : "zu-button-primary"}`}>
+            Ver todos los alquileres
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }

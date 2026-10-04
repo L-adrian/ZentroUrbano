@@ -198,7 +198,9 @@ test("listing cards never use text under 12px and the contact button is at least
     assert.ok((lastValue(".rental-card-contact", "min-width", mobile) ?? 0) >= 44);
   }
   const card = await readFile(new URL("../src/components/property-card.tsx", import.meta.url), "utf8");
-  assert.match(card, /whatsappContactPath\(property\.slug, "tarjeta"\)/);
+  // Cards say where the click came from; "tarjeta" unless a page asks for another source.
+  assert.match(card, /contactSource = "tarjeta"/);
+  assert.match(card, /whatsappContactPath\(property\.slug, contactSource\)/);
   assert.match(card, /<WhatsAppIcon/);
   assert.match(card, /contact\.shortLabel/);
   assert.match(card, /getAvailabilityState\(property\)/);

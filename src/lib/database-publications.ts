@@ -9,6 +9,12 @@ import type { PublicationRequest } from "@/lib/publication-requests";
 import { parseCurrencyAmount } from "@/lib/currency";
 import { replaceDemoForPublication } from "@/lib/demo-replacements";
 import { getCuratedRentalBySlug } from "@/lib/curated-rentals";
+import { generatedMapUrl, isGeneratedMapUrl } from "@/lib/owner-location";
+import type { StoredUploadPhoto } from "@/lib/upload-photos";
+
+// "Pedir corrección" (P8): the request stays out of the catalog and the owner fixes it from Mi cuenta.
+export const correctableRequestStatuses = ["changes_requested", "rejected"];
+export type UploadedPhoto = StoredUploadPhoto & { originalName: string; category: string };
 
 export class PublicationError extends Error {
   constructor(public status:number,message:string) { super(message); }
@@ -29,7 +35,7 @@ export async function databaseRequests(accountId?:string) {
   const rows=await queryRows<RequestRow>(`SELECT * FROM publication_requests ${accountId ? "WHERE account_id=:accountId" : ""} ORDER BY created_at DESC LIMIT 200`,accountId ? {accountId} : {});
   return (rows || []).map(mapRequest);
 }
-export async function storeDatabaseRequest(record:{id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null},photos:File[],key:string) {
+export async function storeDatabaseRequest(record:{id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null;correctionOf?:string},photos:UploadedPhoto[],key:string) {
   return withTransaction(async connection=>{
     // Serializing each owner's submissions makes retries idempotent, even across processes.
     const [accounts]=await connection.execute<RowDataPacket[]>("SELECT id FROM client_accounts WHERE id=? AND kind='owner' AND status='active' FOR UPDATE",[record.accountId]);
@@ -39,11 +45,12 @@ export async function storeDatabaseRequest(record:{id:string;accountId:string;ac
       const payload=parseDbJson<{photos:unknown[]}>(existing[0].payload);
       return {requestId:existing[0].id as string,status:existing[0].status as string,photosStored:payload.photos.length};
     }
-    const storedPhotos=photos.map((photo,index)=>({originalName:photo.name.slice(0,255),storedName:`${String(index+1).padStart(2,"0")}.${photo.type === "image/png" ? "png" : photo.type === "image/webp" ? "webp" : "jpg"}`,size:photo.size,type:photo.type}));
+    // Photos arrive already shrunk (shrinkUploadPhoto); the room label travels with each one.
+    const storedPhotos=photos.map((photo,index)=>({originalName:photo.originalName.slice(0,255),storedName:`${String(index+1).padStart(2,"0")}.${photo.extension}`,size:photo.size,type:photo.type,...(photo.category ? {category:photo.category} : {})}));
     await connection.execute("INSERT INTO publication_requests (id,account_id,idempotency_key,payload) VALUES (?,?,?,?)",[record.id,record.accountId,key,JSON.stringify({...record,photos:storedPhotos})]);
     for (const [index,photo] of photos.entries()) {
       const stored=storedPhotos[index];
-      await connection.execute("INSERT INTO publication_photos (request_id,filename,original_name,content_type,byte_size,original_data) VALUES (?,?,?,?,?,?)",[record.id,stored.storedName,stored.originalName,photo.type,photo.size,Buffer.from(await photo.arrayBuffer())]);
+      await connection.execute("INSERT INTO publication_photos (request_id,filename,original_name,content_type,byte_size,original_data) VALUES (?,?,?,?,?,?)",[record.id,stored.storedName,stored.originalName,photo.type,photo.size,photo.bytes]);
     }
     return {requestId:record.id as string,status:"pending_review",photosStored:photos.length};
   });
@@ -58,7 +65,9 @@ export async function readDatabasePhoto(id:string,filename:string,publicOnly=fal
 export async function reviewDatabaseRequest(id:string,admin:string,input:Record<string,unknown>) {
   const decision=input.decision;
   const reason=typeof input.reason === "string" ? input.reason.trim() : "";
-  if (!["approve","reject"].includes(String(decision)) || reason.length > 1000 || (decision === "reject" && reason.length < 5)) throw new PublicationError(400,"Indica una decisión válida y un motivo para rechazar.");
+  if (!["approve","reject","changes"].includes(String(decision)) || reason.length > 1000 || (decision !== "approve" && reason.length < 5)) {
+    throw new PublicationError(400,decision === "changes" ? "Escribe qué debe corregir el propietario (mínimo 5 caracteres)." : "Indica una decisión válida y un motivo para rechazar.");
+  }
   const lat=Number(input.latitude),lng=Number(input.longitude);
   return withTransaction(async connection=>{
     const [rows]=await connection.execute<RowDataPacket[]>("SELECT * FROM publication_requests WHERE id=? FOR UPDATE",[id]);
@@ -66,7 +75,10 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
     if (rows[0].status !== "pending_review") throw new PublicationError(409,"Esta solicitud ya fue revisada. Actualiza la página.");
     const record=mapRequest(rows[0] as RequestRow);
     let slug:string|null=null;
-    if (record.kind === "republish") {
+    if (decision === "changes" && record.kind === "republish") throw new PublicationError(400,"Para «Volver a publicar», aprueba o mantén oculto el anuncio.");
+    if (decision === "changes") {
+      // Nothing is published or changed: the owner sees the message and sends a corrected request.
+    } else if (record.kind === "republish") {
       if (decision === "approve" && input.confirmed !== true) throw new PublicationError(400,"Confirma que revisaste el anuncio antes de aprobar.");
       slug=await reviewRepublish(connection,record,decision === "approve");
     } else if (decision === "approve" && (input.confirmed !== true || input.latitude === "" || input.longitude === "" || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -23 || lat > -9 || lng < -70 || lng > -57)) {
@@ -94,7 +106,7 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
       await connection.execute("INSERT INTO client_account_properties (id,account_id,property_slug,status) VALUES (?,?,?,'active')",[`cap_${randomUUID().replaceAll("-","")}`,record.accountId,slug]);
       await replaceDemoForPublication(connection, slug);
     }
-    const status=decision === "approve" ? "approved" : "rejected";
+    const status=decision === "approve" ? "approved" : decision === "changes" ? "changes_requested" : "rejected";
     await connection.execute("UPDATE publication_requests SET status=?,property_slug=?,reviewed_by=?,review_reason=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",[status,slug,admin,reason,id]);
     await connection.execute("INSERT INTO publication_review_audit (request_id,admin_user,decision,reason) VALUES (?,?,?,?)",[id,admin,status,reason]);
     return {status,slug};
@@ -212,6 +224,42 @@ export async function requestListingRepublish(accountId:string,slug:string) {
     await connection.execute("UPDATE client_account_properties SET status='review' WHERE id=?",[row.link_id]);
     return {requestId:id,status:"pending_review"};
   });
+}
+
+// "Verificar ubicación": the owner's own point replaces the approximate one and the listing says
+// "Ubicación confirmada por el dueño". No new review; the update date stays as it was.
+// Only listings with reviewed conditions (rental_details) can store the confirmation.
+export async function confirmListingLocation(accountId:string,slug:string,point:{lat:number;lng:number}) {
+  return withTransaction(async connection=>{
+    const [links]=await connection.execute<RowDataPacket[]>("SELECT id FROM client_account_properties WHERE account_id=? AND property_slug=? AND status<>'closed' FOR UPDATE",[accountId,slug]);
+    if (!links.length) throw new PublicationError(403,"No tienes permiso para cambiar este anuncio.");
+    const [rows]=await connection.execute<RowDataPacket[]>("SELECT rental_details,map_url FROM properties WHERE slug=? FOR UPDATE",[slug]);
+    if (!rows.length) throw new PublicationError(404,"Anuncio no encontrado.");
+    if (!rows[0].rental_details) throw new PublicationError(409,"Este anuncio todavía no puede confirmar su ubicación desde aquí. Escríbenos por WhatsApp y lo hacemos contigo.");
+    const confirmedAt=new Date().toISOString();
+    const mapUrl=isGeneratedMapUrl(rows[0].map_url) ? (rows[0].map_url ? generatedMapUrl(point) : null) : rows[0].map_url;
+    await connection.execute(
+      "UPDATE properties SET coordinates=?,map_url=?,rental_details=JSON_SET(rental_details,'$.locationConfirmedAt',?),updated_at=updated_at WHERE slug=?",
+      [JSON.stringify(point),mapUrl,confirmedAt,slug],
+    );
+    return {slug,locationConfirmedAt:confirmedAt};
+  });
+}
+
+// A request its owner can open in /publicar to fix and send again ("Corregir y reenviar").
+export async function ownerCorrectableRequest(accountId:string,id:string) {
+  const record=await databaseRequest(id);
+  if (!record || record.accountId !== accountId || record.kind === "republish" || !correctableRequestStatuses.includes(record.status)) return null;
+  const details=parsePublicationDetails(record.details);
+  return details ? {record,details} : null;
+}
+
+// Photos of the owner's own request while it waits for a correction. Same bytes the admin reviewed.
+export async function readOwnerRequestPhoto(accountId:string,id:string,filename:string) {
+  return queryOne<{bytes:Buffer;content_type:string}>(
+    `SELECT f.original_data AS bytes,f.content_type FROM publication_photos f
+       JOIN publication_requests r ON r.id=f.request_id AND r.account_id=:accountId AND r.status IN ('changes_requested','rejected')
+      WHERE f.request_id=:id AND f.filename=:filename LIMIT 1`,{accountId,id,filename});
 }
 
 // Photos of an owner's own listing, also while it is hidden from the public.

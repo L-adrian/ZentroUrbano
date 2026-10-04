@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getRentalZones, withoutContactEmail } from "@/lib/rentals";
-import { filterPropertiesByCity, slugifyForRoute } from "@/lib/seo-routes";
+import { getRentalZones, withoutOwnerContact } from "@/lib/rentals";
+import { countRentalNeedListings, filterPropertiesByCity, rentalNeedRoutes, slugifyForRoute } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
 
@@ -59,6 +59,10 @@ export default async function OperationCityPage({ params }: { params: Params }) 
 
   const name = cityLabel(properties[0].city);
   const zones = getRentalZones(properties);
+  // Need pages with at least one real listing (they become indexable from 3).
+  const needs = rentalNeedRoutes
+    .map((route) => ({ route, count: countRentalNeedListings(route, properties) }))
+    .filter(({ count }) => count > 0);
   const breadcrumbs = breadcrumbJsonLd([
     { name: "Inicio", path: "/" },
     { name: `Alquiler en ${name}`, path: `/${operation}/${city}` },
@@ -73,7 +77,7 @@ export default async function OperationCityPage({ params }: { params: Params }) 
           Casas, departamentos y monoambientes en alquiler publicados por sus propios dueños. Escribes directo al propietario por WhatsApp, sin inmobiliarias ni comisiones de intermediación.
         </p>
       </div>
-      <DirectRentalExplorer properties={withoutContactEmail(properties)} />
+      <DirectRentalExplorer properties={withoutOwnerContact(properties)} />
       <section className="mx-auto max-w-[1500px] px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="zonas-title">
         <h2 id="zonas-title" className="text-xl font-semibold tracking-tight">Alquileres por zona en {name}</h2>
         <ul className="mt-4 flex flex-wrap gap-2">
@@ -85,6 +89,20 @@ export default async function OperationCityPage({ params }: { params: Params }) 
             </li>
           ))}
         </ul>
+        {needs.length > 0 ? (
+          <>
+            <h2 className="mt-8 text-xl font-semibold tracking-tight">Búsquedas frecuentes en {name}</h2>
+            <ul className="mt-4 flex flex-wrap gap-2">
+              {needs.map(({ route, count }) => (
+                <li key={route.slug}>
+                  <Link href={`/${operation}/${city}/${route.slug}`} className="inline-flex rounded-full border border-black/10 px-4 py-2 text-sm font-medium text-neutral-800 transition hover:border-neutral-950">
+                    {route.label} ({count})
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
         <h2 className="mt-10 text-xl font-semibold tracking-tight">¿Cómo funciona alquilar directo con el dueño?</h2>
         <div className="mt-3 grid max-w-3xl gap-3 text-sm leading-6 text-neutral-600">
           <p>Cada anuncio lo publica el propietario y lo revisa el equipo de Zentro Urbano antes de mostrarse. Ves el precio en bolivianos, las expensas, la garantía y lo que cuesta entrar antes de escribir.</p>

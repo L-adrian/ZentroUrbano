@@ -5,12 +5,13 @@ import { NextResponse, type NextRequest } from "next/server";
 import { saveContactLeads } from "@/lib/contact-leads";
 import { hasDatabaseConfig, requiresDatabase } from "@/lib/mysql";
 import { getPublicationContactErrors, normalizePublicationPhone, validatePublicationDetails } from "@/lib/publication-input";
-import { PublicationError, storeDatabaseRequest } from "@/lib/database-publications";
+import { ownerCorrectableRequest, PublicationError, storeDatabaseRequest, type UploadedPhoto } from "@/lib/database-publications";
 import { getCurrentAccount } from "@/lib/mysql-auth";
 import { isRentalPropertyType } from "@/lib/rentals";
 import { persistentStorageRoot } from "@/lib/storage";
 import { isDisplayCurrency, parsePropertyExchangeRate } from "@/lib/currency";
-import { maxTotalPhotoBytes, validateUploadPhotos } from "@/lib/upload-photos";
+import { maxTotalPhotoBytes, shrinkUploadPhoto, validateUploadPhotos } from "@/lib/upload-photos";
+import { validPhotoCategory } from "@/lib/publish-prefill";
 
 export const runtime = "nodejs";
 
@@ -98,13 +99,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Only the lighter copy of each photo is kept (longest side 1920 px), with its room label.
+  const photoReport = Array.isArray(payload.photoReport) ? payload.photoReport : [];
+  const uploaded: UploadedPhoto[] = [];
+  for (const [index, photo] of photos.entries()) {
+    const report = photoReport[index] as { category?: unknown } | undefined;
+    uploaded.push({ ...(await shrinkUploadPhoto(photo)), originalName: photo.name, category: validPhotoCategory(report?.category) });
+  }
+
   const requestId = `publication_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
   if (hasDatabaseConfig()) {
     const details = validation!.details!;
     try {
+      // "Corregir y reenviar": linked only to a request of this owner that is waiting for it.
+      // Otherwise it is kept as a new request, so nothing the owner sent is lost.
+      const correctionOf = typeof payload.correctionOf === "string" && (await ownerCorrectableRequest(account.id, payload.correctionOf).catch(() => null))
+        ? payload.correctionOf : undefined;
       const result = await storeDatabaseRequest({id:requestId,accountId:account.id,accountEmail:account.email,contactName,
         whatsapp:normalizedPhone,sourceText,details,
-        price:details.price,currency:details.currency,exchangeRate:details.exchangeRate},photos,key);
+        price:details.price,currency:details.currency,exchangeRate:details.exchangeRate,...(correctionOf ? {correctionOf} : {})},uploaded,key);
       return NextResponse.json({ok:true,...result},{status:201});
     } catch(error) {
       return NextResponse.json({ok:false,message:error instanceof PublicationError ? error.message : "No pudimos guardar la solicitud en la base de datos. Conservamos tus datos; intenta nuevamente."},{status:error instanceof PublicationError ? error.status : 503});
@@ -118,13 +131,12 @@ export async function POST(request: NextRequest) {
 
   const storedPhotos: Array<{ originalName: string; storedName: string; size: number; type: string }> = [];
 
-  for (const [index, photo] of photos.entries()) {
+  for (const [index, photo] of uploaded.entries()) {
     const extension = allowedImageTypes.get(photo.type) ?? ".jpg";
     const storedName = `${String(index + 1).padStart(2, "0")}${extension}`;
-    const bytes = Buffer.from(await photo.arrayBuffer());
-    await writeFile(path.join(pendingDirectory, storedName), bytes);
+    await writeFile(path.join(pendingDirectory, storedName), photo.bytes);
     storedPhotos.push({
-      originalName: photo.name,
+      originalName: photo.originalName,
       storedName,
       size: photo.size,
       type: photo.type,

@@ -1,5 +1,6 @@
+import { parseCurrencyAmount } from "@/lib/currency";
 import type { Property } from "@/lib/properties";
-import { getPublicationCosts } from "@/lib/publication-costs";
+import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
 
 // Facts shared by listing cards and the listing page, so both always agree.
 
@@ -79,7 +80,8 @@ export function getGuaranteeLabel(property: Pick<Property, "requirements">) {
   return "Consultar";
 }
 
-export type EntryCost = { rent: number; expenses: number; deposit: number; total: number };
+// advanceMonths is set only when the owner asked for more than the first month in advance.
+export type EntryCost = { rent: number; expenses: number; deposit: number; total: number; advanceMonths?: number };
 
 // What a tenant pays at signing: first month (with expenses) plus the guarantee. Null when unknown.
 export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" | "requirements">): EntryCost | null {
@@ -90,14 +92,30 @@ export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" 
       commonExpenses: String(details.commonExpenses),
       guarantee: details.guarantee,
       guaranteeAmount: details.guaranteeAmount === null ? "" : String(details.guaranteeAmount),
+      advanceMonths: details.advanceMonths,
     });
     if (costs.deposit === null || costs.entry === null) return null;
-    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry };
+    const months = advanceRentMonths(details.advanceMonths);
+    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry, ...(months > 1 ? { advanceMonths: months } : {}) };
   }
   const guarantee = getGuaranteeLabel(property);
   const months = guarantee === "Sin garantía" ? 0 : guarantee === "1 mes" ? 1 : guarantee === "2 meses" ? 2 : null;
   if (months === null) return null;
   return { rent: property.price, expenses: 0, deposit: property.price * months, total: property.price * (months + 1) };
+}
+
+// Rent plus common expenses per month, in the listing's currency. Null when the owner did not say
+// what the expenses are ("pendiente de consulta").
+export function getMonthlyCost(property: Pick<Property, "price" | "rentalDetails" | "requirements">): number | null {
+  const expenses = property.rentalDetails?.commonExpenses;
+  if (property.rentalDetails) {
+    return typeof expenses === "number" && Number.isFinite(expenses) && expenses >= 0 ? property.price + expenses : null;
+  }
+  const line = property.requirements.find((item) => /expensas/i.test(item));
+  if (!line) return null;
+  if (/incluid|sin expensas|no se cobra/i.test(line)) return property.price;
+  const amount = parseCurrencyAmount(/(\d[\d.,\s]*\d|\d)/.exec(line)?.[1]?.trim());
+  return amount === null ? null : property.price + amount;
 }
 
 // Confirmed amenities only; "unknown" is never shown as a tag.

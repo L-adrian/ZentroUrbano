@@ -42,9 +42,19 @@ export function PropertyLocationMap({ property }: PropertyLocationMapProps) {
   return (
     <div className="location-map-frame" role="group" aria-label="Mapa de la vivienda">
       <div className="location-map-toolbar">
-        <span><MapPin size={17} aria-hidden="true" />{property.zone}</span>
-        <a className="map-directions-link zu-button zu-button-primary" href={getGoogleMapsDirectionsUrl(property)} target="_blank" rel="noopener noreferrer" aria-label="Cómo llegar a esta vivienda con Google Maps">
-          <Navigation size={17} aria-hidden="true" />Cómo llegar<ArrowUpRight size={15} aria-hidden="true" />
+        <span>
+          <MapPin size={17} aria-hidden="true" />
+          <span>
+            {property.zone}
+            <small className="location-map-precision">
+              {property.locationConfirmedAt
+                ? "Ubicación confirmada por el dueño"
+                : "Ubicación aproximada: confirma la dirección exacta con el dueño"}
+            </small>
+          </span>
+        </span>
+        <a className="map-directions-link zu-button zu-button-primary" href={getGoogleMapsDirectionsUrl(property)} target="_blank" rel="noopener noreferrer" aria-label={property.locationConfirmedAt ? "Cómo llegar a esta vivienda con Google Maps" : "Cómo llegar a la zona con Google Maps"}>
+          <Navigation size={17} aria-hidden="true" />{property.locationConfirmedAt ? "Cómo llegar" : "Cómo llegar a la zona"}<ArrowUpRight size={15} aria-hidden="true" />
         </a>
       </div>
       {LeafletPropertyLocationMap ? <LeafletPropertyLocationMap property={property} /> : <LocationMapFallback

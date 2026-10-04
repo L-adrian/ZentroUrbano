@@ -4,11 +4,12 @@ import { ArrowUpRight, Mail, MessageCircle, Plus, Search } from "lucide-react";
 import { buildSeoMetadata } from "@/lib/seo";
 import { siteConfig, whatsappUrl } from "@/lib/site";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
+import { supportHoursLabel } from "@/lib/property-reports";
 
 export const metadata: Metadata = buildSeoMetadata({ title: "Contacto y ayuda", description: "Ayuda para buscar o publicar alquileres directos en Zentro Urbano.", path: "/contacto" });
 export default function ContactPage() {
   return <main id="contenido" className="zu-container support-page">
-    <p className="zu-eyebrow">ESTAMOS PARA AYUDARTE</p><h1>Hablemos de tu próximo paso.</h1><p>Consultas sobre tu cuenta, publicaciones y servicios de Zentro Urbano.</p>
+    <p className="zu-eyebrow">ESTAMOS PARA AYUDARTE</p><h1>Hablemos de tu próximo paso.</h1><p>Consultas sobre tu cuenta, publicaciones y servicios de Zentro Urbano. Atendemos {supportHoursLabel}.</p>
     <div className="mt-6"><SupportWhatsAppButton showPhone /></div>
     <div className="support-links">
       <a href={whatsappUrl("Hola, necesito ayuda con Zentro Urbano.")} target="_blank" rel="noreferrer"><MessageCircle size={23} /><div><h2>Escríbenos por WhatsApp</h2><p>{siteConfig.phoneDisplay}</p></div><ArrowUpRight size={19} /></a>
@@ -16,5 +17,10 @@ export default function ContactPage() {
       <Link href="/publicar"><Plus size={23} /><div><h2>Quiero publicar mi vivienda</h2><p>Fotos, información y contacto del propietario.</p></div><ArrowUpRight size={19} /></Link>
       <Link href="/propiedades"><Search size={23} /><div><h2>Estoy buscando alquiler</h2><p>Compara viviendas y habla directamente con su propietario.</p></div><ArrowUpRight size={19} /></Link>
     </div>
+    <section className="support-about">
+      <h2>Quiénes somos</h2>
+      <p>Zentro Urbano es un proyecto de Santa Cruz de la Sierra que conecta a dueños e inquilinos para alquilar sin inmobiliaria. No intermediamos el contrato ni cobramos comisión: publicar es gratis y ofrecemos paquetes mensuales opcionales para dueños, con fotos, ayuda con el contrato y una persona que muestra la vivienda una vez al mes.</p>
+      <p>Te respondemos por WhatsApp al {siteConfig.phoneDisplay} o por correo a {siteConfig.email}, {supportHoursLabel}.</p>
+    </section>
   </main>;
 }

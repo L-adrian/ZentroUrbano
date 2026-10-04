@@ -1,1 +1,5 @@
-export { RentalLoading as default } from "@/components/rental-loading";
+import { RentalLoading } from "@/components/rental-loading";
+
+export default function Loading() {
+  return <RentalLoading withMap />;
+}

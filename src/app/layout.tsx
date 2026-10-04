@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 
 
 import type { ReactNode } from "react";
+import { CatalogCardClicks } from "@/components/catalog-card-clicks";
 import { GoogleAnalytics } from "@/components/google-analytics";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -80,6 +81,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       <body className="flex min-h-full flex-col">
         <SiteHeader />
         {children}
+        <CatalogCardClicks />
         <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
         <SiteFooter />
       </body>

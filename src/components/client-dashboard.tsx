@@ -14,6 +14,7 @@ import {
   LogOut,
   MapPin,
   MessageCircle,
+  Plus,
   Save,
   X,
 } from "lucide-react";
@@ -22,8 +23,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { FormEvent, ReactElement, ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
 import { PriceDisplay } from "@/components/currency-preference";
+import { OwnerLocationDialog } from "@/components/owner-location-dialog";
 import { OwnerServicesNote } from "@/components/owner-services-note";
+import { OwnerShareKit } from "@/components/owner-share-kit";
 import "./listing-tones.css";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
@@ -43,8 +47,10 @@ import {
   ownerPhotoSrc,
   type OwnerListingStatus,
 } from "@/lib/listing-moderation";
+import { beforeVisitFormValues, parseBeforeVisitInput, withBeforeVisit } from "@/lib/before-visit";
 import { availabilityFreshDays, availabilityReportLimit } from "@/lib/listing-summary";
 import { getOwnerListingSuggestions } from "@/lib/owner-listing-suggestions";
+import { ownerLocationStatus } from "@/lib/owner-location";
 import { type Property, type PropertyType } from "@/lib/properties";
 import type { PetsPolicy } from "@/lib/publication-input";
 import { getDirectRentals, rentalPropertyTypes } from "@/lib/rentals";
@@ -53,7 +59,7 @@ import { whatsappUrl } from "@/lib/site";
 const sessionEventName = "morada-session";
 
 type ListingAction = "confirm" | "rented" | "republish";
-type EditedProperty = Property & { petsPolicy?: PetsPolicy };
+type EditedProperty = Property & { petsPolicy?: PetsPolicy; beforeVisit?: BeforeVisitFormValue };
 
 export function ClientDashboard({
   account,
@@ -93,12 +99,32 @@ export function ClientDashboard({
       });
       const result = await response.json().catch(() => ({}));
       if (!response.ok || result.stored !== true) throw new Error(result.message || "No se pudieron guardar los cambios.");
-      const { petsPolicy, ...property } = nextProperty;
+      const { petsPolicy, beforeVisit, ...property } = nextProperty;
+      let rentalDetails = property.rentalDetails;
+      if (rentalDetails && petsPolicy) rentalDetails = { ...rentalDetails, petsPolicy };
+      if (rentalDetails && beforeVisit) rentalDetails = withBeforeVisit(rentalDetails, parseBeforeVisitInput(beforeVisit).values);
       setEditedProperties(current => ({
         ...current,
-        [nextProperty.slug]: property.rentalDetails && petsPolicy ? { ...property, rentalDetails: { ...property.rentalDetails, petsPolicy } } : property,
+        [nextProperty.slug]: { ...property, rentalDetails },
       }));
       router.refresh();
+  }
+
+  // "Verificar ubicación": the saved point replaces any edited copy, so a later edit cannot send the old one.
+  async function confirmLocation(slug: string, point: { lat: number; lng: number }) {
+    const response = await fetch(`/api/cliente/propiedades/${encodeURIComponent(slug)}/ubicacion`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(point),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.ok !== true) throw new Error(result.message || "No se pudo guardar la ubicación.");
+    setEditedProperties((current) => {
+      const next = { ...current };
+      delete next[slug];
+      return next;
+    });
+    router.refresh();
   }
 
   async function runListingAction(slug: string, action: ListingAction) {
@@ -201,6 +227,7 @@ export function ClientDashboard({
                   audienceUnavailable={Boolean(account.audienceUnavailable)}
                   onAction={runListingAction}
                   onSaveProperty={saveProperty}
+                  onConfirmLocation={confirmLocation}
                 />
               ))}
             </div>
@@ -270,14 +297,19 @@ function RequestsSection({ requests, liveSlugs }: { requests: OwnerRequestSummar
   const visible = requests.slice(0, 6);
   if (visible.length === 0) return null;
   const pending = visible.some((request) => request.status === "pending_review");
+  const needsFix = visible.some((request) => request.status === "changes_requested" && !request.corrected);
 
   return (
     <section className="rounded-[28px] border border-black/10 bg-white p-5 sm:p-6" aria-labelledby="owner-requests-title">
       <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#58745f]">Solicitudes</p>
       <h2 id="owner-requests-title" className="mt-2 text-2xl font-semibold tracking-tight text-neutral-950">
-        {pending ? "Tu vivienda está en revisión" : "Tus últimas solicitudes"}
+        {needsFix ? "Te pedimos una corrección" : pending ? "Tu vivienda está en revisión" : "Tus últimas solicitudes"}
       </h2>
-      {pending ? (
+      {needsFix ? (
+        <p className="mt-2 text-sm leading-6 text-neutral-600">
+          Tu vivienda todavía no está publicada. Lee lo que te pedimos, corrige y reenvía: tus datos y fotos ya están cargados.
+        </p>
+      ) : pending ? (
         <p className="mt-2 text-sm leading-6 text-neutral-600">
           Una persona del equipo revisa las fotos, el precio y los datos antes de publicar. Verás el resultado aquí.
         </p>
@@ -294,14 +326,16 @@ function RequestsSection({ requests, liveSlugs }: { requests: OwnerRequestSummar
               </div>
               <RequestStatusBadge status={request.status} />
             </div>
-            {request.status === "rejected" ? (
+            {request.status === "rejected" || request.status === "changes_requested" ? (
               <div className="mt-3 text-sm leading-6 text-neutral-700">
-                {request.reason ? <p><span className="font-semibold">Motivo:</span> {request.reason}</p> : null}
+                {request.reason ? <p><span className="font-semibold">{request.status === "changes_requested" ? "Lo que te pedimos:" : "Motivo:"}</span> {request.reason}</p> : null}
                 {request.kind === "republish" ? (
                   <p className="mt-1 text-neutral-600">Puedes editar el anuncio y volver a pedir que se publique.</p>
+                ) : request.corrected ? (
+                  <p className="mt-1 text-neutral-600">Ya enviaste la corrección. La revisamos y verás el resultado aquí.</p>
                 ) : (
-                  <Link href="/publicar" className="mt-2 inline-flex items-center gap-1 font-semibold text-[#176b4d] underline-offset-4 hover:underline">
-                    Corregir y enviar de nuevo <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  <Link href={`/publicar?corregir=${encodeURIComponent(request.id)}`} className="mt-2 inline-flex min-h-11 items-center gap-1 font-semibold text-[#176b4d] underline-offset-4 hover:underline">
+                    Corregir y reenviar <ArrowRight className="h-4 w-4" aria-hidden="true" />
                   </Link>
                 )}
               </div>
@@ -327,6 +361,7 @@ function RequestStatusBadge({ status }: { status: string }) {
     status === "pending_review" ? ["En revisión", "bg-amber-100 text-amber-900"]
     : status === "approved" ? ["Aprobada", "bg-[#eef7ef] text-[#285340]"]
     : status === "rejected" ? ["No aprobada", "bg-red-100 text-red-900"]
+    : status === "changes_requested" ? ["Pide corrección", "bg-amber-100 text-amber-900"]
     : ["En seguimiento", "bg-neutral-100 text-neutral-700"];
   return <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${tone}`}>{label}</span>;
 }
@@ -345,14 +380,17 @@ function OwnerListingCard({
   audienceUnavailable,
   onAction,
   onSaveProperty,
+  onConfirmLocation,
 }: {
   property: Property;
   listing: OwnerListingState;
   audienceUnavailable: boolean;
   onAction: (slug: string, action: ListingAction) => Promise<void>;
   onSaveProperty: (property: EditedProperty) => Promise<void>;
+  onConfirmLocation: (slug: string, point: { lat: number; lng: number }) => Promise<void>;
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [busy, setBusy] = useState<ListingAction | null>(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -513,6 +551,10 @@ function OwnerListingCard({
             </p>
           ) : null}
 
+          {live && property.rentalDetails ? (
+            <LocationRow property={property} onVerify={() => setIsLocating(true)} />
+          ) : null}
+
           {notice ? <p role="status" className="text-sm font-semibold text-[#176b4d]">{notice}</p> : null}
           {error ? <p role="alert" className="auth-error">{error}</p> : null}
 
@@ -533,6 +575,16 @@ function OwnerListingCard({
             </div>
           ) : null}
 
+          {live ? <OwnerShareKit property={property} /> : null}
+
+          <Link
+            href={`/publicar?parecida=${encodeURIComponent(property.slug)}`}
+            className="inline-flex min-h-11 w-fit items-center gap-2 text-sm font-semibold text-[#176b4d] underline-offset-4 hover:underline"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Publicar otra unidad parecida
+          </Link>
+
           {suggestions.length > 0 ? (
             <section className="owner-listing-tips" aria-label="Sugerencias privadas para este anuncio">
               <h3><LockKeyhole size={15} aria-hidden="true" />Mejora tu anuncio <span>Solo visible para ti</span></h3>
@@ -541,6 +593,19 @@ function OwnerListingCard({
           ) : null}
         </div>
       </article>
+
+      {isLocating ? (
+        <OwnerLocationDialog
+          property={property}
+          onClose={() => setIsLocating(false)}
+          onConfirm={async (point) => {
+            await onConfirmLocation(property.slug, point);
+            setIsLocating(false);
+            setError("");
+            setNotice("Listo. Tu anuncio ya muestra la ubicación que confirmaste.");
+          }}
+        />
+      ) : null}
 
       {isEditing ? (
         <PropertyEditModal
@@ -554,6 +619,40 @@ function OwnerListingCard({
         />
       ) : null}
     </>
+  );
+}
+
+function LocationRow({ property, onVerify }: { property: Property; onVerify: () => void }) {
+  const status = ownerLocationStatus(property);
+  return (
+    <div
+      className={`owner-location-row grid gap-3 rounded-[18px] p-3 ring-1 sm:grid-cols-[1fr_auto] sm:items-center ${
+        status.confirmed ? "bg-white ring-black/10" : "bg-amber-50 ring-amber-200"
+      }`}
+    >
+      <div>
+        <p className="flex items-center gap-2 text-sm font-semibold text-neutral-950">
+          {status.confirmed ? (
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-[#176b4d]" aria-hidden="true" />
+          ) : (
+            <MapPin className="h-4 w-4 shrink-0 text-amber-900" aria-hidden="true" />
+          )}
+          {status.label}
+        </p>
+        <p className="mt-1 text-sm leading-6 text-neutral-700">
+          {status.detail}
+          {property.locationConfirmedAt ? ` Confirmada el ${formatBoliviaDay(property.locationConfirmedAt)}.` : ""}
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={onVerify}
+        className="inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950"
+      >
+        <MapPin className="h-4 w-4" aria-hidden="true" />
+        {status.confirmed ? "Cambiar ubicación" : "Verificar ubicación"}
+      </button>
+    </div>
   );
 }
 
@@ -614,6 +713,7 @@ function PropertyEditModal({
   const [petsPolicy, setPetsPolicy] = useState<PetsPolicy>(
     () => property.rentalDetails?.petsPolicy ?? (property.pets ? "allowed" : "consult"),
   );
+  const [beforeVisit, setBeforeVisit] = useState<BeforeVisitFormValue>(() => beforeVisitFormValues(property.rentalDetails));
   const [exchangeRate, setExchangeRate] = useState(String(property.exchangeRate ?? currencyExchangeRateBobPerUsd));
   const [priceInput, setPriceInput] = useState(String(property.price));
   const [isSaving, setIsSaving] = useState(false);
@@ -632,6 +732,8 @@ function PropertyEditModal({
     if (price === null || price <= 0 || price > 100_000_000) { setSaveError("Indica un precio válido. Puedes escribir 3400 o 3.400; para centavos, 3.400,50."); return; }
     const rate = draft.currency === "USD" ? parsePropertyExchangeRate(exchangeRate) : null;
     if (draft.currency === "USD" && rate === null) { setSaveError("Indica un tipo de cambio válido para este alquiler."); return; }
+    const beforeVisitProblem = reviewedConditions ? Object.values(parseBeforeVisitInput(beforeVisit).errors)[0] : undefined;
+    if (beforeVisitProblem) { setSaveError(beforeVisitProblem); return; }
     setIsSaving(true);
     setSaveError("");
     try {
@@ -642,6 +744,7 @@ function PropertyEditModal({
         images: draft.images.length > 0 ? draft.images : property.images,
         pets: petsPolicy === "allowed",
         petsPolicy,
+        ...(reviewedConditions ? { beforeVisit } : {}),
         shortDescription: nextShortDescription(property, draft.longDescription),
         mapUrl:
           draft.mapUrl.trim() ||
@@ -933,6 +1036,18 @@ function PropertyEditModal({
               </EditorField>
             )}
           </EditorSection>
+
+          {reviewedConditions ? (
+            <section className="grid gap-4 rounded-[24px] border border-black/10 bg-neutral-50 p-4">
+              <BeforeVisitFields
+                value={beforeVisit}
+                onChange={(field, next) => setBeforeVisit((current) => ({ ...current, [field]: next }))}
+                idPrefix={`edit-${property.slug}`}
+                inputClassName={inputClassName}
+                labelClassName="text-base font-semibold text-neutral-950"
+              />
+            </section>
+          ) : null}
 
           {saveError && <p role="alert" className="auth-error">{saveError}</p>}
           <div className="sticky bottom-0 -mx-5 -mb-5 flex flex-col gap-3 border-t border-black/10 bg-white/95 p-5 sm:-mx-6 sm:-mb-6 sm:flex-row sm:justify-end sm:p-6">

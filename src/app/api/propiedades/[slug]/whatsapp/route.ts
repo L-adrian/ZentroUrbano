@@ -6,6 +6,7 @@ import { getPropertyBySlugData } from "@/lib/property-data";
 import { visibleOrigin } from "@/lib/request-origin";
 import { trackServerEvent } from "@/lib/tracking";
 import { getOrCreateVisitorId } from "@/lib/visitor-id";
+import { questionLines, readQuestionChoices } from "@/lib/whatsapp-questions";
 
 export async function GET(
   request: NextRequest,
@@ -19,6 +20,8 @@ export async function GET(
   }
 
   const source = request.nextUrl.searchParams.get("desde");
+  // Optional questions chosen before opening WhatsApp ("Agregar preguntas al mensaje").
+  const extraLines = questionLines(readQuestionChoices(request.nextUrl.searchParams));
   await trackServerEvent({
     eventType: "property_whatsapp_click",
     propertySlug: property.slug,
@@ -30,6 +33,7 @@ export async function GET(
       listing_plan: property.listingPlan,
       source: whatsappContactSources.find((item) => item === source) ?? "otro",
       visitor_id: await getOrCreateVisitorId(),
+      questions: extraLines.length,
     },
   });
 
@@ -41,6 +45,7 @@ export async function GET(
     property,
     formatPriceInCurrency(property, property.currency),
     absoluteUrl(`/propiedades/${property.slug}`),
+    extraLines,
   );
 
   return NextResponse.redirect(`https://wa.me/${property.agent.whatsapp}?text=${encodeURIComponent(message)}`);

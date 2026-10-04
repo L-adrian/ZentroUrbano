@@ -68,6 +68,10 @@ export type Property = {
   availabilityReports?: number;
   // People (devices) who opened the listing; shown publicly.
   publicViews?: number;
+  // Set when the owner checked the map point; until then the map shows an approximate area.
+  locationConfirmedAt?: string;
+  // When the listing went public (row creation at approval); drives the "Nuevo" label.
+  publishedAt?: string;
   isSeeded: boolean;
   coordinates: {
     lat: number;

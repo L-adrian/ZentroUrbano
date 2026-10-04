@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
+import { getDirectRentals, withoutOwnerContact } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +36,7 @@ export default async function PropertiesPage() {
         </p>
       </div>
 
-      <DirectRentalExplorer properties={withoutContactEmail(directRentals)} />
+      <DirectRentalExplorer properties={withoutOwnerContact(directRentals)} />
     </main>
   );
 }

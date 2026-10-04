@@ -70,12 +70,13 @@ export function PropertyShareButton({
   );
 }
 
+// ?desde=compartido lets /admin count the people who arrive from a shared link.
 function getPropertyUrl(slug: string) {
   if (typeof window === "undefined") {
-    return `/propiedades/${slug}`;
+    return `/propiedades/${slug}?desde=compartido`;
   }
 
-  return `${window.location.origin}/propiedades/${slug}`;
+  return `${window.location.origin}/propiedades/${slug}?desde=compartido`;
 }
 
 function trackShare(propertySlug: string) {

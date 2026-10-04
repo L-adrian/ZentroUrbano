@@ -52,6 +52,8 @@ export type OwnerRequestSummary = {
   reviewedAt: string | null;
   reason: string | null;
   slug: string | null;
+  // The owner already sent a corrected request for this one.
+  corrected?: boolean;
 };
 
 export type DemoAccount = {

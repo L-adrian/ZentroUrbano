@@ -60,9 +60,9 @@ export function availabilityPrompt(
 // Mi cuenta keeps a request in view while it is pending and for 45 days after the decision.
 export const recentRequestDays = 45;
 
-export function recentOwnerRequests<T extends { status: string; createdAt: string; reviewedAt?: string | null }>(requests: T[], now = Date.now()) {
+export function recentOwnerRequests<T extends { status: string; createdAt: string; reviewedAt?: string | null; corrected?: boolean }>(requests: T[], now = Date.now()) {
   return requests.filter((request) => {
-    if (request.status === "pending_review") return true;
+    if (request.status === "pending_review" || (request.status === "changes_requested" && !request.corrected)) return true;
     const decidedAt = new Date(request.reviewedAt ?? request.createdAt).getTime();
     return Number.isFinite(decidedAt) && now - decidedAt < recentRequestDays * 86_400_000;
   });

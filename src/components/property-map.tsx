@@ -2,6 +2,7 @@
 
 import { RotateCw } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType, type Ref } from "react";
+import type { MapArea } from "@/lib/catalog-geo";
 import type { Property } from "@/lib/properties";
 
 type PropertyMapProps = {
@@ -16,6 +17,10 @@ type PropertyMapProps = {
   showZoneShortcuts?: boolean;
   loadOnView?: boolean;
   eagerOnDesktop?: boolean;
+  // "Buscar en esta zona del mapa": shown after the person moves the map.
+  onSearchArea?: (area: MapArea) => void;
+  // Keep the person's view when the results change (a map area is being used as a filter).
+  preserveView?: boolean;
 };
 
 type LeafletPropertyMapComponent = ComponentType<PropertyMapProps>;
@@ -32,6 +37,8 @@ export function PropertyMap({
   showZoneShortcuts,
   loadOnView = false,
   eagerOnDesktop = false,
+  onSearchArea,
+  preserveView,
 }: PropertyMapProps) {
   const [LeafletPropertyMap, setLeafletPropertyMap] =
     useState<LeafletPropertyMapComponent | null>(null);
@@ -130,6 +137,8 @@ export function PropertyMap({
       headerClassName={headerClassName}
       mapClassName={mapClassName}
       showZoneShortcuts={showZoneShortcuts}
+      onSearchArea={onSearchArea}
+      preserveView={preserveView}
     />
   );
 }
@@ -182,7 +191,7 @@ function MapFallback({
                 No pudimos cargar el mapa.
               </h2>
               <p className="mt-3 text-sm leading-6 text-neutral-600">
-                Revisa tu conexion e intenta nuevamente para ver las propiedades por ubicacion.
+                Revisa tu conexión e intenta nuevamente para ver los alquileres por ubicación.
               </p>
               <button
                 type="button"

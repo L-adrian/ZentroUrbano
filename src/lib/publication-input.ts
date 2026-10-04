@@ -1,3 +1,4 @@
+import { beforeVisitFields, parseBeforeVisitInput, readBeforeVisit, type BeforeVisit } from "@/lib/before-visit";
 import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 
 export const petsPolicies = ["allowed", "not_allowed", "consult"] as const;
@@ -15,7 +16,9 @@ export type PublicationDetails = {
   pets:boolean; furnished:boolean; security:boolean; pool:boolean; patio:boolean; grill:boolean; elevator:boolean;
   price:number; currency:"BOB"|"USD"; exchangeRate:number|null; commonExpenses:number;
   guarantee:string; guaranteeAmount:number|null; description:string;
-};
+  // Set only by the owner's "Verificar ubicación" in Mi cuenta, never from a request or a review.
+  locationConfirmedAt?: string;
+} & BeforeVisit;
 
 export type PublicationFieldErrors = Partial<Record<keyof PublicationDetails | "contactName" | "whatsapp" | "details", string>>;
 
@@ -79,6 +82,9 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
       fieldErrors[key] = `${labels[key]}: indica un número entero entre 0 y ${key === "area" ? "1.000.000" : "100"}, o deja el campo vacío.`;
     }
   }
+  // "Antes de visitar": optional, so requests sent before these questions keep validating.
+  const beforeVisit=parseBeforeVisitInput(input);
+  Object.assign(fieldErrors,beforeVisit.errors);
   const flags=["pets","furnished","security","pool","patio","grill","elevator"] as const;
   if (input.petsPolicy != null && !(petsPolicies as readonly string[]).includes(String(input.petsPolicy))) fieldErrors.pets = "Selecciona una condición válida para mascotas.";
   if (flags.some(key=>typeof input[key] !== "boolean")) fieldErrors.details = "Revisa las características de la vivienda en el paso Información.";
@@ -89,11 +95,12 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
     ...(expensesMode ? {expensesMode: expensesMode as ExpensesMode} : {}),
     ...(text("parkingNote",120) ? {parkingNote:text("parkingNote",120)} : {}),
     ...(text("mediaNote",500) ? {mediaNote:text("mediaNote",500)} : {}),
+    ...beforeVisit.values,
     bedrooms:number("bedrooms",100,true),bathrooms:number("bathrooms",100,true),area:number("area",1_000_000,true),garage,commonExpenses,guarantee,guaranteeAmount,
     pets:petsPolicy ? petsPolicy === "allowed" : input.pets as boolean,furnished:input.furnished as boolean,security:input.security as boolean,pool:input.pool as boolean,patio:input.patio as boolean,grill:input.grill as boolean,elevator:input.elevator as boolean}};
 }
 
-const priceFields = new Set(["price", "currency", "exchangeRate", "commonExpenses", "expensesMode", "guarantee", "guaranteeAmount", "contactName", "whatsapp"]);
+const priceFields = new Set<string>(["price", "currency", "exchangeRate", "commonExpenses", "expensesMode", "guarantee", "guaranteeAmount", "contactName", "whatsapp", ...beforeVisitFields]);
 
 export function publicationFieldStep(field: string): 1 | 2 {
   return priceFields.has(field) ? 2 : 1;
@@ -104,8 +111,11 @@ export function getPublicationStepErrors(step: number, value: unknown, contactNa
   return Object.fromEntries(Object.entries(errors).filter(([field]) => publicationFieldStep(field) === step));
 }
 
+// Stored request details were normalized once already ("Ninguno" is stored as []), so their
+// "Antes de visitar" answers are kept as stored instead of being parsed like form input again.
 export function parsePublicationDetails(value: unknown): PublicationDetails | null {
-  return validatePublicationDetails(value).details;
+  const details = validatePublicationDetails(value).details;
+  return details ? { ...details, ...readBeforeVisit(value) } : null;
 }
 
 // Entry conditions shown on the listing. Only what the owner answered; nothing is assumed.

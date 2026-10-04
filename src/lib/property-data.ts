@@ -10,7 +10,7 @@ import {
 } from "@/lib/curated-rentals";
 import { hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { isDirectRental } from "@/lib/rentals";
-import { parsePropertyExchangeRate } from "@/lib/currency";
+import { getPropertyPriceInCurrency, parsePropertyExchangeRate } from "@/lib/currency";
 import { getPublicViewCounts, getUnavailableReportTimes } from "@/lib/property-audience";
 import { countReportsSince } from "@/lib/property-reports";
 
@@ -53,6 +53,7 @@ export type PropertyRow = {
   owner_profile?: unknown;
   rental_details?: unknown;
   availability_confirmed_at?: Date | string | null;
+  created_at?: Date | string | null;
   is_seeded: boolean;
   coordinates: unknown;
 };
@@ -128,19 +129,44 @@ async function withAudience(properties: Property[]) {
   }));
 }
 
-export async function getSimilarPropertiesData(property: Property) {
-  const properties = (await getPublishedPropertiesData()).filter(isDirectRental);
-  const similar = properties
+// Similar = same zone, a close price, the same kind of home and bedrooms. Featured ones go first,
+// but only among listings that really are similar.
+export async function getSimilarPropertiesData(property: Property, limit = 3) {
+  const reference = getPropertyPriceInCurrency(property, "BOB");
+  const kind = (candidate: Property) => candidate.rentalDetails?.type ?? candidate.type;
+  const scored = (await getPublishedPropertiesData())
     .filter((candidate) => candidate.slug !== property.slug)
-    .filter(
-      (candidate) =>
-        candidate.zone === property.zone ||
-        candidate.operation === property.operation ||
-        candidate.idealFor.some((tag) => property.idealFor.includes(tag)),
-    )
-    .slice(0, 3);
+    .map((candidate) => {
+      const ratio = reference > 0 ? getPropertyPriceInCurrency(candidate, "BOB") / reference : 0;
+      const score =
+        (candidate.zone === property.zone ? 3 : 0) +
+        (ratio >= 0.7 && ratio <= 1.3 ? 2 : 0) +
+        (kind(candidate) === kind(property) ? 2 : 0) +
+        (candidate.bedrooms === property.bedrooms ? 1 : 0);
+      return { candidate, score };
+    })
+    .filter(({ score }) => score >= 3);
 
-  return similar;
+  return scored
+    .sort(
+      (first, second) =>
+        Number(second.candidate.listingPlan === "featured") - Number(first.candidate.listingPlan === "featured") ||
+        second.score - first.score,
+    )
+    .slice(0, limit)
+    .map(({ candidate }) => candidate);
+}
+
+// A listing that was published and later rented or paused: its old link explains that and offers similar homes.
+export async function getRetiredPropertyBySlugData(slug: string) {
+  try {
+    const row = await queryOne<PropertyRow>("select * from properties where slug = :slug and published = 0 limit 1", { slug });
+    if (!row) return undefined;
+    const property = mapPropertyRow(row);
+    return isPublicListing({ ...property, published: true }) ? property : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getFeaturedPropertiesData() {
@@ -217,6 +243,8 @@ export function mapPropertyRow(row: PropertyRow): Property {
     availabilityConfirmedAt: row.availability_confirmed_at
       ? new Date(row.availability_confirmed_at).toISOString()
       : undefined,
+    locationConfirmedAt: parseLocationConfirmedAt(row.rental_details),
+    publishedAt: row.created_at && Number.isFinite(new Date(row.created_at).getTime()) ? new Date(row.created_at).toISOString() : undefined,
     isSeeded: Boolean(row.is_seeded),
     coordinates,
     neighborhoodHighlights: parseStringArray(
@@ -271,6 +299,12 @@ function parseCoordinates(value: unknown, fallback?: Property["coordinates"]) {
   }
 
   return fallback ?? { lat: -17.7833, lng: -63.1821 };
+}
+
+function parseLocationConfirmedAt(value: unknown) {
+  const details = parseJson(value) as { locationConfirmedAt?: unknown } | null;
+  const at = typeof details?.locationConfirmedAt === "string" ? Date.parse(details.locationConfirmedAt) : NaN;
+  return Number.isFinite(at) ? new Date(at).toISOString() : undefined;
 }
 
 function parseJson(value: unknown) {

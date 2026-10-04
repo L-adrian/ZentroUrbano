@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { getPropertyVideoUrl } from "@/lib/property-video";
 import { allowedOwnerImage, ownerMapUrl, ownerWhatsapp, parseJsonArray } from "@/lib/owner-listing-edit";
 import { petsPolicies } from "@/lib/publication-input";
+import { beforeVisitPatch, parseBeforeVisitInput } from "@/lib/before-visit";
 import { isSameSiteRequest } from "@/lib/request-origin";
 
 export async function PATCH(
@@ -74,6 +75,18 @@ export async function PATCH(
   // "Sí", "No" or "A consultar" from the editor; older clients only send the pets checkbox.
   const petsPolicy = (petsPolicies as readonly unknown[]).includes(payload.petsPolicy) ? String(payload.petsPolicy) : null;
 
+  // "Antes de visitar": only when the editor sends it (older clients do not), and only for
+  // listings that came through the form (rental_details); the rest of the JSON is kept.
+  let beforeVisit = "{}";
+  if (payload.beforeVisit !== undefined && payload.beforeVisit !== null) {
+    const parsed = typeof payload.beforeVisit === "object" && !Array.isArray(payload.beforeVisit)
+      ? parseBeforeVisitInput(payload.beforeVisit as Record<string, unknown>)
+      : null;
+    const problem = parsed ? Object.values(parsed.errors)[0] : "Revisa los datos de «Antes de visitar».";
+    if (!parsed || problem) return NextResponse.json({ ok: false, stored: false, message: problem }, { status: 400 });
+    beforeVisit = JSON.stringify(beforeVisitPatch(parsed.values));
+  }
+
   let whatsapp: string | null | undefined;
   let mapUrl: string | null | undefined;
   try {
@@ -99,8 +112,8 @@ export async function PATCH(
             operation = :operation,
             price = :price,
             rental_details = case when rental_details is null then null
-              when :petsPolicy is null then JSON_SET(rental_details, '$.price', :price)
-              else JSON_SET(rental_details, '$.price', :price, '$.petsPolicy', :petsPolicy) end,
+              when :petsPolicy is null then JSON_SET(JSON_MERGE_PATCH(rental_details, :beforeVisit), '$.price', :price)
+              else JSON_SET(JSON_MERGE_PATCH(rental_details, :beforeVisit), '$.price', :price, '$.petsPolicy', :petsPolicy) end,
             currency = :currency,
             exchange_rate = case when :replaceExchangeRate = 1 then :exchangeRate else exchange_rate end,
             city = :city,
@@ -126,7 +139,7 @@ export async function PATCH(
             whatsapp = :whatsapp,
             ideal_for = :idealFor,
             tags = :tags,
-            coordinates = :coordinates,
+            coordinates = case when json_extract(rental_details, '$.locationConfirmedAt') is null then :coordinates else coordinates end,
             neighborhood_highlights = :neighborhoodHighlights,
             updated_at = current_timestamp
       where slug = :slug`,
@@ -148,6 +161,7 @@ export async function PATCH(
       area: number(payload.area),
       pets: petsPolicy ? petsPolicy === "allowed" : boolean(payload.pets),
       petsPolicy,
+      beforeVisit,
       furnished: boolean(payload.furnished),
       security: boolean(payload.security),
       pool: boolean(payload.pool),

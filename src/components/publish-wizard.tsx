@@ -22,18 +22,30 @@ import {
 import NextImage from "next/image";
 import Link from "next/link";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
-import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { getPublicationCosts } from "@/lib/publication-costs";
+import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
+import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
+import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
+import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
 import { expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
-import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
+import { minUploadPhotos, maxUploadPhotos, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
+import { maxSelectedPhotoBytes, uploadMaxSide } from "@/lib/photo-resize";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
-  analyzePhotoFile,
   isPhotoTechnicallyValid,
   photoCategories,
+  preparePhotoFile,
   type PhotoAnalysis,
   type PhotoCategory,
 } from "@/lib/photo-quality";
+import {
+  clearDraftPhotos,
+  deleteDraftPhotoFiles,
+  draftPhotosAvailable,
+  loadDraftPhotos,
+  saveDraftPhotoFiles,
+  saveDraftPhotoList,
+} from "@/lib/photo-draft-store";
+import { validPhotoCategory, type PrefillPhoto, type PublishPrefill } from "@/lib/publish-prefill";
 
 const steps = ["Fotos", "Información", "Precio", "Confirmación"] as const;
 const stepIcons = [Images, Home, CircleDollarSign, ListChecks];
@@ -65,11 +77,15 @@ type PropertyForm = {
   guarantee: string;
   guaranteeAmount: string;
   description: string;
-};
+} & BeforeVisitFormValue;
 
 type UploadPhoto = {
   id: string;
+  // Name, size and date of the file the owner picked, to skip picking it twice.
+  sourceKey: string;
+  // What is sent: the lighter copy made in the browser, or the original if it could not be made.
   file: File;
+  preview: Blob | null;
   url: string;
   category: PhotoCategory;
   analysis: PhotoAnalysis | null;
@@ -103,11 +119,16 @@ const initialForm: PropertyForm = {
   guarantee: "",
   guaranteeAmount: "",
   description: "",
+  availableFrom: "",
+  minContractMonths: "",
+  advanceMonths: "",
+  includedServices: [],
 };
 
 const petsOptions: Array<[PetsPolicy, string]> = [["allowed", "Sí"], ["not_allowed", "No"], ["consult", "A consultar"]];
 const petsLabels: Record<PetsPolicy, string> = { allowed: "Sí acepta", not_allowed: "No acepta", consult: "A consultar" };
 const expensesLabels: Record<PropertyForm["expensesMode"], string> = { "": "Sin indicar", included: "Incluidas en el alquiler", none: "No se cobran", separate: "Se pagan aparte" };
+const serviceValues = new Set<string>([...includedServiceOptions.map(([key]) => key), noServicesValue]);
 
 // The server accepts older forms without the expenses question; this form always asks it.
 function wizardStepErrors(step: number, form: PropertyForm): PublicationFieldErrors {
@@ -116,8 +137,49 @@ function wizardStepErrors(step: number, form: PropertyForm): PublicationFieldErr
   return errors;
 }
 
-export function PublishWizard({ account }: { account: { id: string; name: string; phone: string } }) {
-  const draftKey = `zu-publication-draft-v2:${account.id}`;
+// A saved draft or data loaded from Mi cuenta: only known fields with the right type are used.
+function restoreForm(saved: Record<string, unknown>, base: PropertyForm): PropertyForm {
+  const restored = { ...base };
+  for (const key of Object.keys(initialForm) as (keyof PropertyForm)[]) {
+    if (key === "includedServices") continue;
+    if (typeof saved[key] === typeof initialForm[key]) Object.assign(restored, { [key]: saved[key] });
+  }
+  if (Array.isArray(saved.includedServices)) {
+    restored.includedServices = saved.includedServices.filter((item): item is string => typeof item === "string" && serviceValues.has(item));
+  }
+  if (!["Casa", "Departamento", "Monoambiente"].includes(restored.type)) restored.type = "Departamento";
+  if (!["BOB", "USD"].includes(restored.currency)) restored.currency = "BOB";
+  // Drafts saved before the pets and expenses questions keep what the owner had answered.
+  if (!(petsPolicies as readonly string[]).includes(restored.petsPolicy) || typeof saved.petsPolicy !== "string") restored.petsPolicy = restored.pets ? "allowed" : "consult";
+  restored.pets = restored.petsPolicy === "allowed";
+  if (!(expensesModes as readonly string[]).includes(restored.expensesMode)) restored.expensesMode = (parseCurrencyAmount(restored.commonExpenses) ?? 0) > 0 ? "separate" : "";
+  return restored;
+}
+
+type SendResult = { status: number; data: { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number } };
+
+// XMLHttpRequest instead of fetch: it reports how much of the upload has been sent.
+function sendPublication(body: FormData, key: string, onProgress: (fraction: number) => void) {
+  return new Promise<SendResult>((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open("POST", "/api/publication-requests");
+    request.setRequestHeader("Idempotency-Key", key);
+    request.timeout = 120_000;
+    request.upload.onprogress = (event) => { if (event.lengthComputable && event.total > 0) onProgress(event.loaded / event.total); };
+    request.onload = () => {
+      let data: SendResult["data"] = {};
+      try { data = JSON.parse(request.responseText); } catch { /* An empty or HTML answer is handled as an error below. */ }
+      resolve({ status: request.status, data });
+    };
+    request.onerror = () => reject(new Error("No se pudo conectar. Conservamos tus datos y fotos; revisa tu conexión e intenta nuevamente."));
+    request.ontimeout = () => { const error = new Error("timeout"); error.name = "TimeoutError"; reject(error); };
+    request.send(body);
+  });
+}
+
+export function PublishWizard({ account, prefill }: { account: { id: string; name: string; phone: string }; prefill?: PublishPrefill }) {
+  // A form opened from Mi cuenta has its own draft, so it never overwrites the regular one.
+  const draftKey = `zu-publication-draft-v2:${account.id}${prefill ? `:${prefill.id}` : ""}`;
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<PropertyForm>(() => ({ ...initialForm, ownerName: account.name, phone: account.phone }));
   const [sessionExpired, setSessionExpired] = useState(false);
@@ -127,14 +189,20 @@ export function PublishWizard({ account }: { account: { id: string; name: string
   const [message, setMessage] = useState("");
   const [receipt, setReceipt] = useState<{ requestId: string; photosStored: number } | null>(null);
   const [processingPhotos, setProcessingPhotos] = useState(false);
+  const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number; label: string } | null>(null);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [draftReady, setDraftReady] = useState(false);
   const [draftSaved, setDraftSaved] = useState(false);
+  const [photosReady, setPhotosReady] = useState(false);
+  const [photoStorage, setPhotoStorage] = useState(false);
   const objectUrls = useRef(new Set<string>());
+  const persistedPhotos = useRef(new Set<string>());
   const mounted = useRef(true);
   const wizardRef = useRef<HTMLFormElement>(null);
   const receiptRef = useRef<HTMLDivElement>(null);
   const previousStep = useRef(step);
   const submissionKey = useRef("");
+  const restoreRun = useRef(0);
 
   useEffect(() => {
     if (status === "success") {
@@ -147,30 +215,54 @@ export function PublishWizard({ account }: { account: { id: string; name: string
     previousStep.current = step;
   }, [step, status]);
 
+  // Photos saved in this browser come back first; a correction without them loads what was sent.
+  const restorePhotos = useEffectEvent(async (run: number) => {
+    const stored = await loadDraftPhotos(draftKey);
+    // Only the latest run restores, so photos are never added twice.
+    if (!mounted.current || restoreRun.current !== run) return;
+    if (stored.length > 0) {
+      const restored = stored.slice(0, maxUploadPhotos).map((photo): UploadPhoto => {
+        const url = URL.createObjectURL(photo.preview ?? photo.file);
+        objectUrls.current.add(url);
+        persistedPhotos.current.add(photo.id);
+        const file = photo.file instanceof File ? photo.file : new File([photo.file], photo.name, { type: photo.type });
+        const analyzed = Boolean(photo.analysis);
+        return { id: photo.id, sourceKey: photo.sourceKey, file, preview: photo.preview, url, category: validPhotoCategory(photo.category) as PhotoCategory, analysis: photo.analysis, analyzing: !analyzed };
+      });
+      setPhotos(restored);
+      setPhotosReady(true);
+      // A photo saved before its check finished is checked again.
+      const unchecked = restored.filter((photo) => photo.analyzing);
+      for (const photo of unchecked) await finishPhoto(photo, photo.file);
+      return;
+    }
+    setPhotosReady(true);
+    if (prefill?.photos.length) await loadPrefillPhotos(prefill.photos);
+  });
+
   useEffect(() => {
     mounted.current = true;
     submissionKey.current = crypto.randomUUID();
+    let restoredDraft = false;
     try {
       const saved = JSON.parse(localStorage.getItem(draftKey) || "null");
       if (saved && typeof saved === "object") {
         if (typeof saved.requestKey === "string" && /^[a-zA-Z0-9_-]{32,64}$/.test(saved.requestKey)) submissionKey.current = saved.requestKey;
-        const restored = { ...initialForm };
-        for (const key of Object.keys(initialForm) as (keyof PropertyForm)[]) {
-          if (typeof saved[key] === typeof initialForm[key]) Object.assign(restored, { [key]: saved[key] });
-        }
-        if (!["Casa", "Departamento", "Monoambiente"].includes(restored.type)) restored.type = "Departamento";
-        if (!["BOB", "USD"].includes(restored.currency)) restored.currency = "BOB";
-        // Drafts saved before the pets and expenses questions keep what the owner had answered.
-        if (!(petsPolicies as readonly string[]).includes(restored.petsPolicy) || typeof saved.petsPolicy !== "string") restored.petsPolicy = restored.pets ? "allowed" : "consult";
-        restored.pets = restored.petsPolicy === "allowed";
-        if (!(expensesModes as readonly string[]).includes(restored.expensesMode)) restored.expensesMode = (parseCurrencyAmount(restored.commonExpenses) ?? 0) > 0 ? "separate" : "";
+        const restored = restoreForm(saved, initialForm);
+        restoredDraft = true;
         startTransition(() => { setForm(restored); setDraftSaved(true); });
       }
     } catch { /* A stale draft must not block publication. */ }
+    if (!restoredDraft && prefill) {
+      const restored = restoreForm(prefill.form, { ...initialForm, ownerName: account.name, phone: account.phone });
+      startTransition(() => setForm(restored));
+    }
     startTransition(() => setDraftReady(true));
+    void draftPhotosAvailable().then((available) => { if (mounted.current) setPhotoStorage(available); });
+    void restorePhotos(++restoreRun.current);
     const urls = objectUrls.current;
     return () => { mounted.current = false; urls.forEach(url => URL.revokeObjectURL(url)); urls.clear(); };
-  }, [draftKey]);
+  }, [draftKey, prefill, account.name, account.phone]);
 
   useEffect(() => {
     if (!draftReady || status === "success") return;
@@ -184,6 +276,32 @@ export function PublishWizard({ account }: { account: { id: string; name: string
     return () => window.clearTimeout(timer);
   }, [form, draftReady, status, draftKey]);
 
+  // Each photo's bytes are stored once; the list with order and room labels on every change.
+  useEffect(() => {
+    if (!photosReady || !photoStorage || status === "success") return;
+    const timer = window.setTimeout(() => {
+      const ready = photos.filter((photo) => !photo.analyzing);
+      const added = ready.filter((photo) => !persistedPhotos.current.has(photo.id));
+      const removed = Array.from(persistedPhotos.current).filter((id) => !photos.some((photo) => photo.id === id));
+      void (async () => {
+        if (await saveDraftPhotoFiles(draftKey, added.map((photo) => ({ id: photo.id, file: photo.file, preview: photo.preview })))) {
+          added.forEach((photo) => persistedPhotos.current.add(photo.id));
+        }
+        await saveDraftPhotoList(draftKey, ready.filter((photo) => persistedPhotos.current.has(photo.id)).map((photo) => ({
+          id: photo.id,
+          sourceKey: photo.sourceKey,
+          name: photo.file.name,
+          type: photo.file.type,
+          category: photo.category,
+          analysis: photo.analysis ? { ...photo.analysis, previewUrl: undefined } : null,
+        })));
+        await deleteDraftPhotoFiles(draftKey, removed);
+        removed.forEach((id) => persistedPhotos.current.delete(id));
+      })();
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [photos, photosReady, photoStorage, status, draftKey]);
+
   const quality = useMemo(() => calculateQuality(form, photos), [form, photos]);
   const canContinue = canAdvanceStep(step, form, photos);
   const stepErrors = step === 1 || step === 2 ? wizardStepErrors(step, form) : {};
@@ -193,57 +311,91 @@ export function PublishWizard({ account }: { account: { id: string; name: string
     if (status === "error") { setStatus("idle"); setMessage(""); }
   }
 
-  async function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
-    if (processingPhotos) return;
-    const availableSlots = Math.max(0, maxUploadPhotos - photos.length);
-    const selectedFiles = Array.from(event.target.files ?? []);
-    const seen = new Set(photos.map(photo => `${photo.file.name}:${photo.file.size}:${photo.file.lastModified}`));
-    const files = selectedFiles.filter(file => {
-      const key = `${file.name}:${file.size}:${file.lastModified}`;
-      if (seen.has(key) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size === 0 || file.size > maxPhotoBytes) return false;
-      seen.add(key); return true;
-    }).slice(0, availableSlots);
-    event.target.value = "";
-    if (files.reduce((sum, file) => sum + file.size, photos.reduce((sum, photo) => sum + photo.file.size, 0)) > maxTotalPhotoBytes) {
-      setMessage("El total de fotos no puede superar 60 MB."); setStatus("error"); return;
+  // Checks one photo and swaps in its lighter copy and thumbnail.
+  async function finishPhoto(photo: UploadPhoto, source: File) {
+    const prepared = await preparePhotoFile(source);
+    if (!mounted.current || !objectUrls.current.has(photo.url)) return;
+    const previewUrl = prepared.preview ? URL.createObjectURL(prepared.preview) : photo.url;
+    if (previewUrl !== photo.url) {
+      objectUrls.current.add(previewUrl);
+      URL.revokeObjectURL(photo.url);
+      objectUrls.current.delete(photo.url);
     }
-    if (files.length !== selectedFiles.length) { setMessage("Se omitieron archivos repetidos o no compatibles. Máximo 15 fotos JPG, PNG o WebP de 10 MB cada una."); setStatus("error"); }
-    else { setMessage(""); setStatus("idle"); }
-    setProcessingPhotos(true);
+    setPhotos((current) =>
+      current.map((item) =>
+        item.id === photo.id ? { ...item, file: prepared.file, preview: prepared.preview, url: previewUrl, analysis: prepared.analysis, analyzing: false } : item,
+      ),
+    );
+  }
 
-    const pending = files.map((file) => ({
+  async function addFiles(selectedFiles: File[], categories: string[] = [], label = "Preparando fotos") {
+    const availableSlots = Math.max(0, maxUploadPhotos - photos.length);
+    const seen = new Set(photos.map(photo => photo.sourceKey));
+    const accepted = selectedFiles.flatMap((file, index) => {
+      const sourceKey = `${file.name}:${file.size}:${file.lastModified}`;
+      if (seen.has(sourceKey) || !["image/jpeg", "image/png", "image/webp"].includes(file.type) || file.size === 0 || file.size > maxSelectedPhotoBytes) return [];
+      seen.add(sourceKey);
+      return [{ file, sourceKey, category: validPhotoCategory(categories[index]) as PhotoCategory }];
+    }).slice(0, availableSlots);
+    if (accepted.length !== selectedFiles.length) { setMessage(`Se omitieron archivos repetidos o no compatibles. Máximo ${maxUploadPhotos} fotos JPG, PNG o WebP de hasta 30 MB cada una.`); setStatus("error"); }
+    else { setMessage(""); setStatus("idle"); }
+    if (!accepted.length) return;
+    setProcessingPhotos(true);
+    setPhotoProgress({ done: 0, total: accepted.length, label });
+
+    const pending = accepted.map(({ file, sourceKey, category }): UploadPhoto => ({
       id: createUploadId(file),
+      sourceKey,
       file,
+      preview: null,
       url: URL.createObjectURL(file),
-      category: "" as PhotoCategory,
+      category,
       analysis: null,
       analyzing: true,
     }));
 
     setPhotos((current) => [...current, ...pending]);
     pending.forEach(photo => objectUrls.current.add(photo.url));
-    // Decode one photo at a time to limit peak memory on older phones.
-    for (const photo of pending) {
-        const analysis = await analyzePhotoFile(photo.file, photo.url);
-        if (!mounted.current || !objectUrls.current.has(photo.url)) {
-          if (analysis.previewUrl) URL.revokeObjectURL(analysis.previewUrl);
-          if (!mounted.current) return;
-          continue;
-        }
-        const previewUrl = analysis.previewUrl || photo.url;
-        if (previewUrl !== photo.url) {
-          objectUrls.current.add(previewUrl);
-          URL.revokeObjectURL(photo.url);
-          objectUrls.current.delete(photo.url);
-        }
-        setPhotos((current) =>
-          current.map((item) =>
-            item.id === photo.id ? { ...item, url: previewUrl, analysis, analyzing: false } : item,
-          ),
-        );
-        await new Promise(resolve => setTimeout(resolve, 0));
+    // One photo at a time limits peak memory on older phones.
+    for (const [index, photo] of pending.entries()) {
+      await finishPhoto(photo, photo.file);
+      if (!mounted.current) return;
+      setPhotoProgress({ done: index + 1, total: pending.length, label });
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
     setProcessingPhotos(false);
+    setPhotoProgress(null);
+  }
+
+  async function handlePhotos(event: ChangeEvent<HTMLInputElement>) {
+    if (processingPhotos) return;
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    await addFiles(selectedFiles);
+  }
+
+  // "Corregir y reenviar": the photos already sent come back from the server with their rooms.
+  async function loadPrefillPhotos(list: PrefillPhoto[]) {
+    setProcessingPhotos(true);
+    setPhotoProgress({ done: 0, total: list.length, label: "Cargando las fotos que enviaste" });
+    const files: File[] = [];
+    const categories: string[] = [];
+    for (const [index, photo] of list.entries()) {
+      try {
+        const response = await fetch(photo.url, { credentials: "same-origin" });
+        if (!response.ok) continue;
+        const blob = await response.blob();
+        files.push(new File([blob], photo.name, { type: blob.type || "image/jpeg", lastModified: index + 1 }));
+        categories.push(photo.category);
+      } catch { /* A photo that cannot be read is chosen again by the owner. */ }
+      if (!mounted.current) return;
+      setPhotoProgress({ done: index + 1, total: list.length, label: "Cargando las fotos que enviaste" });
+    }
+    setProcessingPhotos(false);
+    setPhotoProgress(null);
+    await addFiles(files, categories, "Revisando las fotos");
+    // After addFiles, which clears the message when every photo it got is fine.
+    if (mounted.current && files.length < list.length) { setMessage("Algunas fotos no se pudieron cargar. Agrégalas de nuevo."); setStatus("error"); }
   }
 
   function removePhoto(index: number) {
@@ -263,6 +415,18 @@ export function PublishWizard({ account }: { account: { id: string; name: string
     );
   }
 
+  function clearDraft() {
+    if (!window.confirm("¿Borrar los datos y las fotos de este borrador?")) return;
+    try { localStorage.removeItem(draftKey); } catch {}
+    void clearDraftPhotos(draftKey);
+    persistedPhotos.current.clear();
+    photos.forEach((photo) => { URL.revokeObjectURL(photo.url); objectUrls.current.delete(photo.url); });
+    setPhotos([]);
+    setForm({ ...initialForm, ownerName: account.name, phone: account.phone });
+    setDraftSaved(false);
+    setStep(0);
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -275,9 +439,15 @@ export function PublishWizard({ account }: { account: { id: string; name: string
       setMessage(Object.values(wizardStepErrors(invalidStep, form)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
       return;
     }
+    if (photos.reduce((sum, photo) => sum + photo.file.size, 0) > maxTotalPhotoBytes) {
+      setStatus("error");
+      setMessage("Las fotos pesan más de 60 MB en total. Quita alguna o elige fotos más livianas.");
+      return;
+    }
 
     setStatus("sending");
     setMessage("");
+    setUploadProgress(0);
 
     try {
       const payload = {
@@ -295,6 +465,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         sourceText: buildSubmissionText(form, photos),
         notes: `Solicitud de publicación directa. Calidad ${quality.score}%.`,
         website: "",
+        ...(prefill?.kind === "correction" && prefill.requestId ? { correctionOf: prefill.requestId } : {}),
         photoReport: photos.map((photo) => ({
           fileName: photo.file.name,
           category: photo.category,
@@ -308,17 +479,11 @@ export function PublishWizard({ account }: { account: { id: string; name: string
       photos.forEach((photo) => body.append("photos", photo.file, photo.file.name));
       if (!/^[a-zA-Z0-9_-]{32,64}$/.test(submissionKey.current)) submissionKey.current = crypto.randomUUID();
 
-      const response = await fetch("/api/publication-requests", {
-        method: "POST",
-        headers: {"Idempotency-Key": submissionKey.current},
-        body,
-        signal: AbortSignal.timeout(120_000),
-      });
-      const data = (await response.json().catch(() => ({}))) as { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number };
+      const { status: responseStatus, data } = await sendPublication(body, submissionKey.current, (fraction) => setUploadProgress(Math.round(fraction * 100)));
 
-      if (response.status === 401) setSessionExpired(true);
+      if (responseStatus === 401) setSessionExpired(true);
 
-      if (!response.ok || !data.ok || !data.requestId || data.photosStored !== photos.length) {
+      if (responseStatus < 200 || responseStatus >= 300 || !data.ok || !data.requestId || data.photosStored !== photos.length) {
         const invalidField = Object.keys(data.fieldErrors ?? {})[0];
         if (invalidField) setStep(publicationFieldStep(invalidField));
         if (data.code === "INVALID_REQUEST_KEY") submissionKey.current = crypto.randomUUID();
@@ -328,10 +493,15 @@ export function PublishWizard({ account }: { account: { id: string; name: string
       setReceipt({ requestId: data.requestId, photosStored: data.photosStored });
       setStatus("success");
       try { localStorage.removeItem(draftKey); } catch { /* Submission already succeeded. */ }
-      setMessage("Solicitud recibida. Revisaremos los datos antes de publicar la vivienda.");
+      void clearDraftPhotos(draftKey);
+      setMessage(prefill?.kind === "correction"
+        ? "Recibimos tu corrección. La revisaremos antes de publicar la vivienda."
+        : "Solicitud recibida. Revisaremos los datos antes de publicar la vivienda.");
     } catch (error) {
       setStatus("error");
-      setMessage(error instanceof Error && error.name === "TimeoutError" ? "El envio tardo demasiado. Conservamos tus datos. Antes de reenviar, consulta a soporte si recibimos la solicitud." : error instanceof Error ? error.message : "No se pudo enviar la solicitud.");
+      setMessage(error instanceof Error && error.name === "TimeoutError" ? "El envío tardó demasiado. Conservamos tus datos y fotos. Antes de reenviar, consulta a soporte si recibimos la solicitud." : error instanceof Error ? error.message : "No se pudo enviar la solicitud.");
+    } finally {
+      setUploadProgress(null);
     }
   }
 
@@ -341,7 +511,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         <span className="flex h-10 w-10 items-center justify-center bg-[#edf7f2] text-[#176b4d]">
           <Check className="h-5 w-5" aria-hidden="true" />
         </span>
-        <h2 className="mt-5 text-2xl font-semibold tracking-tight">Recibimos tu propiedad</h2>
+        <h2 className="mt-5 text-2xl font-semibold tracking-tight">{prefill?.kind === "correction" ? "Recibimos tu corrección" : "Recibimos tu propiedad"}</h2>
         <p className="mt-2 text-sm leading-6 text-neutral-600">{message}</p>
         {receipt && <p className="mt-3 text-sm text-neutral-600">{receipt.photosStored} {receipt.photosStored === 1 ? "foto guardada" : "fotos guardadas"}. Referencia: <strong className="break-all">{receipt.requestId}</strong></p>}
         <div className="mt-6 border-t border-neutral-200 pt-5 text-sm text-neutral-600">
@@ -384,8 +554,9 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         </div>
 
         <div className="p-4 sm:p-6">
-          {sessionExpired && <div role="alert" className="publish-draft-notice"><span>Tu sesión venció. Los datos quedan guardados; tendrás que adjuntar las fotos nuevamente.</span><Link href="/login?next=%2Fpublicar">Volver a iniciar sesión</Link></div>}
-          {draftSaved && <div className="publish-draft-notice"><span className="flex items-center gap-2"><Save size={14} />Datos guardados en este dispositivo. Las fotos deben volver a adjuntarse al recargar.</span><button type="button" onClick={() => { if (!window.confirm("¿Borrar los campos del borrador?")) return; try { localStorage.removeItem(draftKey); } catch {} setForm({ ...initialForm, ownerName: account.name, phone: account.phone }); setDraftSaved(false); setStep(0); }}>Borrar datos</button></div>}
+          {prefill ? <PrefillNotice prefill={prefill} /> : null}
+          {sessionExpired && <div role="alert" className="publish-draft-notice"><span>{photoStorage ? "Tu sesión venció. Tus datos y fotos quedan guardados en este dispositivo." : "Tu sesión venció. Los datos quedan guardados; tendrás que adjuntar las fotos nuevamente."}</span><Link href={`/login?next=${encodeURIComponent(currentPublishPath(prefill))}`}>Volver a iniciar sesión</Link></div>}
+          {(draftSaved || (photoStorage && photos.length > 0)) && <div className="publish-draft-notice"><span className="flex items-center gap-2"><Save size={14} />{photoStorage ? "Datos y fotos guardados en este dispositivo." : "Datos guardados en este dispositivo. Las fotos deben volver a adjuntarse al recargar."}</span><button type="button" onClick={clearDraft} disabled={processingPhotos || status === "sending"}>Borrar datos</button></div>}
           {step === 0 ? (
             <PhotoStep
               photos={photos}
@@ -393,6 +564,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
               onRemove={removePhoto}
               onCategoryChange={updatePhotoCategory}
               processing={processingPhotos}
+              progress={photoProgress}
               onCover={(id) => setPhotos(current => [...current.filter(photo => photo.id === id), ...current.filter(photo => photo.id !== id)])}
             />
           ) : null}
@@ -412,6 +584,13 @@ export function PublishWizard({ account }: { account: { id: string; name: string
             <p role="alert" className="mt-5 border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-700">
               {message}
             </p>
+          ) : null}
+
+          {uploadProgress !== null ? (
+            <div className="publish-upload-progress mt-5" role="status">
+              <span>{uploadProgress >= 100 ? "Fotos enviadas. Guardando tu solicitud…" : `Enviando fotos: ${uploadProgress}%`}</span>
+              <div role="progressbar" aria-label="Envío de fotos" aria-valuenow={uploadProgress} aria-valuemin={0} aria-valuemax={100}><div style={{ width: `${uploadProgress}%` }} /></div>
+            </div>
           ) : null}
 
           {step < steps.length - 1 && !canContinue ? (
@@ -449,7 +628,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
                 disabled={!acceptedTerms || status === "sending"}
                 className="inline-flex h-11 cursor-pointer items-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white hover:bg-[#10533b] disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
-                {status === "sending" ? "Enviando..." : "Enviar para revisión"}
+                {status === "sending" ? "Enviando..." : prefill?.kind === "correction" ? "Enviar corrección" : "Enviar para revisión"}
                 {status === "sending" ? <LoaderCircle className="zu-spin h-4 w-4" aria-hidden="true" /> : <Check className="h-4 w-4" aria-hidden="true" />}
               </button>
             )}
@@ -462,12 +641,37 @@ export function PublishWizard({ account }: { account: { id: string; name: string
   );
 }
 
+function currentPublishPath(prefill?: PublishPrefill) {
+  if (prefill?.kind === "correction" && prefill.requestId) return `/publicar?corregir=${prefill.requestId}`;
+  if (prefill?.kind === "similar") return `/publicar?parecida=${prefill.id.replace(/^parecida-/, "")}`;
+  return "/publicar";
+}
+
+function PrefillNotice({ prefill }: { prefill: PublishPrefill }) {
+  if (prefill.kind === "correction") {
+    return (
+      <div className="publish-prefill-notice" role="note">
+        <p className="font-semibold">Estás corrigiendo «{prefill.sourceTitle}».</p>
+        {prefill.reason ? <p><span className="font-semibold">Lo que te pedimos:</span> {prefill.reason}</p> : null}
+        <p>Tus datos y fotos ya están cargados. Cambia lo necesario y vuelve a enviarlo.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="publish-prefill-notice" role="note">
+      <p className="font-semibold">Otra unidad parecida a «{prefill.sourceTitle}».</p>
+      <p>Copiamos la zona, la dirección, las expensas, la garantía, las comodidades y las mascotas. Agrega el título, el precio y las fotos de esta unidad, y revisa lo copiado.</p>
+    </div>
+  );
+}
+
 function PhotoStep({
   photos,
   onPhotos,
   onRemove,
   onCategoryChange,
   processing,
+  progress,
   onCover,
 }: {
   photos: UploadPhoto[];
@@ -475,6 +679,7 @@ function PhotoStep({
   onRemove: (index: number) => void;
   onCategoryChange: (id: string, category: PhotoCategory) => void;
   processing: boolean;
+  progress: { done: number; total: number; label: string } | null;
   onCover: (id: string) => void;
 }) {
   const analyzingCount = photos.filter((photo) => photo.analyzing).length;
@@ -494,9 +699,16 @@ function PhotoStep({
       <label className="mt-6 flex min-h-40 cursor-pointer flex-col items-center justify-center border border-dashed border-neutral-400 bg-neutral-50 p-5 text-center hover:border-[#176b4d]">
         <ImagePlus className="h-6 w-6 text-[#176b4d]" aria-hidden="true" />
         <span className="mt-3 text-sm font-semibold text-neutral-900">Seleccionar fotos</span>
-        <span className="mt-1 text-xs text-neutral-500">Mínimo {minUploadPhotos} y máximo {maxUploadPhotos} fotos. JPG, PNG o WebP, hasta {maxPhotoBytes / 1024 / 1024} MB por foto.</span>
+        <span className="mt-1 text-xs text-neutral-500">Mínimo {minUploadPhotos} y máximo {maxUploadPhotos} fotos. JPG, PNG o WebP. Las achicamos a {uploadMaxSide} px antes de enviarlas para que suban rápido.</span>
         <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={processing || photos.length >= maxUploadPhotos} onChange={onPhotos} className="sr-only" />
       </label>
+
+      {progress ? (
+        <div className="publish-upload-progress mt-3" role="status">
+          <span>{progress.label}: {progress.done} de {progress.total}</span>
+          <div role="progressbar" aria-label={progress.label} aria-valuenow={progress.done} aria-valuemin={0} aria-valuemax={progress.total}><div style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }} /></div>
+        </div>
+      ) : null}
 
       <p role="status" className="mt-3 text-sm text-neutral-600">
         {photos.length < minUploadPhotos
@@ -545,10 +757,15 @@ function PhotoStep({
           <span>{photos.filter((photo) => photo.category).length} clasificadas</span>
           {analyzingCount > 0 ? <span>{analyzingCount} analizando</span> : null}
           {warningCount > 0 ? <span className="text-amber-700">{warningCount} con observaciones</span> : null}
+          <span>{formatMegabytes(photos.reduce((sum, photo) => sum + (photo.analyzing ? 0 : photo.file.size), 0))} para enviar</span>
         </div>
       ) : null}
     </section>
   );
+}
+
+function formatMegabytes(bytes: number) {
+  return `${(bytes / 1024 / 1024).toLocaleString("es-BO", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} MB`;
 }
 
 function PhotoAnalysisStatus({ photo }: { photo: UploadPhoto }) {
@@ -556,7 +773,7 @@ function PhotoAnalysisStatus({ photo }: { photo: UploadPhoto }) {
     return (
       <p className="mt-2 flex items-center gap-2 text-xs font-medium text-neutral-500">
         <LoaderCircle className="h-3.5 w-3.5 zu-spin" aria-hidden="true" />
-        Revisando resolución, luz y nitidez...
+        Revisando y achicando la foto...
       </p>
     );
   }
@@ -708,6 +925,9 @@ function PriceStep({
           </select>
         </Field>
         {form.guarantee === "Otro monto" && <Field label="Monto de la garantía"><input type="text" inputMode="decimal" value={form.guaranteeAmount} onChange={event => updateField("guaranteeAmount", event.target.value)} className={inputClassName} /></Field>}
+        <div className="border-y border-neutral-200 py-4 sm:col-span-2">
+          <BeforeVisitFields value={form} onChange={(field, next) => updateField(field, next as PropertyForm[typeof field])} idPrefix="publication" inputClassName={inputClassName} />
+        </div>
         <Field label="Nombre del propietario" icon={<ShieldCheck className="h-4 w-4" />}>
           <input value={form.ownerName} onChange={(event) => updateField("ownerName", event.target.value)} autoComplete="name" placeholder="Nombre completo" className={inputClassName} />
         </Field>
@@ -733,6 +953,7 @@ function ConfirmationStep({
   onAcceptedTermsChange: (value: boolean) => void;
 }) {
   const symbol = form.currency === "BOB" ? "Bs" : "$us";
+  const beforeVisit = beforeVisitRows(parseBeforeVisitInput(form).values) ?? [];
   return (
     <section>
       <StepHeading title="Revisa antes de enviar" copy="Una persona del equipo revisa fotos, precio y datos antes de publicar. Por ahora no verificamos identidad." />
@@ -744,6 +965,7 @@ function ConfirmationStep({
         {form.currency === "USD" && <SummaryRow label="Tipo de cambio" value={`1 USD = ${form.exchangeRate} Bs`} />}
         <SummaryRow label="Expensas" value={form.expensesMode === "separate" ? `${symbol} ${form.commonExpenses}/mes` : expensesLabels[form.expensesMode]} />
         <SummaryRow label="Garantía" value={form.guarantee === "Otro monto" ? `${symbol} ${form.guaranteeAmount}` : form.guarantee || "No indicada"} />
+        {beforeVisit.map((row) => <SummaryRow key={row.label} label={row.label} value={row.value ?? "Sin indicar"} />)}
         <SummaryRow label="Mascotas" value={petsLabels[form.petsPolicy]} />
         <SummaryRow label="Fotos" value={`${photosCount} cargadas`} />
         <SummaryRow label="Contacto" value={form.phone || "Sin WhatsApp"} />
@@ -875,6 +1097,7 @@ function canAdvanceStep(step: number, form: PropertyForm, photos: UploadPhoto[])
 }
 
 function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
+  const beforeVisit = beforeVisitRows(parseBeforeVisitInput(form).values) ?? [];
   return [
     "Solicitud de publicación directa en Zentro Urbano",
     `Propietario: ${form.ownerName}`,
@@ -898,6 +1121,7 @@ function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
     ...(form.currency === "USD" ? [`Tipo de cambio del propietario: 1 USD = ${form.exchangeRate} Bs`] : []),
     `Expensas: ${form.expensesMode === "separate" ? `${form.currency} ${form.commonExpenses} por mes` : expensesLabels[form.expensesMode]}`,
     `Garantía: ${form.guarantee === "Otro monto" ? `${form.currency} ${form.guaranteeAmount}` : form.guarantee}`,
+    ...beforeVisit.map((row) => `${row.label}: ${row.value ?? "sin indicar"}`),
     `Descripción: ${form.description}`,
     `Fotos seleccionadas: ${photos.map((photo) => `${photo.file.name} [${photo.category || "sin clasificar"}]`).join(", ") || "Ninguna"}`,
   ].join("\n");
@@ -912,6 +1136,7 @@ function createUploadId(file: File) {
 
 function CostSummary({ form }: { form: PropertyForm }) {
   const costs = getPublicationCosts({ ...form, commonExpenses: form.expensesMode === "separate" ? form.commonExpenses : "0" });
+  const months = advanceRentMonths(form.advanceMonths);
   const format = (value: number | null) => value === null ? "Por definir" : `${form.currency === "BOB" ? "Bs" : "$us"} ${value.toLocaleString("es-BO")}`;
-  return <div className="monthly-summary" aria-live="polite"><div><span>Mensual, incluidas expensas</span><strong>{format(costs.monthly)}</strong></div><div><span>Ingreso: primer mes + expensas + garantía</span><strong>{format(costs.entry)}</strong></div><div><span>Comisión de intermediación</span><strong>Sin comisión</strong></div></div>;
+  return <div className="monthly-summary" aria-live="polite"><div><span>Mensual, incluidas expensas</span><strong>{format(costs.monthly)}</strong></div><div><span>{months > 1 ? `Ingreso: ${months} meses de adelanto + expensas + garantía` : "Ingreso: primer mes + expensas + garantía"}</span><strong>{format(costs.entry)}</strong></div><div><span>Comisión de intermediación</span><strong>Sin comisión</strong></div></div>;
 }

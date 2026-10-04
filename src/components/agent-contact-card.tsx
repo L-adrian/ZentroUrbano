@@ -1,19 +1,30 @@
-import { BadgeCheck, ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
+import { CheckCircle2, Clock3, ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
 import Image from "next/image";
+import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
-import { PublisherBadge } from "@/components/publisher-badge";
-import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
+import { ReportListingButton } from "@/components/report-listing-button";
 import { SafetyNotice } from "@/components/safety-notice";
+import { WhatsappQuestionsButton } from "@/components/whatsapp-questions-button";
+import type { AvailabilityState } from "@/lib/listing-summary";
+import { getEntryCost } from "@/lib/listing-summary";
+import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
+import { suggestedQuestions } from "@/lib/whatsapp-questions";
 
 type AgentContactCardProps = {
   property: Property;
+  availability: AvailabilityState;
 };
 
-export function AgentContactCard({ property }: AgentContactCardProps) {
+// Desktop keeps price, cost to move in and WhatsApp next to the gallery, once.
+export function AgentContactCard({ property, availability }: AgentContactCardProps) {
   const agent = property.agent;
   const contactCopy = getPropertyContactCopy(property);
   const contactUsesReference = isExternalContactUrl(property.whatsapp);
+  const entry = getEntryCost(property);
+  const questions = contactUsesReference ? null : (
+    <WhatsappQuestionsButton slug={property.slug} source="ficha" suggested={suggestedQuestions(property)} />
+  );
   const agentInitials = agent.name
     .split(" ")
     .map((part) => part[0])
@@ -23,48 +34,54 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
 
   return (
     <div className="owner-contact-card border border-neutral-300 bg-white p-5">
-      <p className="text-xs font-semibold uppercase text-neutral-500">
-        {property.publisher.kind === "owner" ? "Propietario" : "Responsable del anuncio"}
-      </p>
-      <div className="mt-4">
+      <div className="hidden lg:block">
+        <p className="text-xs font-semibold uppercase text-neutral-500">Alquiler mensual</p>
+        <PriceDisplay property={property} className="mt-1 block text-3xl font-bold tracking-tight text-neutral-950" />
+        <p className="mt-1 text-sm text-neutral-600">
+          Para entrar:{" "}
+          {entry ? (
+            <strong className="font-semibold text-neutral-900">
+              <PriceDisplay property={{ ...property, price: entry.total }} showPeriod={false} showExchangeRate={false} />
+            </strong>
+          ) : (
+            "pendiente de consulta"
+          )}
+        </p>
+        <p className={`owner-card-availability ${availability.fresh ? "is-fresh" : "is-unconfirmed"}`}>
+          {availability.fresh ? <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> : <Clock3 className="h-4 w-4" aria-hidden="true" />}
+          <span>{availability.fresh ? `Disponible · ${availability.detail.toLocaleLowerCase("es")}` : availability.label}</span>
+        </p>
+        <a
+          href={whatsappContactPath(property.slug, "ficha")}
+          target="_blank"
+          rel="noreferrer"
+          className="zu-whatsapp-cta mt-4 inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
+        >
+          {contactUsesReference ? (
+            <ExternalLink className="h-4 w-4" aria-hidden="true" />
+          ) : (
+            <MessageCircle className="h-4 w-4" aria-hidden="true" />
+          )}
+          {contactCopy.label}
+        </a>
+        {questions}
+      </div>
+
+      <div className="owner-card-person mt-0 lg:mt-5 lg:border-t lg:border-neutral-200 lg:pt-4">
         <div className="flex gap-4">
           <div className="relative h-14 w-14 shrink-0 overflow-hidden bg-neutral-200">
-            {contactUsesReference ? (
-              <div className="flex h-full w-full items-center justify-center bg-[#21352b] text-sm font-black text-white">
-                MP
-              </div>
-            ) : agent.photo ? (
-              <Image
-                src={agent.photo}
-                alt={agent.name}
-                fill
-                sizes="64px"
-                className="object-cover"
-              />
+            {agent.photo && !contactUsesReference ? (
+              <Image src={agent.photo} alt={agent.name} fill sizes="64px" className="object-cover" />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-[#21352b] text-sm font-black text-white">
                 {agentInitials || "ZU"}
               </div>
             )}
           </div>
-
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-base font-semibold tracking-tight text-neutral-950">
-                  {agent.name}
-                </h2>
-                <p className="mt-0.5 text-sm font-medium text-neutral-600">{agent.role}</p>
-              </div>
-              {agent.verified ? (
-                <span className="inline-flex shrink-0 items-center gap-1.5 text-xs font-semibold text-[#285340]">
-                  <BadgeCheck className="h-4 w-4" aria-hidden="true" />
-                  Verificado
-                </span>
-              ) : null}
-            </div>
-
-            <PublisherBadge property={property} className="mt-3 max-w-full" />
+            <h2 className="truncate text-base font-semibold tracking-tight text-neutral-950">{agent.name}</h2>
+            <p className="mt-0.5 text-sm font-medium text-neutral-600">{agent.role}</p>
+            <p className="mt-1 text-xs leading-5 text-neutral-500">{agent.responseTime}</p>
           </div>
         </div>
 
@@ -98,10 +115,6 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
             </a>
           </div>
         )}
-
-        <p className="mt-4 border-t border-neutral-200 pt-3 text-xs font-medium leading-5 text-neutral-500">
-          {agent.responseTime}
-        </p>
       </div>
 
       <div className="mt-5 space-y-3">
@@ -109,7 +122,7 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
           href={whatsappContactPath(property.slug, "ficha")}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
+          className="zu-whatsapp-cta inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b] lg:hidden"
         >
           {contactUsesReference ? (
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -118,8 +131,15 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
           )}
           {contactCopy.label}
         </a>
+        <div className="lg:hidden">{questions}</div>
         <PropertyShareButton property={property} />
-        <SafetyNotice slug={property.slug} />
+        <div className="hidden lg:block">
+          <SafetyNotice slug={property.slug} />
+        </div>
+        <p className="owner-card-no-reply">
+          Si no te responde en 48 horas,{" "}
+          <ReportListingButton slug={property.slug} label="avísanos" initialReason="no_responde" />.
+        </p>
       </div>
     </div>
   );

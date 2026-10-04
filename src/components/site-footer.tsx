@@ -4,12 +4,12 @@ import { ChevronDown, House, MapPin } from "lucide-react";
 const groups = [
   { title: "Encuentra tu lugar", links: [["Explorar alquileres", "/propiedades"], ["Alquileres en Santa Cruz", "/alquiler/santa-cruz-de-la-sierra"], ["Casas", "/propiedades?type=Casa"], ["Departamentos", "/propiedades?type=Departamento"], ["Buscar en el mapa", "/mapa"]] },
   { title: "Para propietarios", links: [["Publicar mi vivienda", "/publicar"], ["Qué necesito para publicar", "/requisitos"], ["Mi cuenta", "/cliente"]] },
-  { title: "Ayuda", links: [["Conoce Zentro Urbano", "/bienvenida"], ["Centro de ayuda", "/ayuda"], ["Preguntas frecuentes", "/preguntas-frecuentes"], ["Contáctanos", "/contacto"], ["Seguridad y reportes", "/seguridad"]] },
+  { title: "Ayuda", links: [["Conoce Zentro Urbano", "/bienvenida"], ["Centro de ayuda", "/ayuda"], ["Preguntas frecuentes", "/preguntas-frecuentes"], ["Guías para alquilar", "/guias"], ["Contáctanos", "/contacto"], ["Seguridad y reportes", "/seguridad"]] },
 ];
 export function SiteFooter() {
   return <footer className="zu-footer professional-footer">
     <div className="zu-container footer-directory">
-      <div className="footer-brand"><Link href="/" className="zu-logo"><House size={23} /><span>Zentro<span className="logo-accent">Urbano</span></span></Link><p>Tu próximo lugar.<br />Directo con su propietario.</p><span className="footer-location"><MapPin size={14} /> Santa Cruz, Bolivia</span></div>
+      <div className="footer-brand"><Link href="/" className="zu-logo" aria-label="Zentro Urbano, inicio"><span className="logo-mark"><House size={22} strokeWidth={1.8} /></span><span>Zentro<span className="logo-accent">Urbano</span></span></Link><p>Tu próximo lugar.<br />Directo con su propietario.</p><span className="footer-location"><MapPin size={14} /> Santa Cruz, Bolivia</span></div>
       {groups.map(group => <nav className="footer-desktop-group" key={group.title} aria-label={group.title}><h2>{group.title}</h2>{group.links.map(([title, href]) => <Link href={href} key={href}>{title}</Link>)}</nav>)}
       <div className="footer-mobile-groups">
         {groups.map(group => <details className="footer-mobile-group" key={group.title}>

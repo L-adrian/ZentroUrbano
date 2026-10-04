@@ -1,3 +1,4 @@
+import { isExternalContactUrl } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
 
 export const rentalPropertyTypes = ["Casa", "Departamento"] as const;
@@ -24,7 +25,40 @@ export function getRentalZones(properties: Property[]) {
     .sort((first, second) => first.localeCompare(second, "es"));
 }
 
-// Catalog and map payloads are serialized into the page; contact emails are only needed on the listing page.
-export function withoutContactEmail(properties: Property[]) {
-  return properties.map((property) => ({ ...property, agent: { ...property.agent, email: "" } }));
+// Catalog and map payloads are serialized into the page, so they leave out the owners' email and
+// phone: one request would otherwise hand every number to a scraper. The listing page still shows
+// them, and every card contacts through /api/propiedades/<slug>/whatsapp. A link to an original
+// ad is not a phone, so it stays (the card shows "Ver anuncio original" for it).
+export function withoutOwnerContact(properties: Property[]) {
+  return properties.map((property) => ({
+    ...property,
+    whatsapp: catalogContactUrl(property.whatsapp),
+    agent: { ...property.agent, email: "", phone: "", whatsapp: "" },
+  }));
+}
+
+export type RentalSummary = Pick<
+  Property,
+  "slug" | "title" | "zone" | "images" | "price" | "currency" | "exchangeRate" | "operation"
+>;
+
+// Just what a small strip ("Vistos recientemente") needs, so a page does not send every listing in full.
+export function toRentalSummaries(properties: Property[]): RentalSummary[] {
+  return properties.map(({ slug, title, zone, images, price, currency, exchangeRate, operation }) => ({
+    slug,
+    title,
+    zone,
+    images: images.slice(0, 1),
+    price,
+    currency,
+    exchangeRate,
+    operation,
+  }));
+}
+
+// A wa.me link carries the phone number, so it keeps only its kind (still an external link).
+function catalogContactUrl(value: string) {
+  if (!isExternalContactUrl(value)) return "";
+  const host = new URL(value).hostname.toLowerCase();
+  return host === "wa.me" || host === "whatsapp.com" || host.endsWith(".whatsapp.com") ? "https://wa.me/" : value;
 }

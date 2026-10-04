@@ -1,9 +1,13 @@
 "use client";
 import Image from "next/image";
-import { ChevronLeft, ChevronRight, Home, Images, Play, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, ExternalLink, Home, Images, MessageCircle, Play, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { trackAnalyticsEvent } from "@/lib/analytics-events";
+import { PriceDisplay } from "@/components/currency-preference";
 import type { Property } from "@/lib/properties";
+import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyVideoUrl } from "@/lib/property-video";
+import { ListingPhoto } from "@/components/listing-photo";
 import { PropertyTourButton } from "@/components/property-tour";
 import type { PublicTour } from "@/lib/property-tour-contract";
 
@@ -21,10 +25,18 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
   // downloaded when the gallery opens and switching photos never shows a black screen.
   const [warm, setWarm] = useState(false);
   const [loaded, setLoaded] = useState<ReadonlySet<number>>(() => new Set());
+  // Phones on mobile data warm only the first photos and then the neighbours of the open one.
+  // Read only after hydration: slides render once the page is idle or the gallery opens.
+  const [warmLimit] = useState(() => typeof window !== "undefined" && (window.matchMedia("(max-width: 768px)").matches || isSavingData()) ? 3 : Number.POSITIVE_INFINITY);
+  function shouldMount(index: number) {
+    if (index < warmLimit || loaded.has(index)) return true;
+    if (active === null) return false;
+    const distance = Math.abs(index - active);
+    return Math.min(distance, photoCount - distance) <= 2;
+  }
   useEffect(() => {
     if (photoCount < 1) return;
-    const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
-    if (connection?.saveData || connection?.effectiveType?.includes("2g")) return;
+    if (isSavingData()) return;
     const start = () => setWarm(true);
     if ("requestIdleCallback" in window) {
       const id = window.requestIdleCallback(start, { timeout: 1500 });
@@ -50,7 +62,17 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
       trigger.current?.focus();
     };
   }, [opened]);
-  function open(index: number) { trigger.current = document.activeElement as HTMLElement; setVideoFailed(false); setActive(index); }
+  // Counted once per page load: /admin shows how many people opened the photos.
+  const galleryReported = useRef(false);
+  function open(index: number) {
+    trigger.current = document.activeElement as HTMLElement;
+    setVideoFailed(false);
+    setActive(index);
+    if (!galleryReported.current) {
+      galleryReported.current = true;
+      trackAnalyticsEvent("property_gallery_open", { property_slug: property.slug });
+    }
+  }
   function move(direction: number) { setActive(index => index === null ? null : (index + direction + count) % count); }
   // Horizontal swipes change the photo on phones; vertical drags and pinch zoom are left alone.
   const swipe = useRef<{ x: number; y: number } | null>(null);
@@ -67,14 +89,14 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
   return <>
     {photoCount > 0 && <div className={`property-gallery ${photoCount === 1 ? "single-photo" : ""}`}>
       <button type="button" className="gallery-main" onClick={() => open(0)} aria-label="Ver galería de fotos">
-        <Image src={property.images[0]} alt={property.title} fill priority quality={72} sizes="(min-width: 1024px) 780px, 100vw" />
+        <ListingPhoto src={property.images[0]} alt={property.title} fill priority quality={72} sizes="(min-width: 1024px) 780px, 100vw" />
         <span><Images size={17} />{photoCount === 1 ? "Ver foto" : `Ver las ${photoCount} fotos`}</span>
       </button>
-      {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><Image src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
+      {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><ListingPhoto src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
     </div>}
     {photoCount > 1 && <div className="gallery-strip" aria-label="Más fotos">{property.images.slice(1, 5).map((src, index) => {
       const remaining = photoCount - 5;
-      return <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={index === 3 && remaining > 0 ? `Ver ${remaining + 1} fotos más` : `Ver foto ${index + 2}`}><Image src={src} alt="" fill sizes="25vw" quality={68} />{index === 3 && remaining > 0 && <span className="gallery-strip-more">+{remaining + 1}</span>}</button>;
+      return <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={index === 3 && remaining > 0 ? `Ver ${remaining + 1} fotos más` : `Ver foto ${index + 2}`}><ListingPhoto src={src} alt="" fill sizes="25vw" quality={68} />{index === 3 && remaining > 0 && <span className="gallery-strip-more">+{remaining + 1}</span>}</button>;
     })}</div>}
     {(videoUrl || tour) && <div className="gallery-media-actions">{videoUrl && <button type="button" className="zu-button zu-button-secondary" onClick={() => open(photoCount)}><Play size={16} aria-hidden="true" />Ver video</button>}{tour && <PropertyTourButton tour={tour} />}</div>}
     {property.rentalDetails?.mediaNote && <p className="gallery-media-note">{property.rentalDetails.mediaNote}</p>}
@@ -103,12 +125,24 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
                 <Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="gallery-slide-placeholder" />
                 <span className="gallery-loader" role="status"><span className="gallery-loader-mark"><Home size={18} strokeWidth={2.2} aria-hidden="true" /></span><span>Cargando foto…</span></span>
               </>}
-              <Image src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={74} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} className="gallery-full-photo" />
+              {(current || shouldMount(index)) && <ListingPhoto src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={72} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} onError={() => markLoaded(index)} className="gallery-full-photo" />}
             </div>;
           })}</div>}
           {opened && count > 1 && <><button type="button" className="gallery-prev" onClick={() => move(-1)} aria-label={videoUrl ? "Contenido anterior" : "Foto anterior"} title="Anterior"><ChevronLeft size={24} /></button><button type="button" className="gallery-next" onClick={() => move(1)} aria-label={videoUrl ? "Siguiente contenido" : "Siguiente foto"} title="Siguiente"><ChevronRight size={24} /></button></>}
         </div>}
-      {opened && <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>}
+      {opened && <div className="gallery-contact-bar">
+        <PriceDisplay property={property} showExchangeRate={false} className="gallery-contact-price" />
+        <a href={whatsappContactPath(property.slug, "galeria")} target="_blank" rel="noreferrer" className="gallery-contact-button">
+          {isExternalContactUrl(property.whatsapp) ? <ExternalLink size={16} aria-hidden="true" /> : <MessageCircle size={16} aria-hidden="true" />}
+          {getPropertyContactCopy(property).shortLabel}
+        </a>
+      </div>}
+      {opened && <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><ListingPhoto src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>}
     </dialog>
   </>;
+}
+
+function isSavingData() {
+  const connection = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return Boolean(connection?.saveData || connection?.effectiveType?.includes("2g"));
 }

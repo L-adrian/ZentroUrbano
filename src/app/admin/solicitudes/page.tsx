@@ -10,7 +10,7 @@ export const metadata = buildSeoMetadata({ title: "Solicitudes recibidas", descr
 export default async function AdminRequestsPage() {
   return <main id="contenido" className="requests-page zu-container">
     <Link href="/admin" className="request-back-link"><ArrowLeft size={17} />Administración</Link>
-    <header className="requests-heading"><div><h1>Solicitudes recibidas</h1><p>Revisa los datos y las fotos. Aprobar publica la ficha; rechazar la mantiene fuera del catálogo y el propietario ve el motivo en Mi cuenta. «Volver a publicar» muestra de nuevo un anuncio oculto solo si lo apruebas.</p></div></header>
+    <header className="requests-heading"><div><h1>Solicitudes recibidas</h1><p>Revisa los datos y las fotos. Aprobar publica la ficha; rechazar la mantiene fuera del catálogo y el propietario ve el motivo en Mi cuenta. «Pedir corrección» le envía tu mensaje para que corrija y reenvíe con sus datos y fotos ya cargados. «Volver a publicar» muestra de nuevo un anuncio oculto solo si lo apruebas.</p></div></header>
     <PublicationRequestList requests={await listPublicationRequests()} admin />
   </main>;
 }
