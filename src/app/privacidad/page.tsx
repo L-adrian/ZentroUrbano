@@ -26,6 +26,10 @@ const sections = [
     body: "Para mostrar cuántas personas vieron cada anuncio, guardamos una cookie con un número aleatorio que identifica tu navegador, no a ti. No contiene tu nombre, teléfono ni correo, y dura un año. Con ella contamos cada teléfono o computadora una sola vez. Si reportas un anuncio, guardamos el motivo, el detalle que escribas y ese mismo número aleatorio, para revisar el aviso y evitar repeticiones.",
   },
   {
+    title: "Alertas de búsqueda",
+    body: "Si pides que te avisemos cuando haya una vivienda como la que buscas, guardamos tu búsqueda, el WhatsApp o correo que escribas, tu nombre si lo das, la fecha y el número aleatorio de tu navegador. Solo lo usamos para escribirte sobre esa búsqueda: lo hace una persona de nuestro equipo, no un sistema automático, y no lo compartimos con los dueños. Cada aviso trae un enlace para darte de baja, y también puedes pedirlo por WhatsApp o correo.",
+  },
+  {
     title: "Canales externos",
     body: "Zentro Urbano usa enlaces de WhatsApp, mapas y servicios de imágenes o mapas. Al abrir esos servicios, aplican también sus propias políticas de privacidad.",
   },

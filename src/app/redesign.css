@@ -542,3 +542,23 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .guide-note a, .guide-page section a { color: var(--brand); font-weight: 650; text-decoration: underline; text-underline-offset: 2px; }
 .guide-more { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
 .guide-more a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-weight: 600; }
+
+/* "Avísame" alert form (reuses the report dialog) and the admin list of alerts. */
+.report-dialog-note input { font: inherit; font-weight: 400; min-height: 44px; border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 8px 10px; background: transparent; color: inherit; }
+.search-alert-summary { padding: 10px 12px; border-radius: 8px; background: var(--subtle); }
+.admin-alerts { padding-block: 40px 60px; }
+.admin-alerts h1 { font-size: 28px; font-weight: 650; margin-block: 10px; }
+.admin-alerts-intro { max-width: 720px; color: var(--muted); line-height: 1.6; margin-bottom: 10px; }
+.admin-alerts > p > a, .admin-alert-meta a { color: var(--brand); font-weight: 600; text-decoration: underline; }
+.admin-alert-list { display: grid; gap: 12px; margin-top: 20px; }
+.admin-alert-list > li { display: grid; gap: 6px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.admin-alert-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; }
+.admin-alert-meta { font-size: 13px; color: var(--muted); }
+.admin-alert-matches { font-size: 14px; color: var(--muted); }
+.admin-alert-matches.has-matches { color: var(--brand); font-weight: 600; }
+.admin-alert-contact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 6px; }
+.admin-alert-contact a, .admin-alert-actions button { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; font-weight: 600; }
+.admin-alert-contact a { background: var(--brand); border-color: var(--brand); color: #fff; }
+.dark .admin-alert-contact a { color: #08291e; }
+.admin-alert-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.admin-alert-actions button:disabled { opacity: 0.6; }
