@@ -7,11 +7,15 @@ import { revalidatePath } from "next/cache";
 import { getPropertyVideoUrl } from "@/lib/property-video";
 import { allowedOwnerImage, ownerMapUrl, ownerWhatsapp, parseJsonArray } from "@/lib/owner-listing-edit";
 import { petsPolicies } from "@/lib/publication-input";
+import { isSameSiteRequest } from "@/lib/request-origin";
 
 export async function PATCH(
   request: NextRequest,
   context: RouteContext<"/api/propiedades/[slug]">,
 ) {
+  if (!isSameSiteRequest(request)) {
+    return NextResponse.json({ ok: false, stored: false, message: "Origen no permitido." }, { status: 403 });
+  }
   const { slug } = await context.params;
   const payload = (await request.json().catch(() => null)) as Record<string, unknown> | null;
 
