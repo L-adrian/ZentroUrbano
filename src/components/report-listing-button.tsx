@@ -1,7 +1,8 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useId, useRef, useState, type FormEvent } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   reportNoteMaxLength,
   reportReasons,
@@ -20,6 +21,11 @@ export function ReportListingButton({ slug }: { slug: string }) {
   const [note, setNote] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState("");
+  // The dialog lives in <body>: the trigger sits inside sentences, where a dialog is not valid HTML.
+  const [openRequests, setOpenRequests] = useState(0);
+  useEffect(() => {
+    if (openRequests > 0 && !dialog.current?.open) dialog.current?.showModal();
+  }, [openRequests]);
   const supportLink = whatsappUrl(`Hola, quiero reportar este anuncio de Zentro Urbano: ${absoluteUrl(`/propiedades/${slug}`)}`);
 
   function open() {
@@ -27,7 +33,7 @@ export function ReportListingButton({ slug }: { slug: string }) {
       setStatus("idle");
       setMessage("");
     }
-    dialog.current?.showModal();
+    setOpenRequests((count) => count + 1);
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -62,7 +68,7 @@ export function ReportListingButton({ slug }: { slug: string }) {
       <button type="button" className="report-listing-trigger" onClick={open}>
         Reportar este anuncio
       </button>
-      <dialog ref={dialog} className="report-dialog" aria-labelledby={titleId} onClick={(event) => event.target === dialog.current && dialog.current?.close()}>
+      {openRequests > 0 ? createPortal(<dialog ref={dialog} className="report-dialog" aria-labelledby={titleId} onClick={(event) => event.target === dialog.current && dialog.current?.close()}>
         <div className="report-dialog-body">
           <div className="report-dialog-head">
             <h2 id={titleId}>Reportar este anuncio</h2>
@@ -117,7 +123,7 @@ export function ReportListingButton({ slug }: { slug: string }) {
             </form>
           )}
         </div>
-      </dialog>
+      </dialog>, document.body) : null}
     </>
   );
 }

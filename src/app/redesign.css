@@ -401,3 +401,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 
 /* Phones swipe between photos; the browser keeps vertical scroll and pinch zoom. */
 .gallery-full-image { touch-action: pan-y pinch-zoom; }
+.listing-views { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.listing-views svg { flex-shrink: 0; margin-top: 2px; }
+.listing-views small { display: block; font-size: 12px; }

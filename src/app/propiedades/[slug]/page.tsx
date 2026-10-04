@@ -246,14 +246,14 @@ export default async function PropertyDetailPage({
                 </span>
               </div>
               {viewStats && viewStats.total > 0 ? (
-                <p className="listing-views mt-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600">
+                <p className="listing-views mt-3">
                   <Eye className="h-4 w-4 text-[#58745f]" aria-hidden="true" />
                   <span>
                     <strong className="font-semibold text-neutral-900">{viewStats.total}</strong>{" "}
                     {viewStats.total === 1 ? "persona vio" : "personas vieron"} este anuncio
                     {viewStats.last7 > 0 ? ` · ${viewStats.last7} en los últimos 7 días` : ""}
+                    <small>Contamos cada teléfono o computadora una sola vez.</small>
                   </span>
-                  <span className="text-xs text-neutral-500">Contamos cada teléfono o computadora una sola vez.</span>
                 </p>
               ) : null}
               <EntryCostBreakdown property={property} />
