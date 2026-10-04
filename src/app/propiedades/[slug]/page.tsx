@@ -6,6 +6,7 @@ import {
   Car,
   Clock3,
   CheckCircle2,
+  Eye,
   Flame,
   MapPin,
   MessageCircle,
@@ -41,7 +42,9 @@ import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
 import { absoluteUrl } from "@/lib/site";
 import { isDirectRental } from "@/lib/rentals";
 import { getPublicationCosts } from "@/lib/publication-costs";
-import { getAvailabilityLabel, getEntryCost, getGuaranteeLabel } from "@/lib/listing-summary";
+import { getAvailabilityState, getEntryCost, getGuaranteeLabel } from "@/lib/listing-summary";
+import { getPublicViewStats } from "@/lib/property-audience";
+import { whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
 import { getPrivateTourShowcase } from "@/lib/private-tour-showcase";
@@ -142,8 +145,12 @@ export default async function PropertyDetailPage({
     { name: property.title, path: `/propiedades/${property.slug}` },
   ]);
 
-  const similarProperties = await getSimilarPropertiesData(property);
-  const tour = await publishedTour(property.slug);
+  const [similarProperties, tour, viewStats] = await Promise.all([
+    getSimilarPropertiesData(property),
+    publishedTour(property.slug),
+    getPublicViewStats(property.slug),
+  ]);
+  const availability = getAvailabilityState(property);
 
   return (
     <main id="contenido" className="property-detail bg-white pb-24 lg:pb-0">
@@ -173,13 +180,6 @@ export default async function PropertyDetailPage({
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950"
                 label="Compartir"
               />
-              <span className="hidden rounded-full bg-[#eef7ef] px-4 py-2 text-sm font-semibold text-[#285340] sm:inline-flex">
-                {property.isSeeded
-                  ? "Ficha de prueba"
-                  : property.listingPlan === "featured"
-                    ? "Ficha destacada"
-                    : "Ficha curada"}
-              </span>
             </div>
           </div>
 
@@ -222,7 +222,7 @@ export default async function PropertyDetailPage({
                   />
                 </div>
                 <a
-                  href={`/api/propiedades/${property.slug}/whatsapp`}
+                  href={whatsappContactPath(property.slug, "ficha")}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex h-12 items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
@@ -232,16 +232,30 @@ export default async function PropertyDetailPage({
                 </a>
               </div>
 
-              <div className="mt-4 flex flex-col gap-2 border border-[#bddfce] bg-[#f1f8f4] p-3 text-sm sm:flex-row sm:items-center sm:justify-between">
-                <span className="inline-flex items-center gap-2 font-semibold text-[#10533b]">
-                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                  Disponible
+              <div className={`availability-box ${availability.fresh ? "is-fresh" : "is-unconfirmed"} mt-4 flex flex-col gap-2 border p-3 text-sm sm:flex-row sm:items-center sm:justify-between`}>
+                <span className="availability-box-label inline-flex items-center gap-2 font-semibold">
+                  {availability.fresh ? (
+                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Clock3 className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  {availability.label}
                 </span>
                 <span className="inline-flex items-center gap-2 text-neutral-600">
-                  <Clock3 className="h-4 w-4" aria-hidden="true" />
-                  {getAvailabilityLabel(property)}
+                  {availability.detail}
                 </span>
               </div>
+              {viewStats && viewStats.total > 0 ? (
+                <p className="listing-views mt-3 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600">
+                  <Eye className="h-4 w-4 text-[#58745f]" aria-hidden="true" />
+                  <span>
+                    <strong className="font-semibold text-neutral-900">{viewStats.total}</strong>{" "}
+                    {viewStats.total === 1 ? "persona vio" : "personas vieron"} este anuncio
+                    {viewStats.last7 > 0 ? ` · ${viewStats.last7} en los últimos 7 días` : ""}
+                  </span>
+                  <span className="text-xs text-neutral-500">Contamos cada teléfono o computadora una sola vez.</span>
+                </p>
+              ) : null}
               <EntryCostBreakdown property={property} />
               <SafetyNotice slug={property.slug} className="mt-4" />
             </div>

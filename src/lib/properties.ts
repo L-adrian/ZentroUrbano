@@ -64,6 +64,10 @@ export type Property = {
   featured: boolean;
   published: boolean;
   availabilityConfirmedAt?: string;
+  // People who reported "ya no está disponible" since the last confirmation.
+  availabilityReports?: number;
+  // People (devices) who opened the listing; shown publicly.
+  publicViews?: number;
   isSeeded: boolean;
   coordinates: {
     lat: number;

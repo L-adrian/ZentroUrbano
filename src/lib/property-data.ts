@@ -3,10 +3,7 @@ import {
   publishedProperties,
   type Property,
 } from "@/lib/properties";
-import {
-  directRentalDemoProperties,
-  getDirectRentalDemoBySlug,
-} from "@/lib/direct-rental-demo";
+import { getDirectRentalDemoBySlug } from "@/lib/direct-rental-demo";
 import {
   curatedRentalProperties,
   getCuratedRentalBySlug,
@@ -14,7 +11,8 @@ import {
 import { hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { isDirectRental } from "@/lib/rentals";
 import { parsePropertyExchangeRate } from "@/lib/currency";
-import { getRetiredDemoSlugs } from "@/lib/demo-replacements";
+import { getPublicViewCounts, getUnavailableReportTimes } from "@/lib/property-audience";
+import { countReportsSince } from "@/lib/property-reports";
 
 export type PropertyRow = {
   id: string;
@@ -59,6 +57,12 @@ export type PropertyRow = {
   coordinates: unknown;
 };
 
+// Example listings were retired from every public page (2026-10-03). Their rows and code stay
+// untouched; they are only filtered out here.
+function isPublicListing(property: Property) {
+  return !property.isSeeded && isDirectRental(property);
+}
+
 export async function getPublishedPropertiesData() {
   try {
     const data = await queryRows<PropertyRow>(
@@ -72,32 +76,27 @@ export async function getPublishedPropertiesData() {
 
     const storedProperties = data ? data.map(mapPropertyRow) : publishedProperties;
 
-    const retired = await getRetiredDemoSlugs();
-    return mergeProperties(
-      directRentalDemoProperties,
-      mergeProperties(curatedRentalProperties, storedProperties),
-    )
-      .filter(property => !retired.has(property.slug) && isDirectRental(property))
-      .sort(sortPropertiesByVisibility);
+    return withAudience(
+      mergeProperties(curatedRentalProperties, storedProperties)
+        .filter(isPublicListing)
+        .sort(sortPropertiesByVisibility),
+    );
   } catch {
     if (hasDatabaseConfig()) {
-      return curatedRentalProperties.filter(isDirectRental).sort(sortPropertiesByVisibility);
+      return curatedRentalProperties.filter(isPublicListing).sort(sortPropertiesByVisibility);
     }
-    return mergeProperties(
-      directRentalDemoProperties,
-      mergeProperties(curatedRentalProperties, publishedProperties),
-    ).filter(isDirectRental).sort(sortPropertiesByVisibility);
+    return mergeProperties(curatedRentalProperties, publishedProperties)
+      .filter(isPublicListing)
+      .sort(sortPropertiesByVisibility);
   }
 }
 
 export async function getPropertyBySlugData(slug: string) {
-  const demoFallback = getDirectRentalDemoBySlug(slug);
   const curatedFallback = getCuratedRentalBySlug(slug);
-  const candidate = curatedFallback ?? demoFallback ?? getPropertyBySlug(slug);
-  const fallback = candidate && isDirectRental(candidate) ? candidate : undefined;
+  const candidate = curatedFallback ?? getPropertyBySlug(slug);
+  const fallback = candidate && isPublicListing(candidate) ? candidate : undefined;
 
   try {
-    if (demoFallback && (await getRetiredDemoSlugs()).has(slug)) return undefined;
     const data = await queryOne<PropertyRow>(
       "select * from properties where slug = :slug and published = 1 limit 1",
       { slug },
@@ -105,17 +104,28 @@ export async function getPropertyBySlugData(slug: string) {
 
     if (!data) {
       if (hasDatabaseConfig()) {
-        return curatedFallback ?? demoFallback;
+        return curatedFallback ? (await withAudience([curatedFallback]))[0] : undefined;
       }
 
       return fallback;
     }
 
     const property = mapPropertyRow(data);
-    return isDirectRental(property) ? property : undefined;
+    return isPublicListing(property) ? (await withAudience([property]))[0] : undefined;
   } catch {
     return curatedFallback ?? (hasDatabaseConfig() ? undefined : fallback);
   }
+}
+
+// Public view counts and "ya no está disponible" reports; listings keep working without them.
+async function withAudience(properties: Property[]) {
+  if (!hasDatabaseConfig() || properties.length === 0) return properties;
+  const [views, reports] = await Promise.all([getPublicViewCounts(), getUnavailableReportTimes()]);
+  return properties.map((property) => ({
+    ...property,
+    publicViews: views.get(property.slug)?.total ?? 0,
+    availabilityReports: countReportsSince(reports.get(property.slug), property.availabilityConfirmedAt),
+  }));
 }
 
 export async function getSimilarPropertiesData(property: Property) {
@@ -227,9 +237,6 @@ function mergeProperties(primary: Property[], secondary: Property[]) {
 }
 
 function sortPropertiesByVisibility(a: Property, b: Property) {
-  const demoRank = Number(Boolean(a.isSeeded)) - Number(Boolean(b.isSeeded));
-  if (demoRank !== 0) return demoRank;
-
   const planRank = (a.listingPlan === "featured" ? 0 : 1) - (b.listingPlan === "featured" ? 0 : 1);
 
   if (planRank !== 0) {

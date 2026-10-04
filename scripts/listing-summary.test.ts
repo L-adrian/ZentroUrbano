@@ -1,17 +1,33 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getAvailabilityShortLabel, getEntryCost, getGuaranteeLabel, getListingHighlights } from "../src/lib/listing-summary";
+import { getAvailabilityState, getEntryCost, getGuaranteeLabel, getListingHighlights } from "../src/lib/listing-summary";
 import type { Property } from "../src/lib/properties";
+import { buildOwnerWhatsappMessage, ownerFirstName } from "../src/lib/property-contact";
+import { countReportsSince } from "../src/lib/property-reports";
 
 const day = 86_400_000;
 
 test("availability labels count whole days since confirmation", () => {
   const now = Date.parse("2026-10-03T12:00:00Z");
-  assert.equal(getAvailabilityShortLabel({ availabilityConfirmedAt: "2026-10-03T08:00:00Z" }, now), "hoy");
-  assert.equal(getAvailabilityShortLabel({ availabilityConfirmedAt: new Date(now - day).toISOString() }, now), "hace 1 día");
-  assert.equal(getAvailabilityShortLabel({ availabilityConfirmedAt: new Date(now - 5 * day).toISOString() }, now), "hace 5 días");
-  assert.equal(getAvailabilityShortLabel({ availabilityConfirmedAt: undefined }, now), null);
-  assert.equal(getAvailabilityShortLabel({ availabilityConfirmedAt: new Date(now - 45 * day).toISOString() }, now), null);
+  const label = (availabilityConfirmedAt?: string) => getAvailabilityState({ availabilityConfirmedAt }, now).shortLabel;
+  assert.equal(label("2026-10-03T08:00:00Z"), "Disponible · hoy");
+  assert.equal(label(new Date(now - day).toISOString()), "Disponible · hace 1 día");
+  assert.equal(label(new Date(now - 5 * day).toISOString()), "Disponible · hace 5 días");
+  assert.equal(label(undefined), "Por confirmar");
+});
+
+test("a confirmation stops counting as available after 21 days or 5 reports", () => {
+  const now = Date.parse("2026-10-03T12:00:00Z");
+  const confirmed = (days: number, availabilityReports = 0) =>
+    getAvailabilityState({ availabilityConfirmedAt: new Date(now - days * day).toISOString(), availabilityReports }, now);
+  assert.equal(confirmed(21).fresh, true);
+  assert.equal(confirmed(22).fresh, false);
+  assert.equal(confirmed(22).reason, "old");
+  assert.match(confirmed(22).detail, /hace 22 días/);
+  assert.equal(confirmed(2, 4).fresh, true);
+  assert.equal(confirmed(2, 5).fresh, false);
+  assert.equal(confirmed(2, 5).reason, "reported");
+  assert.equal(getAvailabilityState({ availabilityConfirmedAt: undefined }, now).reason, "missing");
 });
 
 test("entry cost adds first month and guarantee from listing requirements", () => {
@@ -30,4 +46,24 @@ test("highlights only list confirmed amenities", () => {
   const base = { pets: false, garage: 0, furnished: false, pool: false, patio: false, security: false, grill: false } as Property;
   assert.deepEqual(getListingHighlights(base), []);
   assert.deepEqual(getListingHighlights({ ...base, pets: true, garage: 1, pool: true, patio: true }), ["Acepta mascotas", "Parqueo", "Piscina"]);
+});
+
+test("reports only count after the latest availability confirmation", () => {
+  const confirmedAt = "2026-10-01T12:00:00Z";
+  const before = Date.parse("2026-09-30T12:00:00Z");
+  const after = Date.parse("2026-10-02T12:00:00Z");
+  assert.equal(countReportsSince([before, after, after + 1], confirmedAt), 2);
+  assert.equal(countReportsSince([before, after], undefined), 2);
+  assert.equal(countReportsSince(undefined, confirmedAt), 0);
+});
+
+test("first WhatsApp message names the home, price and link, and greets real names only", () => {
+  const property = { agent: { name: "Luis Mario Castro" }, type: "Departamento", zone: "Equipetrol", rentalDetails: undefined } as unknown as Property;
+  const message = buildOwnerWhatsappMessage(property, "Bs 3.500/mes", "https://zentrourbano.com/propiedades/x");
+  assert.equal(message, "Hola Luis, vi en Zentro Urbano tu departamento en Equipetrol a Bs 3.500/mes: https://zentrourbano.com/propiedades/x\n¿Sigue disponible? Me gustaría coordinar una visita.");
+  assert.equal(ownerFirstName("Equipo Zentro Urbano"), null);
+  assert.equal(ownerFirstName("Familia Rivero"), null);
+  assert.equal(ownerFirstName("Propietario de la vivienda"), null);
+  assert.equal(ownerFirstName("María José"), "María");
+  assert.match(buildOwnerWhatsappMessage({ ...property, agent: { ...property.agent, name: "Familia Rivero" } }, "Bs 1", "u"), /^Hola, vi/);
 });

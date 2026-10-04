@@ -145,6 +145,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-image img { object-fit: cover; }
 .rental-status { display: inline-flex; align-items: center; gap: 5px; position: absolute; left: 10px; top: 10px; padding: 5px 8px; border-radius: 4px; color: #174738; background: #fff; font-size: 10px; font-weight: 650; }
 .rental-status svg { width: 12px; height: 12px; }
+.rental-status.is-unconfirmed { color: #7a4b00; background: #fff4d6; }
+.rental-views { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; }
 .rental-demo { position: absolute; bottom: 9px; left: 10px; color: white; background: #202726; border-radius: 4px; padding: 3px 7px; font-size: 10px; }
 .rental-image-count { position: absolute; right: 10px; bottom: 9px; display: flex; gap: 5px; align-items: center; color: white; background: #202726; border-radius: 4px; font-size: 10px; padding: 3px 7px; }
 .rental-card-content { padding-top: 13px; display: flex; flex-direction: column; flex: 1; }
@@ -360,3 +362,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .gallery-strip .gallery-strip-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(16 22 20 / 0.6); color: #fff; font-weight: 700; font-size: 14px; }
 }
 .dark .safety-notice { background: #3a2d16; color: #f3d39b; }
+
+/* Availability: green only while the owner's confirmation is recent (21 days, fewer than 5 reports). */
+.availability-box.is-fresh { border-color: #bddfce; background: #f1f8f4; }
+.availability-box.is-fresh .availability-box-label { color: #10533b; }
+.availability-box.is-unconfirmed { border-color: #f0d49a; background: #fff8e8; }
+.availability-box.is-unconfirmed .availability-box-label { color: #7a4b00; }
+.dark .availability-box.is-fresh { border-color: #285340; background: #12261d; }
+.dark .availability-box.is-fresh .availability-box-label { color: #7fd8b4; }
+.dark .availability-box.is-unconfirmed { border-color: #5c4718; background: #2e2412; }
+.dark .availability-box.is-unconfirmed .availability-box-label { color: #f3d39b; }
+.dark .rental-status.is-unconfirmed { color: #7a4b00; background: #fff4d6; }

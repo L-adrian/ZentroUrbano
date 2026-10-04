@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { trackServerEvent } from "@/lib/tracking";
 import { isServerTrackedEvent } from "@/lib/tracking-events";
+import { getOrCreateVisitorId } from "@/lib/visitor-id";
 
 // Beacons are a few hundred bytes; anything larger is not from our pages.
 const maxBodyBytes = 4096;
@@ -31,12 +32,14 @@ export async function POST(request: NextRequest) {
   }
 
   const params = sanitizeMetadata(body.params);
+  // Public view counts dedupe by this id, so it always comes from the server cookie, never the payload.
+  const visitorId = await getOrCreateVisitorId();
   const result = await trackServerEvent({
     eventType,
     propertySlug: typeof params.property_slug === "string" ? params.property_slug : undefined,
     adId: typeof params.ad_id === "string" ? params.ad_id : undefined,
     path: typeof body.path === "string" ? body.path : undefined,
-    metadata: params,
+    metadata: { ...params, visitor_id: visitorId },
   });
 
   return NextResponse.json({ ok: true, stored: result.stored });
@@ -46,7 +49,7 @@ function sanitizeMetadata(value: unknown): Record<string, string | number | bool
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const entries: [string, string | number | boolean][] = [];
   for (const [key, item] of Object.entries(value)) {
-    if (entries.length >= maxMetadataKeys || key.length > 60) continue;
+    if (entries.length >= maxMetadataKeys || key.length > 60 || key === "visitor_id") continue;
     if (typeof item === "string") entries.push([key, item.slice(0, maxMetadataText)]);
     else if ((typeof item === "number" && Number.isFinite(item)) || typeof item === "boolean") entries.push([key, item]);
   }
