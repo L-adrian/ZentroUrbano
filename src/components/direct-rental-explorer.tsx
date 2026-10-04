@@ -24,6 +24,7 @@ import { PropertyMap } from "@/components/property-map";
 import { SearchAlertButton } from "@/components/search-alert-button";
 import { RecentlyViewed, SavedListingsLink } from "@/components/recently-viewed";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import { trackAnalyticsEvent } from "@/lib/analytics-events";
 import {
   formatApproxDistance,
   getKnownPlace,
@@ -203,6 +204,18 @@ export function DirectRentalExplorer({
     }, 300);
     return () => window.clearTimeout(timer);
   }, [serializedFilters]);
+
+  // One "search_empty" per search that stays without results, not per keystroke.
+  const reportedEmpty = useRef<string | null>(null);
+  const emptySearch = results.length === 0 && properties.length > 0;
+  useEffect(() => {
+    if (!emptySearch || reportedEmpty.current === serializedFilters) return;
+    const timer = window.setTimeout(() => {
+      reportedEmpty.current = serializedFilters;
+      trackAnalyticsEvent("search_empty", { filters: serializedFilters || "(sin filtros)" });
+    }, 1500);
+    return () => window.clearTimeout(timer);
+  }, [emptySearch, serializedFilters]);
 
   function updateFilter<Key extends keyof RentalSearchFilters>(key: Key, value: RentalSearchFilters[Key]) {
     setFilters((current) => {
@@ -713,6 +726,7 @@ function SearchShareActions({ url, message }: { url: string; message: string }) 
     if (navigator.share) {
       try {
         await navigator.share({ title: "Alquileres en Zentro Urbano", text: message, url });
+        trackAnalyticsEvent("search_share", { method: "compartir" });
         return;
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
@@ -721,6 +735,7 @@ function SearchShareActions({ url, message }: { url: string; message: string }) 
 
     try {
       await navigator.clipboard.writeText(url);
+      trackAnalyticsEvent("search_share", { method: "copiar" });
       setStatus("copied");
       window.setTimeout(() => setStatus("idle"), 2000);
     } catch {
@@ -742,6 +757,7 @@ function SearchShareActions({ url, message }: { url: string; message: string }) 
         href={`https://wa.me/?text=${encodeURIComponent(`${message} ${url}`)}`}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() => trackAnalyticsEvent("search_share", { method: "whatsapp" })}
         className="inline-flex min-h-11 items-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
       >
         <WhatsAppIcon width={16} height={16} />

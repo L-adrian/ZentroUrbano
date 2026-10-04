@@ -14,7 +14,7 @@ export const serverTrackedEvents = [
   "property_tour_whatsapp_click",
   "ad_impression",
   "ad_click",
-  // Accepted for the catalog; nothing sends them yet.
+  // Catalog: card clicks, searches left without results, shared searches.
   "catalog_card_click",
   "search_empty",
   "search_share",
