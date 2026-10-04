@@ -469,9 +469,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .gallery-contact-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #087c65; color: #fff; font-size: 14px; font-weight: 650; }
 .gallery-contact-button:hover { background: #05624f; }
 @media (max-width: 768px) { .gallery-contact-bar { padding-inline: 14px; } }
-.listing-views { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
-.listing-views svg { flex-shrink: 0; margin-top: 2px; }
-.listing-views small { display: block; font-size: 12px; }
 
 /* Help button: smaller, light and round, so it is not mistaken for the owner's WhatsApp. */
 .support-whatsapp-floating { min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--surface); color: var(--foreground); border: 1px solid var(--line); font-size: 13px; }
