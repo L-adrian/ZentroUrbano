@@ -239,6 +239,22 @@ test("writing monoambiente finds the same homes as the Monoambiente type", () =>
   assert.ok(homes.filter(isMonoambiente).every((property) => byType.includes(property.slug)));
 });
 
+test("several home types can be checked at once and travel in the link", () => {
+  const homes = [...directRentalDemoProperties.map((property) => ({ ...property, isSeeded: false })), ...curatedRentalProperties];
+  const casas = slugs(searchRentals(homes, filters({ type: "Casa" }), "BOB"));
+  const departamentos = slugs(searchRentals(homes, filters({ type: "Departamento" }), "BOB"));
+  const both = slugs(searchRentals(homes, filters({ type: "Casa,Departamento" }), "BOB")).sort();
+  assert.ok(casas.length > 0 && departamentos.length > 0);
+  assert.deepEqual(both, [...new Set([...casas, ...departamentos])].sort());
+
+  const read = readRentalSearchParams(new URLSearchParams("type=Departamento,Casa,Oficina"));
+  assert.equal(read.type, "Casa,Departamento");
+  assert.equal(buildRentalSearchParams(read, "BOB").get("type"), "Casa,Departamento");
+  assert.equal(readRentalSearchParams(new URLSearchParams("type=Casa&type=Monoambiente")).type, "Casa,Monoambiente");
+  assert.equal(readRentalSearchParams(new URLSearchParams("type=Oficina")).type, "");
+  assert.equal(describeRentalFilter("type", read, "BOB"), "Casa o Departamento");
+});
+
 test("distances are straight-line and approximate", () => {
   assert.ok(Math.abs(distanceKm({ lat: -17, lng: -63 }, { lat: -18, lng: -63 }) - 111.2) < 0.2);
   assert.equal(formatApproxKm(1.234), "~1,2 km");

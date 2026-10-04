@@ -46,13 +46,16 @@ import {
   getActiveRentalFilters,
   getEntryBound,
   getPriceBounds,
+  getRentalTypes,
   getUnsupportedSearchIntent,
   readRentalSearchParams,
   rentalBathroomOptions,
   rentalBedroomOptions,
   rentalSearchParamKeys,
   rentalSortOptions,
+  rentalTypeOptions,
   searchRentals,
+  toRentalTypeFilter,
   understandRentalQuery,
   withoutRentalFilter,
   type GuaranteeFilter,
@@ -61,7 +64,7 @@ import {
   type RentalSearchFilters,
   type RentalSearchMatch,
   type RentalSort,
-  type RentalTypeFilter,
+  type RentalType,
 } from "@/lib/property-search";
 import type { Property } from "@/lib/properties";
 import { getRentalZones } from "@/lib/rentals";
@@ -105,14 +108,11 @@ export function DirectRentalExplorer({
   // Filters live in the URL, so going back from a listing or opening a shared link restores them.
   const [filters, setFilters] = useState<RentalSearchFilters>(() => readRentalSearchParams(searchParams, initialFilters));
   const deferredQuery = useDeferredValue(filters.query);
-  const [showAdvanced, setShowAdvanced] = useState(
-    Boolean(
-      filters.bedrooms || filters.bathrooms || filters.minPrice || filters.pets || filters.garage || filters.furnished ||
-        filters.guarantee || filters.includeExpenses || filters.maxEntry || filters.belowZoneAverage || filters.near,
-    ),
-  );
+  // Phones and tablets open the filter sidebar as a panel over the page.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState<ResultsView>(initialView);
-  const filterBarRef = useRef<HTMLDivElement>(null);
+  const filtersRef = useRef<HTMLElement>(null);
+  const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const displayCurrency = useCurrencyPreference();
   const zones = useMemo(() => {
     const available = getRentalZones(properties);
@@ -137,6 +137,7 @@ export function DirectRentalExplorer({
   const distancePlace = getKnownPlace(appliedFilters.near) ?? findPlaceInQuery(deferredQuery);
 
   const activeFilters = getActiveRentalFilters(filters);
+  const selectedTypes = getRentalTypes(filters.type);
   const relaxations = useMemo(() => {
     if (matches.length > 0) return [];
     return getActiveRentalFilters(appliedFilters)
@@ -223,6 +224,23 @@ export function DirectRentalExplorer({
     return () => window.clearTimeout(timer);
   }, [emptySearch, serializedFilters]);
 
+  // The open filter panel takes the focus, closes with Escape and gives the focus back to "Filtros".
+  useEffect(() => {
+    if (!filtersOpen) return;
+    const button = filtersButtonRef.current;
+    filtersRef.current?.querySelector<HTMLElement>(".catalog-sidebar-close")?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFiltersOpen(false);
+    };
+    document.addEventListener("keydown", closeOnEscape);
+    document.documentElement.classList.add("catalog-filters-open");
+    return () => {
+      document.removeEventListener("keydown", closeOnEscape);
+      document.documentElement.classList.remove("catalog-filters-open");
+      if (button?.offsetParent) button.focus();
+    };
+  }, [filtersOpen]);
+
   function updateFilter<Key extends keyof RentalSearchFilters>(key: Key, value: RentalSearchFilters[Key]) {
     setFilters((current) => {
       const next = { ...current, [key]: value };
@@ -248,9 +266,13 @@ export function DirectRentalExplorer({
     setFilters((current) => ({ ...emptyRentalSearchFilters, sort: current.sort === "cercania" ? "" : current.sort }));
   }
 
-  function openFilters() {
-    setShowAdvanced(true);
-    filterBarRef.current?.scrollIntoView({ block: "start" });
+  function toggleType(type: RentalType, checked: boolean) {
+    setFilters((current) => {
+      const types = new Set<string>(getRentalTypes(current.type));
+      if (checked) types.add(type);
+      else types.delete(type);
+      return { ...current, type: toRentalTypeFilter(types) };
+    });
   }
 
   function searchArea(area: MapArea) {
@@ -305,103 +327,118 @@ export function DirectRentalExplorer({
 
   return (
     <div className={`zu-explorer${mapLayout ? " is-map-layout" : ""}`}>
-      <div ref={filterBarRef} className="catalog-filter-bar z-[40] border-y border-neutral-200 bg-white lg:sticky lg:top-[76px]">
-        <div className="mx-auto max-w-[1500px] px-4 py-3 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-2 md:grid-cols-[minmax(220px,1.5fr)_minmax(120px,0.7fr)_minmax(120px,0.65fr)_minmax(100px,0.55fr)_auto]">
-            <label className="relative col-span-2 block md:col-span-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
-              <input
-                value={filters.query}
-                onChange={(event) => updateFilter("query", event.target.value)}
-                type="search"
-                aria-label="Buscar alquiler por zona o características"
-                aria-describedby={understanding.chips.length || understanding.unused.length ? "search-understood" : undefined}
-                placeholder="Zona, avenida o característica"
-                className="h-11 w-full border border-neutral-300 bg-white pl-10 pr-3 text-sm font-medium outline-none focus:border-[#176b4d]"
-              />
-            </label>
-
-            <FilterSelect label="Zona" value={filters.zone} onChange={(value) => updateFilter("zone", value)}>
-              <option value="">Todas las zonas</option>
-              {zones.map((item) => (
-                <option key={item} value={item}>{item}</option>
-              ))}
-            </FilterSelect>
-
-            <FilterSelect
-              label="Tipo"
-              value={filters.type}
-              onChange={(value) => updateFilter("type", value as RentalTypeFilter)}
-            >
-              <option value="">Cualquier tipo</option>
-              <option value="Casa">Casa</option>
-              <option value="Departamento">Departamento</option>
-              <option value="Monoambiente">Monoambiente</option>
-            </FilterSelect>
-
-            <label className="relative block">
-              <span className="sr-only">Precio máximo por mes</span>
-              <input
-                value={filters.maxPrice}
-                onChange={(event) => updateFilter("maxPrice", event.target.value)}
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                aria-describedby="rental-price-hint"
-                placeholder={`Máx. ${priceLabel}`}
-                className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
-              />
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setShowAdvanced((current) => !current)}
-              aria-expanded={showAdvanced}
-              aria-controls="rental-advanced-filters"
-              className="inline-flex h-11 cursor-pointer items-center justify-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
-            >
-              <SlidersHorizontal className="h-4 w-4 shrink-0" aria-hidden="true" />
-              Filtros
-              {activeFilters.length > 0 ? <FilterCount count={activeFilters.length} /> : null}
+      {filtersOpen ? <button type="button" className="catalog-filters-backdrop" aria-label="Cerrar filtros" tabIndex={-1} onClick={() => setFiltersOpen(false)} /> : null}
+      <div className="catalog-layout mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
+        <aside
+          id="rental-filters"
+          ref={filtersRef}
+          className={`catalog-sidebar${filtersOpen ? " is-open" : ""}`}
+          aria-label="Filtros"
+          role={filtersOpen ? "dialog" : undefined}
+          aria-modal={filtersOpen || undefined}
+        >
+          <div className="catalog-sidebar-head">
+            <h2>Filtros</h2>
+            {activeFilters.length > 0 ? (
+              <button type="button" onClick={clearFilters} className="catalog-sidebar-clear">Limpiar</button>
+            ) : null}
+            <button type="button" onClick={() => setFiltersOpen(false)} className="catalog-sidebar-close" aria-label="Cerrar filtros">
+              <X aria-hidden="true" />
             </button>
           </div>
 
-          {showAdvanced ? (
-            <div id="rental-advanced-filters" className="catalog-advanced mt-3 border-t border-neutral-200 pt-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <FilterSelect label="Dormitorios" value={filters.bedrooms} onChange={(value) => updateFilter("bedrooms", value)} compact>
+          <div className="catalog-sidebar-body">
+            <FilterGroup title="¿Qué estás buscando?">
+              {rentalTypeOptions.map((option) => (
+                <FilterCheckbox
+                  key={option}
+                  label={option}
+                  checked={selectedTypes.includes(option)}
+                  onChange={(checked) => toggleType(option, checked)}
+                />
+              ))}
+            </FilterGroup>
+
+            <FilterGroup title="Zona">
+              <FilterSelect label="Zona" value={filters.zone} onChange={(value) => updateFilter("zone", value)}>
+                <option value="">Todas las zonas</option>
+                {zones.map((item) => (
+                  <option key={item} value={item}>{item}</option>
+                ))}
+              </FilterSelect>
+            </FilterGroup>
+
+            <FilterGroup title="Precio por mes">
+              <div className="catalog-filter-pair">
+                <label className="block min-w-0">
+                  <span className="sr-only">Precio mínimo por mes</span>
+                  <input
+                    value={filters.minPrice}
+                    onChange={(event) => updateFilter("minPrice", event.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    aria-describedby="rental-price-hint"
+                    placeholder={`Mín. ${priceLabel}`}
+                    className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
+                  />
+                </label>
+                <label className="block min-w-0">
+                  <span className="sr-only">Precio máximo por mes</span>
+                  <input
+                    value={filters.maxPrice}
+                    onChange={(event) => updateFilter("maxPrice", event.target.value)}
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    aria-describedby="rental-price-hint"
+                    placeholder={`Máx. ${priceLabel}`}
+                    className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
+                  />
+                </label>
+              </div>
+              <FilterCheckbox
+                label="Incluir expensas en el presupuesto"
+                icon={<Receipt />}
+                checked={filters.includeExpenses}
+                onChange={(checked) => updateFilter("includeExpenses", checked)}
+              />
+              <FilterCheckbox
+                label="Bajo el promedio de la zona"
+                icon={<TrendingDown />}
+                checked={filters.belowZoneAverage}
+                onChange={(checked) => updateFilter("belowZoneAverage", checked)}
+              />
+            </FilterGroup>
+
+            <FilterGroup title="Comodidades">
+              <FilterCheckbox label="Acepta mascotas" icon={<PawPrint />} checked={filters.pets} onChange={(checked) => updateFilter("pets", checked)} />
+              <FilterCheckbox label="Con parqueo" icon={<Car />} checked={filters.garage} onChange={(checked) => updateFilter("garage", checked)} />
+              <FilterCheckbox label="Amoblado" icon={<Sofa />} checked={filters.furnished} onChange={(checked) => updateFilter("furnished", checked)} />
+            </FilterGroup>
+
+            <FilterGroup title="Dormitorios y baños">
+              <div className="catalog-filter-pair">
+                <FilterSelect label="Dormitorios" value={filters.bedrooms} onChange={(value) => updateFilter("bedrooms", value)}>
                   <option value="">Dormitorios</option>
                   {rentalBedroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
                 </FilterSelect>
-                <FilterSelect label="Baños" value={filters.bathrooms} onChange={(value) => updateFilter("bathrooms", value)} compact>
+                <FilterSelect label="Baños" value={filters.bathrooms} onChange={(value) => updateFilter("bathrooms", value)}>
                   <option value="">Baños</option>
                   {rentalBathroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
                 </FilterSelect>
-                <label className="sr-only" htmlFor="min-rental-price">Precio mínimo por mes</label>
-                <input
-                  id="min-rental-price"
-                  value={filters.minPrice}
-                  onChange={(event) => updateFilter("minPrice", event.target.value)}
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="off"
-                  aria-describedby="rental-price-hint"
-                  placeholder={`Mín. ${priceLabel}`}
-                  className="h-10 w-36 border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
-                />
-                <FilterToggle active={filters.pets} label="Acepta mascotas" icon={<PawPrint className="h-4 w-4" />} onClick={() => updateFilter("pets", !filters.pets)} />
-                <FilterToggle active={filters.garage} label="Con parqueo" icon={<Car className="h-4 w-4" />} onClick={() => updateFilter("garage", !filters.garage)} />
-                <FilterToggle active={filters.furnished} label="Amoblado" icon={<Sofa className="h-4 w-4" />} onClick={() => updateFilter("furnished", !filters.furnished)} />
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <FilterSelect label="Garantía" value={filters.guarantee} onChange={(value) => updateFilter("guarantee", value as GuaranteeFilter)} compact>
-                  <option value="">Garantía: cualquiera</option>
-                  <option value="sin">Sin garantía</option>
-                  <option value="hasta-1-mes">Garantía hasta 1 mes</option>
-                </FilterSelect>
-                <label className="sr-only" htmlFor="max-rental-entry">Para entrar, hasta (primer mes, expensas y garantía)</label>
+            </FilterGroup>
+
+            <FilterGroup title="Para entrar">
+              <FilterSelect label="Garantía" value={filters.guarantee} onChange={(value) => updateFilter("guarantee", value as GuaranteeFilter)}>
+                <option value="">Garantía: cualquiera</option>
+                <option value="sin">Sin garantía</option>
+                <option value="hasta-1-mes">Garantía hasta 1 mes</option>
+              </FilterSelect>
+              <label className="block">
+                <span className="sr-only">Para entrar, hasta (primer mes, expensas y garantía)</span>
                 <input
-                  id="max-rental-entry"
                   value={filters.maxEntry}
                   onChange={(event) => updateFilter("maxEntry", event.target.value)}
                   type="text"
@@ -409,282 +446,290 @@ export function DirectRentalExplorer({
                   autoComplete="off"
                   aria-describedby="rental-price-hint"
                   placeholder={`Para entrar, hasta ${priceLabel}`}
-                  className="h-10 w-52 border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
+                  className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
                 />
-                <FilterToggle
-                  active={filters.includeExpenses}
-                  label="Incluir expensas en el presupuesto"
-                  icon={<Receipt className="h-4 w-4" />}
-                  onClick={() => updateFilter("includeExpenses", !filters.includeExpenses)}
-                />
-                <FilterToggle
-                  active={filters.belowZoneAverage}
-                  label="Bajo el promedio de la zona"
-                  icon={<TrendingDown className="h-4 w-4" />}
-                  onClick={() => updateFilter("belowZoneAverage", !filters.belowZoneAverage)}
-                />
-                {knownPlaces.length > 0 ? (
-                  <FilterSelect label="Cerca de" value={filters.near} onChange={selectPlace} compact>
-                    <option value="">Cerca de…</option>
-                    {knownPlaces.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
-                  </FilterSelect>
-                ) : null}
-                {activeFilters.length > 0 ? (
-                  <button
-                    type="button"
-                    onClick={clearFilters}
-                    className="inline-flex h-10 cursor-pointer items-center gap-1.5 px-2 text-sm font-semibold text-neutral-600 hover:text-neutral-950"
-                  >
-                    <X className="h-4 w-4" aria-hidden="true" />
-                    Limpiar
-                  </button>
-                ) : null}
-              </div>
-              <p className="catalog-advanced-note">
-                Lo que el dueño no indicó (garantía, expensas o costo para entrar) sale al final como “pendiente de consulta”.
-                El promedio de la zona se calcula solo en zonas con {zoneAverageMinListings} o más anuncios.
-              </p>
+              </label>
+            </FilterGroup>
+
+            {knownPlaces.length > 0 ? (
+              <FilterGroup title="Cerca de">
+                <FilterSelect label="Cerca de" value={filters.near} onChange={selectPlace}>
+                  <option value="">Cualquier lugar</option>
+                  {knownPlaces.map((place) => <option key={place.id} value={place.id}>{place.name}</option>)}
+                </FilterSelect>
+              </FilterGroup>
+            ) : null}
+
+            <p className="catalog-advanced-note">
+              Lo que el dueño no indicó (garantía, expensas o costo para entrar) sale al final como “pendiente de consulta”.
+              El promedio de la zona se calcula solo en zonas con {zoneAverageMinListings} o más anuncios.
+            </p>
+          </div>
+
+          <div className="catalog-sidebar-foot">
+            <button type="button" onClick={() => setFiltersOpen(false)} className="zu-button zu-button-primary">
+              Ver {countLabel}
+            </button>
+          </div>
+        </aside>
+
+        <div className="catalog-main">
+          <label className="catalog-search relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+            <input
+              value={filters.query}
+              onChange={(event) => updateFilter("query", event.target.value)}
+              type="search"
+              aria-label="Buscar alquiler por zona o características"
+              aria-describedby={understanding.chips.length || understanding.unused.length ? "search-understood" : undefined}
+              placeholder="Zona, avenida o característica"
+              className="h-11 w-full border border-neutral-300 bg-white pl-10 pr-3 text-sm font-medium outline-none focus:border-[#176b4d]"
+            />
+          </label>
+
+          {understanding.chips.length > 0 || understanding.unused.length > 0 ? (
+            <div id="search-understood" className="search-understood">
+              {understanding.chips.length > 0 ? (
+                <>
+                  <span className="search-understood-label">Entendimos:</span>
+                  {understanding.chips.map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      className="catalog-chip"
+                      onClick={() => updateFilter("query", chip.query)}
+                      aria-label={`Quitar ${chip.label} de la búsqueda`}
+                    >
+                      {chip.label}
+                      <X aria-hidden="true" />
+                    </button>
+                  ))}
+                </>
+              ) : null}
+              {understanding.unused.length > 0 ? (
+                <span className="search-unused">
+                  No usamos: {understanding.unused.map((word) => `“${shorten(word, 24)}”`).join(", ")}
+                </span>
+              ) : null}
             </div>
           ) : null}
-        </div>
-      </div>
 
-      <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-        {understanding.chips.length > 0 || understanding.unused.length > 0 ? (
-          <div id="search-understood" className="search-understood">
-            {understanding.chips.length > 0 ? (
-              <>
-                <span className="search-understood-label">Entendimos:</span>
-                {understanding.chips.map((chip) => (
-                  <button
-                    key={chip.key}
-                    type="button"
-                    className="catalog-chip"
-                    onClick={() => updateFilter("query", chip.query)}
-                    aria-label={`Quitar ${chip.label} de la búsqueda`}
-                  >
-                    {chip.label}
-                    <X aria-hidden="true" />
-                  </button>
-                ))}
-              </>
-            ) : null}
-            {understanding.unused.length > 0 ? (
-              <span className="search-unused">
-                No usamos: {understanding.unused.map((word) => `“${shorten(word, 24)}”`).join(", ")}
-              </span>
-            ) : null}
+          <div className="catalog-results-bar">
+            <p className="catalog-count" aria-live="polite" aria-atomic="true">{countLabel}</p>
+            <SortControl
+              id="rental-sort"
+              className="catalog-sort is-inline"
+              value={filters.sort}
+              placeName={distancePlace?.name}
+              onChange={(value) => updateFilter("sort", value)}
+            />
+            <div className="catalog-phone-actions">
+              <button
+                ref={filtersButtonRef}
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                aria-expanded={filtersOpen}
+                aria-controls="rental-filters"
+                className="catalog-phone-button"
+              >
+                <SlidersHorizontal aria-hidden="true" />
+                Filtros
+                {activeFilters.length > 0 ? <FilterCount count={activeFilters.length} /> : null}
+              </button>
+              <div className="catalog-view-toggle" role="group" aria-label="Ver resultados como">
+                <ViewButton active={view === "list"} label="Lista" icon={<List />} onClick={() => setView("list")} />
+                <ViewButton active={view === "map"} label="Mapa" icon={<MapIcon />} onClick={() => setView("map")} />
+              </div>
+            </div>
           </div>
-        ) : null}
-
-        <div className="catalog-results-bar">
-          <p className="catalog-count" aria-live="polite" aria-atomic="true">{countLabel}</p>
           <SortControl
-            id="rental-sort"
-            className="catalog-sort is-inline"
+            id="rental-sort-phone"
+            className="catalog-sort is-below"
             value={filters.sort}
             placeName={distancePlace?.name}
             onChange={(value) => updateFilter("sort", value)}
           />
-          <div className="catalog-phone-actions">
-            <button type="button" onClick={openFilters} className="catalog-phone-button">
-              <SlidersHorizontal aria-hidden="true" />
-              Filtros
-              {activeFilters.length > 0 ? <FilterCount count={activeFilters.length} /> : null}
-            </button>
-            <div className="catalog-view-toggle" role="group" aria-label="Ver resultados como">
-              <ViewButton active={view === "list"} label="Lista" icon={<List />} onClick={() => setView("list")} />
-              <ViewButton active={view === "map"} label="Mapa" icon={<MapIcon />} onClick={() => setView("map")} />
-            </div>
-          </div>
-        </div>
-        <SortControl
-          id="rental-sort-phone"
-          className="catalog-sort is-below"
-          value={filters.sort}
-          placeName={distancePlace?.name}
-          onChange={(value) => updateFilter("sort", value)}
-        />
 
-        <p className="mt-1 text-sm text-neutral-500">{subline}</p>
-        <p id="rental-price-hint" className="mt-1 text-sm" aria-live="polite">
-          {unreadablePrice ? (
-            <span className="text-[#a12d1c] dark:text-[#ff9c8a]">No entendimos “{shorten(unreadablePrice, 24)}”. Escribe solo el monto, por ejemplo 3.000.</span>
-          ) : moneyHint ? (
-            <span className="font-semibold text-[#10533b]">{capitalize(moneyHint)}</span>
-          ) : null}
-        </p>
-        {zoneAverageNote ? <p className="catalog-average-note">{zoneAverageNote}</p> : null}
-
-        {activeFilters.length > 0 ? (
-          <div className="catalog-chips" role="group" aria-label="Filtros activos">
-            {activeFilters.map((key) => {
-              const label = describeRentalFilter(key, filters, displayCurrency);
-              return (
-                <button key={key} type="button" className="catalog-chip" onClick={() => removeFilter(key)} aria-label={`Quitar filtro: ${label}`}>
-                  {label}
-                  <X aria-hidden="true" />
-                </button>
-              );
-            })}
-            <button type="button" className="catalog-chip-clear" onClick={clearFilters}>Limpiar todo</button>
-          </div>
-        ) : null}
-
-        <div className="catalog-share-row">
-          {activeFilters.length > 0 ? (
-            <SearchShareActions
-              url={shareUrl}
-              message={`Mira estos alquileres en Zentro Urbano${searchSummary ? `: ${searchSummary}` : ""}`}
-            />
-          ) : null}
-          <SavedListingsLink className="saved-listings-link" />
-        </div>
-
-        {unsupportedIntent ? (
-          <p className="mb-4 flex gap-2 border border-[#f0d49a] bg-[#fff8e8] p-3 text-sm text-[#5c3b00]" role="note">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>
-              Por ahora Zentro Urbano solo publica alquileres mensuales de casas, departamentos y monoambientes. {unsupportedSearchCopy[unsupportedIntent]}
-            </span>
+          <p className="mt-1 text-sm text-neutral-500">{subline}</p>
+          <p id="rental-price-hint" className="mt-1 text-sm" aria-live="polite">
+            {unreadablePrice ? (
+              <span className="text-[#a12d1c] dark:text-[#ff9c8a]">No entendimos “{shorten(unreadablePrice, 24)}”. Escribe solo el monto, por ejemplo 3.000.</span>
+            ) : moneyHint ? (
+              <span className="font-semibold text-[#10533b]">{capitalize(moneyHint)}</span>
+            ) : null}
           </p>
-        ) : null}
+          {zoneAverageNote ? <p className="catalog-average-note">{zoneAverageNote}</p> : null}
 
-        <div
-          data-results
-          aria-busy={filters.query !== deferredQuery}
-          className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid lg:grid lg:gap-5`}
-        >
-          <div className={view === "map" ? "hidden lg:block" : "block"}>
-            {results.length > 0 ? (
-              <>
-                {mainMatches.length > 0 ? (
-                  <div className="catalog-card-grid grid gap-4 sm:grid-cols-2">
-                    {mainMatches.map((match, index) => (
-                      <PropertyCard key={match.property.slug} property={match.property} eagerImage={index < 4} notes={cardNotes(match)} />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
-                    {onlyPetsPending
-                      ? "Ningún anuncio con esta búsqueda confirma todavía que acepta mascotas."
-                      : "Ningún anuncio con esta búsqueda tiene todos los datos que pides. Mira abajo los que están pendientes de consulta."}
-                  </p>
-                )}
-                {pendingMatches.length > 0 ? (
-                  <section className="mt-8" aria-labelledby="pending-heading">
-                    <h2 id="pending-heading" className="flex items-center gap-2 text-base font-semibold text-neutral-950">
-                      {onlyPetsPending ? <PawPrint className="h-4 w-4" aria-hidden="true" /> : <Info className="h-4 w-4" aria-hidden="true" />}
-                      {onlyPetsPending ? "Mascotas: a consultar" : "Pendiente de consulta"}
-                    </h2>
-                    <p className="mt-1 text-sm text-neutral-600">
-                      {onlyPetsPending
-                        ? "El propietario no indicó si acepta mascotas. Pregúntale antes de visitar."
-                        : "El propietario no indicó alguno de estos datos. Pregúntale antes de visitar."}
-                    </p>
-                    <div className="catalog-card-grid mt-4 grid gap-4 sm:grid-cols-2">
-                      {pendingMatches.map((match, index) => (
-                        <PropertyCard
-                          key={match.property.slug}
-                          property={match.property}
-                          pending={match.pending.map((reason) => pendingLabels[reason])}
-                          notes={cardNotes(match)}
-                          eagerImage={mainMatches.length === 0 && index < 4}
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ) : null}
-              </>
-            ) : (
-              <div className="border border-neutral-300 bg-neutral-50 p-6 text-center sm:p-8">
-                <Search className="mx-auto h-6 w-6 text-neutral-400" aria-hidden="true" />
-                <h2 className="mt-3 text-lg font-semibold">
-                  {activeFilters.length > 0 ? "No hay alquileres con esta búsqueda" : "Todavía no hay alquileres publicados aquí"}
-                </h2>
-                {relaxations.length > 0 ? (
-                  <>
-                    <p className="mt-1 text-sm text-neutral-600">Prueba quitando un filtro:</p>
-                    <div className="mt-4 flex flex-wrap justify-center gap-2">
-                      {relaxations.map(({ key, label, count }) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => removeFilter(key)}
-                          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
-                        >
-                          <X className="h-4 w-4 shrink-0" aria-hidden="true" />
-                          {label} ({count} {count === 1 ? "resultado" : "resultados"})
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : activeFilters.length > 1 ? (
-                  <p className="mt-1 text-sm text-neutral-600">Quitar un solo filtro no alcanza. Prueba limpiar la búsqueda.</p>
-                ) : null}
-                <div className="mt-4 flex flex-col items-center gap-3">
-                  {activeFilters.length > 0 ? (
-                    <button type="button" onClick={clearFilters} className="min-h-11 cursor-pointer px-3 text-sm font-semibold text-[#176b4d] hover:underline">
-                      Limpiar todos los filtros ({properties.length} {properties.length === 1 ? "alquiler" : "alquileres"})
-                    </button>
-                  ) : null}
-                  <SearchAlertButton
-                    params={alertParams}
-                    summary={searchSummary}
-                    whatsappHref={whatsappUrl(alertMessage)}
-                    className="zu-button zu-button-primary"
-                  />
-                  <p className="text-xs text-neutral-500">
-                    Guardamos tu búsqueda y te escribimos cuando se publique una así. Si prefieres,{" "}
-                    <a href={whatsappUrl(alertMessage)} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
-                      envíanos tu búsqueda por WhatsApp
-                    </a>
-                    .
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className={`${view === "list" ? "hidden lg:block" : "block"} catalog-map-column lg:sticky lg:top-[9.25rem] lg:self-start`}>
-            {results.length > 0 ? (
-              <PropertyMap
-                properties={results}
-                sectionClassName="h-full bg-white"
-                containerClassName="h-full"
-                headerClassName="hidden"
-                mapClassName="rental-results-map relative min-h-[70svh] w-full overflow-hidden border border-neutral-300 bg-[#e9ece3] lg:min-h-[calc(100svh-11rem)]"
-                showZoneShortcuts={false}
-                loadOnView
-                onSearchArea={searchArea}
-                preserveView={Boolean(filters.area)}
-              />
-            ) : (
-              <div className="flex min-h-[55svh] items-center justify-center border border-neutral-300 bg-neutral-50 p-6 text-center text-sm text-neutral-500">
-                El mapa se actualizará cuando existan resultados.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {nearby.length > 0 ? (
-          <section className="catalog-nearby" aria-labelledby="nearby-heading">
-            <h2 id="nearby-heading">Cerca de {appliedFilters.zone}</h2>
-            <p>Viviendas de zonas vecinas que también cumplen tu búsqueda. Distancias aproximadas, en línea recta.</p>
-            <div className="catalog-card-grid mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {nearby.map(({ property, distanceKm }) => (
-                <PropertyCard
-                  key={property.slug}
-                  property={property}
-                  notes={[capitalize(formatApproxDistance(distanceKm, appliedFilters.zone) ?? "")].filter(Boolean)}
-                  contactSource="cercanos"
-                />
-              ))}
+          {activeFilters.length > 0 ? (
+            <div className="catalog-chips" role="group" aria-label="Filtros activos">
+              {activeFilters.map((key) => {
+                const label = describeRentalFilter(key, filters, displayCurrency);
+                return (
+                  <button key={key} type="button" className="catalog-chip" onClick={() => removeFilter(key)} aria-label={`Quitar filtro: ${label}`}>
+                    {label}
+                    <X aria-hidden="true" />
+                  </button>
+                );
+              })}
+              <button type="button" className="catalog-chip-clear" onClick={clearFilters}>Limpiar todo</button>
             </div>
-          </section>
-        ) : null}
+          ) : null}
 
-        <RecentlyViewed properties={properties} />
+          <div className="catalog-share-row">
+            {activeFilters.length > 0 ? (
+              <SearchShareActions
+                url={shareUrl}
+                message={`Mira estos alquileres en Zentro Urbano${searchSummary ? `: ${searchSummary}` : ""}`}
+              />
+            ) : null}
+            <SavedListingsLink className="saved-listings-link" />
+          </div>
+
+          {unsupportedIntent ? (
+            <p className="mb-4 flex gap-2 border border-[#f0d49a] bg-[#fff8e8] p-3 text-sm text-[#5c3b00]" role="note">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <span>
+                Por ahora Zentro Urbano solo publica alquileres mensuales de casas, departamentos y monoambientes. {unsupportedSearchCopy[unsupportedIntent]}
+              </span>
+            </p>
+          ) : null}
+
+          <div
+            data-results
+            aria-busy={filters.query !== deferredQuery}
+            className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid`}
+          >
+            <div className={view === "map" ? "hidden" : "block"}>
+              {results.length > 0 ? (
+                <>
+                  {mainMatches.length > 0 ? (
+                    <div className="catalog-card-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {mainMatches.map((match, index) => (
+                        <PropertyCard key={match.property.slug} property={match.property} eagerImage={index < 4} notes={cardNotes(match)} />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
+                      {onlyPetsPending
+                        ? "Ningún anuncio con esta búsqueda confirma todavía que acepta mascotas."
+                        : "Ningún anuncio con esta búsqueda tiene todos los datos que pides. Mira abajo los que están pendientes de consulta."}
+                    </p>
+                  )}
+                  {pendingMatches.length > 0 ? (
+                    <section className="mt-8" aria-labelledby="pending-heading">
+                      <h2 id="pending-heading" className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+                        {onlyPetsPending ? <PawPrint className="h-4 w-4" aria-hidden="true" /> : <Info className="h-4 w-4" aria-hidden="true" />}
+                        {onlyPetsPending ? "Mascotas: a consultar" : "Pendiente de consulta"}
+                      </h2>
+                      <p className="mt-1 text-sm text-neutral-600">
+                        {onlyPetsPending
+                          ? "El propietario no indicó si acepta mascotas. Pregúntale antes de visitar."
+                          : "El propietario no indicó alguno de estos datos. Pregúntale antes de visitar."}
+                      </p>
+                      <div className="catalog-card-grid mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        {pendingMatches.map((match, index) => (
+                          <PropertyCard
+                            key={match.property.slug}
+                            property={match.property}
+                            pending={match.pending.map((reason) => pendingLabels[reason])}
+                            notes={cardNotes(match)}
+                            eagerImage={mainMatches.length === 0 && index < 4}
+                          />
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </>
+              ) : (
+                <div className="border border-neutral-300 bg-neutral-50 p-6 text-center sm:p-8">
+                  <Search className="mx-auto h-6 w-6 text-neutral-400" aria-hidden="true" />
+                  <h2 className="mt-3 text-lg font-semibold">
+                    {activeFilters.length > 0 ? "No hay alquileres con esta búsqueda" : "Todavía no hay alquileres publicados aquí"}
+                  </h2>
+                  {relaxations.length > 0 ? (
+                    <>
+                      <p className="mt-1 text-sm text-neutral-600">Prueba quitando un filtro:</p>
+                      <div className="mt-4 flex flex-wrap justify-center gap-2">
+                        {relaxations.map(({ key, label, count }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => removeFilter(key)}
+                            className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
+                          >
+                            <X className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            {label} ({count} {count === 1 ? "resultado" : "resultados"})
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  ) : activeFilters.length > 1 ? (
+                    <p className="mt-1 text-sm text-neutral-600">Quitar un solo filtro no alcanza. Prueba limpiar la búsqueda.</p>
+                  ) : null}
+                  <div className="mt-4 flex flex-col items-center gap-3">
+                    {activeFilters.length > 0 ? (
+                      <button type="button" onClick={clearFilters} className="min-h-11 cursor-pointer px-3 text-sm font-semibold text-[#176b4d] hover:underline">
+                        Limpiar todos los filtros ({properties.length} {properties.length === 1 ? "alquiler" : "alquileres"})
+                      </button>
+                    ) : null}
+                    <SearchAlertButton
+                      params={alertParams}
+                      summary={searchSummary}
+                      whatsappHref={whatsappUrl(alertMessage)}
+                      className="zu-button zu-button-primary"
+                    />
+                    <p className="text-xs text-neutral-500">
+                      Guardamos tu búsqueda y te escribimos cuando se publique una así. Si prefieres,{" "}
+                      <a href={whatsappUrl(alertMessage)} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                        envíanos tu búsqueda por WhatsApp
+                      </a>
+                      .
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className={`${view === "list" ? "hidden" : "block"} catalog-map-column`}>
+              {results.length > 0 ? (
+                <PropertyMap
+                  properties={results}
+                  sectionClassName="h-full bg-white"
+                  containerClassName="h-full"
+                  headerClassName="hidden"
+                  mapClassName="rental-results-map relative min-h-[70svh] w-full overflow-hidden border border-neutral-300 bg-[#e9ece3] lg:min-h-[calc(100svh-11rem)]"
+                  showZoneShortcuts={false}
+                  loadOnView
+                  onSearchArea={searchArea}
+                  preserveView={Boolean(filters.area)}
+                />
+              ) : (
+                <div className="flex min-h-[55svh] items-center justify-center border border-neutral-300 bg-neutral-50 p-6 text-center text-sm text-neutral-500">
+                  El mapa se actualizará cuando existan resultados.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {nearby.length > 0 ? (
+            <section className="catalog-nearby" aria-labelledby="nearby-heading">
+              <h2 id="nearby-heading">Cerca de {appliedFilters.zone}</h2>
+              <p>Viviendas de zonas vecinas que también cumplen tu búsqueda. Distancias aproximadas, en línea recta.</p>
+              <div className="catalog-card-grid mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {nearby.map(({ property, distanceKm }) => (
+                  <PropertyCard
+                    key={property.slug}
+                    property={property}
+                    notes={[capitalize(formatApproxDistance(distanceKm, appliedFilters.zone) ?? "")].filter(Boolean)}
+                    contactSource="cercanos"
+                  />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <RecentlyViewed properties={properties} />
+        </div>
       </div>
     </div>
   );
@@ -810,31 +855,32 @@ function FilterSelect({
   );
 }
 
-function FilterToggle({
-  active,
+function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <fieldset className="catalog-filter-group">
+      <legend>{title}</legend>
+      {children}
+    </fieldset>
+  );
+}
+
+function FilterCheckbox({
   label,
   icon,
-  onClick,
+  checked,
+  onChange,
 }: {
-  active: boolean;
   label: string;
-  icon: React.ReactNode;
-  onClick: () => void;
+  icon?: React.ReactNode;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`inline-flex h-10 cursor-pointer items-center gap-2 border px-3 text-sm font-semibold ${
-        active
-          ? "border-[#176b4d] bg-[#edf7f2] text-[#10533b]"
-          : "border-neutral-300 bg-white text-neutral-700 hover:border-neutral-950"
-      }`}
-    >
-      <span aria-hidden="true" className="shrink-0">{icon}</span>
-      {label}
-    </button>
+    <label className="catalog-check">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      {icon ? <span aria-hidden="true" className="catalog-check-icon">{icon}</span> : null}
+      <span>{label}</span>
+    </label>
   );
 }
 

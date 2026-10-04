@@ -837,7 +837,19 @@ function levenshteinDistance(source: string, target: string, maxDistance: number
 
 // Catalog filters: shared by the catalog, the home search and the links people share.
 
-export type RentalTypeFilter = "" | "Casa" | "Departamento" | "Monoambiente";
+export const rentalTypeOptions = ["Casa", "Departamento", "Monoambiente"] as const;
+export type RentalType = (typeof rentalTypeOptions)[number];
+// "" means any type; several types travel joined by commas ("Casa,Departamento"), always in this order.
+export type RentalTypeFilter = string;
+
+export function getRentalTypes(filter: string): RentalType[] {
+  const picked = new Set(filter.split(",").map((item) => item.trim()));
+  return rentalTypeOptions.filter((type) => picked.has(type));
+}
+
+export function toRentalTypeFilter(types: Iterable<string>): RentalTypeFilter {
+  return getRentalTypes([...types].join(",")).join(",");
+}
 export type PetsPolicy = "allowed" | "consult" | "not_allowed";
 export type PriceBound = { amount: number; currency: DisplayCurrency };
 export type GuaranteeFilter = "" | "sin" | "hasta-1-mes";
@@ -1027,7 +1039,7 @@ export function readRentalSearchParams(
     const value = params.get(key);
     return value === null ? null : value.trim().slice(0, max);
   };
-  const typeParam = text("type", 20);
+  const typeParams = params.getAll("type");
   const bedroomsParam = text("bedrooms", 20);
   const amenityParams = params.getAll("amenity");
   const amenities = new Set(amenityParams.flatMap((value) => value.split(",").map((item) => item.trim())));
@@ -1041,8 +1053,8 @@ export function readRentalSearchParams(
   const sortParam = text("orden", 20);
 
   let type = base.type;
-  if (typeParam === "Monoambiente" || bedroomsParam === "Monoambiente") type = "Monoambiente";
-  else if (typeParam !== null) type = typeParam === "Casa" || typeParam === "Departamento" ? typeParam : "";
+  if (bedroomsParam === "Monoambiente") type = "Monoambiente";
+  else if (typeParams.length) type = toRentalTypeFilter(typeParams.join(",").slice(0, 80).split(","));
 
   return {
     query: text("q", 120) ?? base.query,
@@ -1157,6 +1169,7 @@ export function searchRentals(
 ): RentalSearchMatch[] {
   const places = options.places ?? knownPlaces;
   const parsed = parseSearchQuery(filters.query, { currency: displayCurrency, places });
+  const types = getRentalTypes(filters.type);
   const hasQuery = parsed.meaningfulTokens.length > 0;
   if (hasQuery) markIgnoredTokens(parsed, properties);
   const { min, max } = getPriceBounds(filters, displayCurrency);
@@ -1177,7 +1190,7 @@ export function searchRentals(
 
     if (hasQuery && !evaluation.matches) return [];
     if (filters.zone && property.zone !== filters.zone) return [];
-    if (filters.type && (filters.type === "Monoambiente" ? !isMonoambiente(property) : property.type !== filters.type)) return [];
+    if (types.length && !types.some((type) => (type === "Monoambiente" ? isMonoambiente(property) : property.type === type))) return [];
 
     const monthly = filters.includeExpenses ? getMonthlyCost(property) : property.price;
     if (min || max) {
@@ -1274,7 +1287,7 @@ export function describeRentalFilter(
     case "zone":
       return `Zona: ${filters.zone}`;
     case "type":
-      return filters.type;
+      return getRentalTypes(filters.type).join(" o ");
     case "minPrice":
       return min ? `Desde ${formatPriceBound(min)}` : `Mín.: “${shortenText(filters.minPrice.trim(), 16)}”`;
     case "maxPrice":
@@ -1315,7 +1328,7 @@ export function describeRentalSearch(
   const query = filters.query.trim();
   const bedrooms = Number(filters.bedrooms);
   const bathrooms = Number(filters.bathrooms);
-  const kind = filters.type ? filters.type.toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
+  const kind = filters.type ? getRentalTypes(filters.type).join(" o ").toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
   const place = getKnownPlace(filters.near, places);
   return [
     kind ? `${kind}${filters.zone ? ` en ${filters.zone}` : ""}` : null,

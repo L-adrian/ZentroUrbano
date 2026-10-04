@@ -654,9 +654,35 @@ function FitMapToProperties({
   const previousSelectedSlug = useRef(selected.slug);
 
   useEffect(() => {
-    if (bounds && !preserveView) {
-      fitMapToBounds(map, bounds);
-    }
+    if (!bounds || preserveView) return;
+    fitMapToBounds(map, bounds);
+
+    // A map that first drew hidden or before its box had its final size (Lista/Mapa, a late layout)
+    // kept a view picked for the wrong size and showed the homes off to one side. Fit again when the
+    // size changes, until the person moves the map themselves.
+    const container = map.getContainer();
+    let lastSize = `${container.clientWidth}x${container.clientHeight}`;
+    let movedByPerson = false;
+    const handleMoveEnd = () => {
+      if ((programmaticMoveUntil.get(map) ?? 0) <= Date.now()) movedByPerson = true;
+    };
+    map.on("moveend", handleMoveEnd);
+    const observer =
+      typeof ResizeObserver === "undefined"
+        ? null
+        : new ResizeObserver(() => {
+            const size = `${container.clientWidth}x${container.clientHeight}`;
+            if (size === lastSize || !container.clientWidth || !container.clientHeight) return;
+            lastSize = size;
+            markProgrammaticMove(map, 400);
+            map.invalidateSize({ animate: false });
+            if (!movedByPerson) fitMapToBounds(map, bounds);
+          });
+    observer?.observe(container);
+    return () => {
+      observer?.disconnect();
+      map.off("moveend", handleMoveEnd);
+    };
   }, [bounds, map, preserveView]);
 
   useEffect(() => {
@@ -742,13 +768,17 @@ function isClusterFeature(
   return "cluster" in feature.properties;
 }
 
+// Even side margins keep the homes in the middle of the map; the top leaves room for the
+// "Santa Cruz, Bolivia" label and the bottom for the selected-home bar. A hidden map is fitted
+// once it has a size (see FitMapToProperties).
 function fitMapToBounds(map: L.Map, bounds: LatLngBoundsExpression) {
-  const isDesktop = window.innerWidth >= 768 && !shouldReduceMapAnimation();
+  const container = map.getContainer();
+  if (!container.clientWidth || !container.clientHeight) return;
 
   markProgrammaticMove(map);
   map.fitBounds(bounds, {
-    paddingTopLeft: [70, 70],
-    paddingBottomRight: isDesktop ? [470, 170] : [70, 280],
+    paddingTopLeft: [48, 72],
+    paddingBottomRight: [48, 96],
     maxZoom: 12,
     animate: !shouldReduceMapAnimation(),
   });
