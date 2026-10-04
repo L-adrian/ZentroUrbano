@@ -5,6 +5,7 @@ import { Geist } from "next/font/google";
 import { Suspense, type ReactNode } from "react";
 import { CatalogCardClicks } from "@/components/catalog-card-clicks";
 import { GoogleAnalytics } from "@/components/google-analytics";
+import { PushAd } from "@/components/push-ad";
 import { RouteProgress } from "@/components/route-progress";
 import { SplashScreen } from "@/components/splash-screen";
 import { SiteHeader } from "@/components/site-header";
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
         <SiteHeader />
         {children}
         <CatalogCardClicks />
+        <PushAd />
         <GoogleAnalytics measurementId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID} />
         <SiteFooter />
       </body>
