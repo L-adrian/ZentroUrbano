@@ -7,7 +7,7 @@ import { splashHousePixels } from "@/lib/splash";
 export function SplashScreen() {
   return <div id="zu-splash" aria-hidden="true">
     <div className="zu-splash-house">
-      {splashHousePixels.map(({ x, y, kind, order }) => <span key={`${x}-${y}`} className={`is-${kind}`} style={{ gridColumn: x + 1, gridRow: y + 1, animationDelay: `${order * 22}ms` }} />)}
+      {splashHousePixels.map(({ x, y, kind, order }) => <span key={`${x}-${y}`} className={`is-${kind}`} style={{ gridColumn: x + 1, gridRow: y + 1, animationDelay: `${order * 10}ms` }} />)}
     </div>
     <p className="zu-splash-name">Zentro<span>Urbano</span></p>
     <p className="zu-splash-tagline">Tu próximo hogar, directo con el dueño</p>
