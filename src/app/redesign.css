@@ -404,3 +404,35 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .listing-views { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
 .listing-views svg { flex-shrink: 0; margin-top: 2px; }
 .listing-views small { display: block; font-size: 12px; }
+
+/* Listing cards: no text under 12px and a WhatsApp button with a 44px touch area. */
+.rental-card { container-type: inline-size; }
+.rental-status { font-size: 12px; padding: 5px 9px; }
+.rental-status svg { width: 13px; height: 13px; }
+.rental-demo, .rental-image-count { font-size: 12px; padding: 4px 8px; }
+.rental-card-location { font-size: 13px; }
+.rental-card-title { font-size: 15px; line-height: 1.45; min-height: 44px; }
+.rental-card-facts { font-size: 13px; gap: 6px 12px; }
+.rental-card-tags li { font-size: 12px; padding: 3px 9px; }
+.rental-card-tags li.is-unknown { color: #7a4b00; background: #fff4d6; }
+.dark .rental-card-tags li.is-unknown { color: #f3d39b; background: #3a2d16; }
+.rental-card-bottom { flex-wrap: wrap; row-gap: 10px; }
+.rental-card-pricing { min-width: 0; }
+.rental-card-price { font-size: 20px; }
+.rental-entry-label { font-size: 13px; }
+.rental-card-contact { width: auto; height: auto; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; padding: 0 12px; border-radius: 7px; border-color: #087c65; background: #087c65; color: #fff; font-size: 14px; font-weight: 650; white-space: nowrap; }
+.rental-card-contact:hover { background: #05624f; border-color: #05624f; }
+.dark .rental-card-contact { background: #43c49b; border-color: #43c49b; color: #08291e; }
+.dark .rental-card-contact:hover { background: #69d4b1; border-color: #69d4b1; }
+.rental-card-contact.is-external, .dark .rental-card-contact.is-external { background: transparent; border-color: var(--line); color: var(--brand); }
+.rental-card-contact.is-external:hover { background: var(--brand-soft); border-color: var(--brand); }
+.rental-owner-label { flex-wrap: wrap; row-gap: 2px; font-size: 12px; margin-top: 8px; }
+.rental-views { gap: 4px; margin-left: 6px; }
+@container (max-width: 279px) { .rental-card-pricing, .rental-card-contact { width: 100%; } }
+@media (max-width: 540px) { .rental-card-title { font-size: 17px; min-height: auto; }.rental-card-price { font-size: 22px; }.rental-card-location, .rental-card-facts { font-size: 14px; }.rental-entry-label { font-size: 14px; }.rental-owner-label { font-size: 13px; }.rental-card-contact { min-height: 46px; padding-inline: 16px; font-size: 15px; } }
+
+/* Home budget: shows how the amount was understood ("Hasta Bs 3.000 por mes"). */
+.home-search-hint { grid-column: 1/-1; padding: 8px 15px 2px; font-size: 12px; font-weight: 600; color: var(--brand); }
+.home-search-hint.is-error { color: #a12d1c; }
+.dark .home-search-hint.is-error { color: #ff9c8a; }
+@media (max-width: 768px) { .home-search-hint { padding: 0 12px 12px; } }

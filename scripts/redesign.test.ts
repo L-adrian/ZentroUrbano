@@ -158,3 +158,49 @@ test("the open gallery changes photo with a horizontal swipe on phones", async (
   const css = await readFile(new URL("../src/app/redesign.css", import.meta.url), "utf8");
   assert.match(css, /\.gallery-full-image \{ touch-action: pan-y pinch-zoom; \}/);
 });
+
+function cssRules(css: string) {
+  const rules: Array<{ media: string | null; selectors: string[]; body: string }> = [];
+  const stack: string[] = [];
+  let buffer = "";
+  for (const char of css.replace(/\/\*[\s\S]*?\*\//g, "")) {
+    if (char === "{") {
+      stack.push(buffer.slice(buffer.lastIndexOf(";") + 1).trim());
+      buffer = "";
+    } else if (char === "}") {
+      const prelude = stack.pop() ?? "";
+      if (!prelude.startsWith("@")) rules.push({ media: stack.find((item) => item.startsWith("@")) ?? null, selectors: prelude.split(",").map((item) => item.trim()), body: buffer });
+      buffer = "";
+    } else buffer += char;
+  }
+  return rules;
+}
+
+test("listing cards never use text under 12px and the contact button is at least 44x44", async () => {
+  const css = await readFile(new URL("../src/app/redesign.css", import.meta.url), "utf8");
+  const rules = cssRules(css);
+  // Last declaration wins: base rules on desktop, plus max-width media down to 540px on a phone.
+  const lastValue = (selector: string, property: string, mobile: boolean) => {
+    const matching = rules.filter((rule) => rule.selectors.includes(selector) && (rule.media === null || (mobile && Number(/^@media \(max-width: ?(\d+)px\)$/.exec(rule.media)?.[1]) >= 540)));
+    const values = matching.flatMap((rule) => [...rule.body.matchAll(new RegExp(`(?:^|;)\\s*${property}:\\s*([\\d.]+)px`, "g"))].map((match) => Number(match[1])));
+    return values.at(-1);
+  };
+  const selectors = [".rental-status", ".rental-image-count", ".rental-card-location", ".rental-card-title", ".rental-card-facts", ".rental-card-tags li", ".rental-card-price", ".rental-entry-label", ".rental-owner-label", ".rental-card-contact"];
+  for (const mobile of [false, true]) {
+    for (const selector of selectors) {
+      const size = lastValue(selector, "font-size", mobile);
+      assert.ok(size !== undefined && size >= 12, `${selector} ${mobile ? "mobile" : "desktop"}: ${size}px`);
+    }
+    for (const selector of [".rental-card-location", ".rental-card-facts", ".rental-entry-label"]) {
+      assert.ok((lastValue(selector, "font-size", mobile) ?? 0) >= 13, selector);
+    }
+    assert.ok((lastValue(".rental-card-contact", "min-height", mobile) ?? 0) >= 44);
+    assert.ok((lastValue(".rental-card-contact", "min-width", mobile) ?? 0) >= 44);
+  }
+  const card = await readFile(new URL("../src/components/property-card.tsx", import.meta.url), "utf8");
+  assert.match(card, /whatsappContactPath\(property\.slug, "tarjeta"\)/);
+  assert.match(card, /<WhatsAppIcon/);
+  assert.match(card, /contact\.shortLabel/);
+  assert.match(card, /getAvailabilityState\(property\)/);
+  assert.match(card, /property\.publicViews/);
+});

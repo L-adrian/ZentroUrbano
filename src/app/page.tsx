@@ -20,10 +20,13 @@ const categories = [
   { label: "Todos", href: "/propiedades", icon: SlidersHorizontal },
   { label: "Casas", href: "/propiedades?type=Casa", icon: Home },
   { label: "Departamentos", href: "/propiedades?type=Departamento", icon: Building2 },
-  { label: "Monoambientes", href: "/propiedades?type=Departamento&bedrooms=Monoambiente", icon: KeyRound },
+  { label: "Monoambientes", href: "/propiedades?type=Monoambiente", icon: KeyRound },
   { label: "Aceptan mascotas", href: "/propiedades?amenity=pets", icon: PawPrint },
   { label: "Con parqueo", href: "/propiedades?amenity=garage", icon: Car },
 ];
+
+// Only real listings reach this page (example listings are filtered out in getPublishedPropertiesData).
+const homeListingLimit = 8;
 
 export default async function HomePage() {
   const rentals = getDirectRentals(await getPublishedPropertiesData());
@@ -43,9 +46,9 @@ export default async function HomePage() {
     </section>
     <section className="zu-container rental-catalog">
       <nav className="rental-categories" aria-label="Tipos de alquiler">{categories.map(({label,href,icon: Icon},index) => <Link href={href} key={label} className={index === 0 ? "is-active" : ""}><Icon size={22} strokeWidth={1.6} /><span>{label}</span></Link>)}</nav>
-      <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length} viviendas · Contacto directo con el propietario</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
-      {rentals.length ? <div className="rental-grid">{rentals.slice(0, 8).map((property, index) => <PropertyCard key={property.slug} property={property} compact eagerImage={index < 2} />)}</div> : <div className="zu-empty"><Home size={32} /><h2>Pronto, nuevos alquileres</h2><p>Las nuevas viviendas aparecerán aquí.</p><Link href="/publicar" className="zu-button zu-button-primary">Publicar mi vivienda</Link></div>}
-      {rentals.length > 0 && <div className="catalog-more"><Link href="/propiedades" className="zu-button zu-button-secondary">Explorar todos los alquileres <ArrowRight size={17} /></Link></div>}
+      <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length === 1 ? "1 vivienda publicada" : `${rentals.length} viviendas publicadas`} · Contacto directo con el propietario</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
+      {rentals.length ? <div className="rental-grid">{rentals.slice(0, homeListingLimit).map((property, index) => <PropertyCard key={property.slug} property={property} compact eagerImage={index < 2} />)}</div> : <div className="zu-empty"><Home size={32} /><h2>Pronto, nuevos alquileres</h2><p>Las nuevas viviendas aparecerán aquí.</p><Link href="/publicar" className="zu-button zu-button-primary">Publicar mi vivienda</Link></div>}
+      {rentals.length > 0 && <div className="catalog-more"><Link href="/propiedades" className="zu-button zu-button-secondary">{rentals.length > homeListingLimit ? `Ver los ${rentals.length} alquileres` : "Buscar con filtros"} <ArrowRight size={17} /></Link></div>}
     </section>
     <section className="owner-band"><div className="zu-container"><span className="owner-band-icon"><KeyRound size={28} /></span><div><h2>Tu vivienda, tu trato.</h2><p>Publica tu alquiler y recibe consultas directamente.</p></div><Link href="/publicar" className="zu-button zu-button-primary">Publicar alquiler <ArrowRight size={17} /></Link></div></section>
     <SupportWhatsAppButton floating />
