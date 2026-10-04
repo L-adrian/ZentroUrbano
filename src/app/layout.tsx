@@ -2,11 +2,14 @@ import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 
 
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { CatalogCardClicks } from "@/components/catalog-card-clicks";
 import { GoogleAnalytics } from "@/components/google-analytics";
+import { RouteProgress } from "@/components/route-progress";
+import { SplashScreen } from "@/components/splash-screen";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { splashScript } from "@/lib/splash";
 import { themeScript } from "@/lib/theme";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import { jsonLdScript, organizationJsonLd, websiteJsonLd } from "@/lib/structured-data";
@@ -77,8 +80,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="es-BO" className={`${geistSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /><script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript([organizationJsonLd(), websiteJsonLd()])} /></head>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /><script dangerouslySetInnerHTML={{ __html: splashScript }} /><script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript([organizationJsonLd(), websiteJsonLd()])} /></head>
       <body className="flex min-h-full flex-col">
+        <SplashScreen />
+        <Suspense fallback={null}><RouteProgress /></Suspense>
         <SiteHeader />
         {children}
         <CatalogCardClicks />
