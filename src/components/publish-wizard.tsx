@@ -24,7 +24,7 @@ import Link from "next/link";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { getPublicationCosts } from "@/lib/publication-costs";
-import { getPublicationStepErrors, normalizePublicationPhone, publicationFieldStep, type PublicationFieldErrors } from "@/lib/publication-input";
+import { expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxPhotoBytes, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
@@ -50,6 +50,7 @@ type PropertyForm = {
   garage: string;
   area: string;
   pets: boolean;
+  petsPolicy: PetsPolicy;
   furnished: boolean;
   security: boolean;
   pool: boolean;
@@ -59,6 +60,7 @@ type PropertyForm = {
   price: string;
   currency: "BOB" | "USD";
   exchangeRate: string;
+  expensesMode: ExpensesMode | "";
   commonExpenses: string;
   guarantee: string;
   guaranteeAmount: string;
@@ -86,6 +88,7 @@ const initialForm: PropertyForm = {
   garage: "0",
   area: "",
   pets: false,
+  petsPolicy: "consult",
   furnished: false,
   security: false,
   pool: false,
@@ -95,11 +98,23 @@ const initialForm: PropertyForm = {
   price: "",
   currency: "BOB",
   exchangeRate: String(currencyExchangeRateBobPerUsd),
-  commonExpenses: "0",
+  expensesMode: "",
+  commonExpenses: "",
   guarantee: "",
   guaranteeAmount: "",
   description: "",
 };
+
+const petsOptions: Array<[PetsPolicy, string]> = [["allowed", "Sí"], ["not_allowed", "No"], ["consult", "A consultar"]];
+const petsLabels: Record<PetsPolicy, string> = { allowed: "Sí acepta", not_allowed: "No acepta", consult: "A consultar" };
+const expensesLabels: Record<PropertyForm["expensesMode"], string> = { "": "Sin indicar", included: "Incluidas en el alquiler", none: "No se cobran", separate: "Se pagan aparte" };
+
+// The server accepts older forms without the expenses question; this form always asks it.
+function wizardStepErrors(step: number, form: PropertyForm): PublicationFieldErrors {
+  const errors = getPublicationStepErrors(step, form, form.ownerName, form.phone);
+  if (step === 2 && !form.expensesMode) return { ...errors, commonExpenses: "Elige si las expensas están incluidas, no se cobran o se pagan aparte." };
+  return errors;
+}
 
 export function PublishWizard({ account }: { account: { id: string; name: string; phone: string } }) {
   const draftKey = `zu-publication-draft-v2:${account.id}`;
@@ -145,6 +160,10 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         }
         if (!["Casa", "Departamento", "Monoambiente"].includes(restored.type)) restored.type = "Departamento";
         if (!["BOB", "USD"].includes(restored.currency)) restored.currency = "BOB";
+        // Drafts saved before the pets and expenses questions keep what the owner had answered.
+        if (!(petsPolicies as readonly string[]).includes(restored.petsPolicy) || typeof saved.petsPolicy !== "string") restored.petsPolicy = restored.pets ? "allowed" : "consult";
+        restored.pets = restored.petsPolicy === "allowed";
+        if (!(expensesModes as readonly string[]).includes(restored.expensesMode)) restored.expensesMode = (parseCurrencyAmount(restored.commonExpenses) ?? 0) > 0 ? "separate" : "";
         startTransition(() => { setForm(restored); setDraftSaved(true); });
       }
     } catch { /* A stale draft must not block publication. */ }
@@ -167,7 +186,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
 
   const quality = useMemo(() => calculateQuality(form, photos), [form, photos]);
   const canContinue = canAdvanceStep(step, form, photos);
-  const stepErrors = step === 1 || step === 2 ? getPublicationStepErrors(step, form, form.ownerName, form.phone) : {};
+  const stepErrors = step === 1 || step === 2 ? wizardStepErrors(step, form) : {};
 
   function updateField<TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -253,7 +272,7 @@ export function PublishWizard({ account }: { account: { id: string; name: string
     const invalidStep = [0, 1, 2].find(index => !canAdvanceStep(index, form, photos));
     if (invalidStep !== undefined) {
       setStep(invalidStep); setStatus("error");
-      setMessage(Object.values(getPublicationStepErrors(invalidStep, form, form.ownerName, form.phone)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
+      setMessage(Object.values(wizardStepErrors(invalidStep, form)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
       return;
     }
 
@@ -327,9 +346,12 @@ export function PublishWizard({ account }: { account: { id: string; name: string
         {receipt && <p className="mt-3 text-sm text-neutral-600">{receipt.photosStored} {receipt.photosStored === 1 ? "foto guardada" : "fotos guardadas"}. Referencia: <strong className="break-all">{receipt.requestId}</strong></p>}
         <div className="mt-6 border-t border-neutral-200 pt-5 text-sm text-neutral-600">
           <p className="font-semibold text-neutral-900">Siguiente paso</p>
-          <p className="mt-1">Confirmaremos identidad, disponibilidad y fotos antes de activar la ficha.</p>
+          <p className="mt-1">Una persona del equipo revisará las fotos, el precio y los datos antes de publicarla. Por ahora no verificamos identidad. Verás el estado en Mi cuenta.</p>
         </div>
-        <Link href="/cliente/solicitudes" className="zu-button zu-button-primary mt-6">Ver mis solicitudes<ArrowRight size={17} /></Link>
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link href="/cliente" className="zu-button zu-button-primary">Ir a Mi cuenta<ArrowRight size={17} /></Link>
+          <Link href="/cliente/solicitudes" className="zu-button zu-button-secondary">Ver mis solicitudes</Link>
+        </div>
       </div>
     );
   }
@@ -610,8 +632,18 @@ function InformationStep({
         <Field label="Superficie (m², opcional)" icon={<Ruler className="h-4 w-4" />}>
           <input value={form.area} onChange={(event) => updateField("area", event.target.value)} type="number" min="0" inputMode="numeric" className={inputClassName} />
         </Field>
+        <fieldset className="grid gap-2 sm:col-span-2">
+          <legend className="text-sm font-semibold text-neutral-800">¿Acepta mascotas?</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {petsOptions.map(([value, label]) => (
+              <label key={value} className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-neutral-700">
+                <input type="radio" name="petsPolicy" value={value} checked={form.petsPolicy === value} onChange={() => { updateField("petsPolicy", value); updateField("pets", value === "allowed"); }} className="h-4 w-4 accent-[#176b4d]" />
+                {label}
+              </label>
+            ))}
+          </div>
+        </fieldset>
         <div className="flex flex-wrap gap-x-5 gap-y-3 border-y border-neutral-200 py-4 sm:col-span-2">
-          <SimpleCheckbox checked={form.pets} onChange={(value) => updateField("pets", value)} label="Acepta mascotas" />
           <SimpleCheckbox checked={form.furnished} onChange={(value) => updateField("furnished", value)} label="Amoblado" />
           <SimpleCheckbox checked={form.security} onChange={(value) => updateField("security", value)} label="Seguridad" />
           <SimpleCheckbox checked={form.pool} onChange={(value) => updateField("pool", value)} label="Piscina" />
@@ -650,10 +682,18 @@ function PriceStep({
             <option value="USD">Dólares ($us)</option>
           </select>
         </Field>
-        <Field label="Expensas mensuales">
-          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="text" inputMode="decimal" required aria-invalid={Boolean(errors.commonExpenses)} aria-describedby="publication-expenses-help" className={inputClassName} />
-          <span id="publication-expenses-help" className="text-xs text-neutral-600">Escribe 0 si están incluidas o no se cobran.</span>
+        <Field label="Expensas">
+          <select value={form.expensesMode} onChange={(event) => updateField("expensesMode", event.target.value as PropertyForm["expensesMode"])} required aria-invalid={Boolean(errors.commonExpenses)} className={inputClassName}>
+            <option value="">Seleccionar</option>
+            <option value="included">Incluidas en el alquiler</option>
+            <option value="none">No se cobran</option>
+            <option value="separate">Se pagan aparte</option>
+          </select>
         </Field>
+        {form.expensesMode === "separate" && <Field label="Expensas por mes">
+          <input value={form.commonExpenses} onChange={(event) => updateField("commonExpenses", event.target.value)} type="text" inputMode="decimal" required aria-invalid={Boolean(errors.commonExpenses)} aria-describedby="publication-expenses-help" placeholder="Ej. 300" className={inputClassName} />
+          <span id="publication-expenses-help" className="text-xs text-neutral-600">En la misma moneda del alquiler.</span>
+        </Field>}
         {form.currency === "USD" && <Field label="Tipo de cambio (Bs por USD)">
           <input value={form.exchangeRate} onChange={event => updateField("exchangeRate", event.target.value)} type="number" min="0.0001" max={maxPropertyExchangeRate} step="0.0001" inputMode="decimal" required className={inputClassName} />
           <span className="exchange-rate-note">1 USD = {form.exchangeRate || "..."} Bs para este alquiler.</span>
@@ -695,14 +735,16 @@ function ConfirmationStep({
   const symbol = form.currency === "BOB" ? "Bs" : "$us";
   return (
     <section>
-      <StepHeading title="Revisa antes de enviar" copy="Zentro Urbano verificará identidad y disponibilidad antes de publicar." />
+      <StepHeading title="Revisa antes de enviar" copy="Una persona del equipo revisa fotos, precio y datos antes de publicar. Por ahora no verificamos identidad." />
       <dl className="mt-6 divide-y divide-neutral-200 border-y border-neutral-200">
         <SummaryRow label="Contrato" value="Alquiler directo con el propietario" />
         <SummaryRow label="Propiedad" value={form.title || "Sin título"} />
         <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
         <SummaryRow label="Alquiler" value={form.price ? `${symbol} ${form.price}/mes` : "Sin precio"} />
         {form.currency === "USD" && <SummaryRow label="Tipo de cambio" value={`1 USD = ${form.exchangeRate} Bs`} />}
+        <SummaryRow label="Expensas" value={form.expensesMode === "separate" ? `${symbol} ${form.commonExpenses}/mes` : expensesLabels[form.expensesMode]} />
         <SummaryRow label="Garantía" value={form.guarantee === "Otro monto" ? `${symbol} ${form.guaranteeAmount}` : form.guarantee || "No indicada"} />
+        <SummaryRow label="Mascotas" value={petsLabels[form.petsPolicy]} />
         <SummaryRow label="Fotos" value={`${photosCount} cargadas`} />
         <SummaryRow label="Contacto" value={form.phone || "Sin WhatsApp"} />
       </dl>
@@ -826,7 +868,7 @@ function canAdvanceStep(step: number, form: PropertyForm, photos: UploadPhoto[])
   }
 
   if (step === 1 || step === 2) {
-    return Object.keys(getPublicationStepErrors(step, form, form.ownerName, form.phone)).length === 0;
+    return Object.keys(wizardStepErrors(step, form)).length === 0;
   }
 
   return true;
@@ -845,7 +887,7 @@ function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
     `Baños: ${form.bathrooms || "Consultar"}`,
     `Parqueos: ${form.garage}`,
     `Superficie: ${form.area} m2`,
-    `Mascotas: ${form.pets ? "Sí" : "No"}`,
+    `Mascotas: ${petsLabels[form.petsPolicy]}`,
     `Amoblado: ${form.furnished ? "Sí" : "No"}`,
     `Seguridad: ${form.security ? "Sí" : "No"}`,
     `Piscina: ${form.pool ? "Sí" : "No"}`,
@@ -854,7 +896,7 @@ function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
     `Ascensor: ${form.elevator ? "Sí" : "No"}`,
     `Precio: ${form.currency} ${form.price}`,
     ...(form.currency === "USD" ? [`Tipo de cambio del propietario: 1 USD = ${form.exchangeRate} Bs`] : []),
-    `Expensas: ${form.currency} ${form.commonExpenses}`,
+    `Expensas: ${form.expensesMode === "separate" ? `${form.currency} ${form.commonExpenses} por mes` : expensesLabels[form.expensesMode]}`,
     `Garantía: ${form.guarantee === "Otro monto" ? `${form.currency} ${form.guaranteeAmount}` : form.guarantee}`,
     `Descripción: ${form.description}`,
     `Fotos seleccionadas: ${photos.map((photo) => `${photo.file.name} [${photo.category || "sin clasificar"}]`).join(", ") || "Ninguna"}`,
@@ -869,7 +911,7 @@ function createUploadId(file: File) {
 }
 
 function CostSummary({ form }: { form: PropertyForm }) {
-  const costs = getPublicationCosts(form);
+  const costs = getPublicationCosts({ ...form, commonExpenses: form.expensesMode === "separate" ? form.commonExpenses : "0" });
   const format = (value: number | null) => value === null ? "Por definir" : `${form.currency === "BOB" ? "Bs" : "$us"} ${value.toLocaleString("es-BO")}`;
   return <div className="monthly-summary" aria-live="polite"><div><span>Mensual, incluidas expensas</span><strong>{format(costs.monthly)}</strong></div><div><span>Ingreso: primer mes + expensas + garantía</span><strong>{format(costs.entry)}</strong></div><div><span>Comisión de intermediación</span><strong>Sin comisión</strong></div></div>;
 }

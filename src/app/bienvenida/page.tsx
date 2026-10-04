@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Check, Home, KeyRound, MapPin, Search } from "lucide-react";
+import { OwnerServicesNote } from "@/components/owner-services-note";
 import { OwnerWelcome } from "@/components/owner-welcome";
 import { CommissionExamples } from "@/components/commission-examples";
 import { RentalFaqItem } from "@/components/rental-faq-item";
@@ -30,7 +31,8 @@ const steps = [
 
 export default async function WelcomePage() {
   const rentals = getDirectRentals(await getPublishedPropertiesData()).slice(0, 3);
-  const questions = [rentalFaq[1], rentalFaq[4], rentalFaq[2], rentalFaq[3]];
+  const freeToPublish = rentalFaq.find(item => item.question === "¿Cuesta publicar mi vivienda?");
+  const questions = [rentalFaq[1], rentalFaq[4], rentalFaq[2], ...(freeToPublish ? [freeToPublish] : []), rentalFaq[3]];
   return <main id="contenido" className="welcome-page">
     <section className="welcome-intro" aria-labelledby="welcome-title">
       <div className="zu-container">
@@ -62,6 +64,7 @@ export default async function WelcomePage() {
     </div></section>}
 
     <OwnerWelcome />
+    <div className="zu-container pb-10"><OwnerServicesNote className="max-w-3xl rounded-[10px]" /></div>
 
     <section className="welcome-faq zu-container" aria-labelledby="welcome-faq-title">
       <div className="welcome-section-heading"><h2 id="welcome-faq-title">Antes de empezar.</h2><Link href="/preguntas-frecuentes" className="welcome-text-link">Todas las preguntas<ArrowRight size={16} /></Link></div>

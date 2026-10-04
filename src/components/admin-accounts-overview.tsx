@@ -2,6 +2,7 @@ import Link from "next/link";
 import { BadgeCheck, Building2, Eye, Mail, MessageCircle, ShieldCheck, Users } from "lucide-react";
 import type { ReactNode } from "react";
 import type { AdminAccountSummary } from "@/lib/admin-accounts";
+import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
 
 type AdminAccountsOverviewProps = {
   databaseReady: boolean;
@@ -18,8 +19,8 @@ export function AdminAccountsOverview({ databaseReady, accounts }: AdminAccounts
       properties: summary.properties + account.propertyCount,
       accountsWithoutProperties:
         summary.accountsWithoutProperties + (account.propertyCount === 0 ? 1 : 0),
-      views: summary.views + account.views,
-      whatsappClicks: summary.whatsappClicks + account.whatsappClicks,
+      views: summary.views + account.views30,
+      whatsappClicks: summary.whatsappClicks + account.whatsapp30,
     }),
     {
       accounts: 0,
@@ -43,7 +44,8 @@ export function AdminAccountsOverview({ databaseReady, accounts }: AdminAccounts
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-neutral-600">
             Revisa qué cuentas existen, cómo iniciaron sesión, cuántas fichas tienen asignadas y
-            si sus propiedades están publicadas correctamente.
+            si sus propiedades están publicadas correctamente. Vistas y WhatsApp cuentan personas
+            distintas, una vez por teléfono o computadora.
           </p>
         </div>
         <div className="rounded-full border border-black/10 bg-neutral-50 px-4 py-2 text-sm font-semibold text-neutral-700">
@@ -62,8 +64,8 @@ export function AdminAccountsOverview({ databaseReady, accounts }: AdminAccounts
             <MetricCard icon={Users} label="Cuentas" value={totals.accounts} />
             <MetricCard icon={ShieldCheck} label="Con Google" value={totals.googleAccounts} />
             <MetricCard icon={Building2} label="Fichas asignadas" value={totals.properties} />
-            <MetricCard icon={Eye} label="Vistas registradas" value={totals.views} />
-            <MetricCard icon={MessageCircle} label="Clicks WhatsApp" value={totals.whatsappClicks} />
+            <MetricCard icon={Eye} label="Vistas · 30 días" value={totals.views} />
+            <MetricCard icon={MessageCircle} label="WhatsApp · 30 días" value={totals.whatsappClicks} />
           </div>
 
           {totals.accountsWithoutProperties > 0 ? (
@@ -163,9 +165,9 @@ function AccountCard({ account }: { account: AdminAccountSummary }) {
 
           <div className="mt-5 grid grid-cols-2 gap-3 text-sm">
             <AccountStat label="Fichas" value={account.propertyCount} />
-            <AccountStat label="Premium" value={account.premiumCount} />
-            <AccountStat label="Vistas" value={account.views} />
-            <AccountStat label="WhatsApp" value={account.whatsappClicks} />
+            <AccountStat label="Publicadas" value={account.activePropertyCount} />
+            <AccountStat label="Vistas · 30 días" value={account.views30} />
+            <AccountStat label="WhatsApp · 30 días" value={account.whatsapp30} />
           </div>
 
           <p className="mt-4 text-xs font-medium text-neutral-400">
@@ -190,8 +192,7 @@ function AccountCard({ account }: { account: AdminAccountSummary }) {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0">
                       <div className="flex flex-wrap gap-2">
-                        <SoftBadge>{planLabel(property.planSlug)}</SoftBadge>
-                        <SoftBadge>{property.published ? "Publicada" : "Oculta"}</SoftBadge>
+                        <SoftBadge>{statusLabel(property.status, property.published)}</SoftBadge>
                         {property.featured ? <SoftBadge>Destacada</SoftBadge> : null}
                       </div>
                       <h4 className="mt-2 line-clamp-2 text-base font-semibold text-neutral-950">
@@ -212,10 +213,10 @@ function AccountCard({ account }: { account: AdminAccountSummary }) {
                     </Link>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
-                    <MiniStat label="Vistas" value={property.views} />
-                    <MiniStat label="Ficha" value={property.propertyClicks} />
-                    <MiniStat label="Mapa" value={property.mapViews} />
-                    <MiniStat label="WhatsApp" value={property.whatsappClicks} />
+                    <MiniStat label="Vistas · 30 días" value={property.views30} />
+                    <MiniStat label="Vistas · total" value={property.viewsTotal} />
+                    <MiniStat label="WhatsApp · 30 días" value={property.whatsapp30} />
+                    <MiniStat label="WhatsApp · total" value={property.whatsappTotal} />
                   </div>
                 </div>
               ))
@@ -272,16 +273,8 @@ function SoftBadge({ children }: { children: ReactNode }) {
   );
 }
 
-function planLabel(planSlug: string) {
-  if (planSlug === "premium") {
-    return "Premium";
-  }
-
-  if (planSlug === "pro") {
-    return "Pro";
-  }
-
-  return "Básico";
+function statusLabel(status: string, published: boolean) {
+  return ownerListingStatusLabels[ownerListingStatus(status, published)];
 }
 
 function formatMoney(price: number, currency: string) {

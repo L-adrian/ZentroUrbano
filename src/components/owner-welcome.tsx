@@ -6,8 +6,8 @@ import { ArrowRight, Check, ClipboardCheck, Home, Images, MessageCircle, Sliders
 
 const stages = [
   { label: "Tu cuenta", icon: UserRound, title: "Empieza a tu nombre", description: "Tu cuenta es el punto de partida para enviar tu vivienda y mantener tus datos de contacto.", points: ["Registro con correo o Google", "Nombre y WhatsApp del propietario", "Contrato directo, sin intermediarios"], action: "Crear mi cuenta", href: "/publicar" },
-  { label: "Tu anuncio", icon: Images, title: "Los detalles hacen la diferencia", description: "Prepara la información que una persona necesita para decidir si quiere visitar tu vivienda.", points: ["Fotos de los ambientes y revisión técnica", "Zona, características y condiciones", "Alquiler, garantía y tu T/C si cobras en dólares"], action: "Ver qué necesito para publicar", href: "/requisitos" },
-  { label: "Revisión", icon: ClipboardCheck, title: "Una última revisión antes de salir", description: "Revisamos manualmente la solicitud. Si falta información, podemos pedirte una aclaración antes de publicarla.", points: ["Envío vinculado a tu cuenta", "Revisión de fotos y datos del anuncio", "Consultas directas al publicarse"], action: "Conocer el proceso", href: "/preguntas-frecuentes" },
+  { label: "Tu anuncio", icon: Images, title: "Los detalles hacen la diferencia", description: "Prepara la información que una persona necesita para decidir si quiere visitar tu vivienda.", points: ["Fotos claras de los ambientes", "Zona, características y condiciones", "Alquiler, garantía y tu T/C si cobras en dólares"], action: "Ver qué necesito para publicar", href: "/requisitos" },
+  { label: "Revisión", icon: ClipboardCheck, title: "Una última revisión antes de salir", description: "Una persona del equipo revisa las fotos, el precio y los datos. Si falta algo, te pedimos una aclaración antes de publicar. Por ahora no verificamos identidad.", points: ["Ves el estado en Mi cuenta", "Si no se aprueba, te decimos por qué", "Consultas directas a tu WhatsApp al publicarse"], action: "Conocer el proceso", href: "/preguntas-frecuentes" },
 ];
 
 export function OwnerWelcome() {
@@ -28,7 +28,7 @@ export function OwnerWelcome() {
     <div className="welcome-owner-copy">
       <p className="zu-eyebrow"><Home size={15} /> PARA PROPIETARIOS</p>
       <h2 id="welcome-owners-title">Tu vivienda. Tu trato.<br />Tú tienes el control.</h2>
-      <p>Menos preguntas repetidas. Más información desde el primer contacto. Presenta tu alquiler con fotos, costos y condiciones claras.</p>
+      <p>Publicar es gratis. Presenta tu alquiler con fotos, costos y condiciones claras, y recibe menos preguntas repetidas.</p>
       <ul className="owner-benefits"><li><SlidersHorizontal size={19} /><div><strong>Decide tus condiciones</strong><span>Precio, garantía, mascotas y tipo de cambio.</span></div></li><li><MessageCircle size={19} /><div><strong>Habla sin intermediarios</strong><span>Las consultas llegan directamente a tu WhatsApp.</span></div></li></ul>
       <Link href="/publicar" className="zu-button zu-button-primary">Publicar mi vivienda<ArrowRight size={17} /></Link>
     </div>

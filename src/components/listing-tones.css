@@ -1,0 +1,14 @@
+/* Amber and red states in Mi cuenta and the admin panel. The site switches theme with the .dark
+   class (see redesign.css), so these tones are redefined here instead of with dark: utilities. */
+.dark .zu-tones {
+  --color-amber-50: #2e2412;
+  --color-amber-100: #3a2d16;
+  --color-amber-200: #5c4718;
+  --color-amber-300: #6e5520;
+  --color-amber-900: #f3d39b;
+  --color-amber-950: #f6dfb3;
+  --color-red-50: #2b1616;
+  --color-red-100: #3d1a1a;
+  --color-red-300: #803030;
+  --color-red-900: #f8b4b4;
+}

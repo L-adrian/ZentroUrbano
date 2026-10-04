@@ -1,12 +1,14 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import sharp from "sharp";
-import type { RowDataPacket } from "mysql2/promise";
+import { revalidatePath } from "next/cache";
+import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { queryOne, queryRows, withTransaction } from "@/lib/mysql";
-import { parsePublicationDetails, type PublicationDetails } from "@/lib/publication-input";
+import { parsePublicationDetails, publicationRequirements, type PublicationDetails } from "@/lib/publication-input";
 import type { PublicationRequest } from "@/lib/publication-requests";
 import { parseCurrencyAmount } from "@/lib/currency";
 import { replaceDemoForPublication } from "@/lib/demo-replacements";
+import { getCuratedRentalBySlug } from "@/lib/curated-rentals";
 
 export class PublicationError extends Error {
   constructor(public status:number,message:string) { super(message); }
@@ -17,7 +19,7 @@ export function parseDbJson<T>(value:unknown): T {
 
 type RequestRow = {id:string;account_id:string;status:string;payload:unknown;property_slug:string|null;review_reason:string|null;reviewed_by:string|null;reviewed_at:Date|null;created_at:Date};
 function mapRequest(row:RequestRow): PublicationRequest {
-  return {...parseDbJson<PublicationRequest>(row.payload),id:row.id,accountId:row.account_id,status:row.status,propertySlug:row.property_slug,reviewReason:row.review_reason,reviewedBy:row.reviewed_by,createdAt:row.created_at.toISOString()};
+  return {...parseDbJson<PublicationRequest>(row.payload),id:row.id,accountId:row.account_id,status:row.status,propertySlug:row.property_slug,reviewReason:row.review_reason,reviewedBy:row.reviewed_by,reviewedAt:row.reviewed_at ? row.reviewed_at.toISOString() : null,createdAt:row.created_at.toISOString()};
 }
 export async function databaseRequest(id:string) {
   const row=await queryOne<RequestRow>("SELECT * FROM publication_requests WHERE id=:id",{id});
@@ -58,14 +60,18 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
   const reason=typeof input.reason === "string" ? input.reason.trim() : "";
   if (!["approve","reject"].includes(String(decision)) || reason.length > 1000 || (decision === "reject" && reason.length < 5)) throw new PublicationError(400,"Indica una decisión válida y un motivo para rechazar.");
   const lat=Number(input.latitude),lng=Number(input.longitude);
-  if (decision === "approve" && (input.confirmed !== true || input.latitude === "" || input.longitude === "" || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -23 || lat > -9 || lng < -70 || lng > -57)) throw new PublicationError(400,"Confirma la revisión y una ubicación válida dentro de Bolivia.");
   return withTransaction(async connection=>{
     const [rows]=await connection.execute<RowDataPacket[]>("SELECT * FROM publication_requests WHERE id=? FOR UPDATE",[id]);
     if (!rows.length) throw new PublicationError(404,"Solicitud no encontrada.");
     if (rows[0].status !== "pending_review") throw new PublicationError(409,"Esta solicitud ya fue revisada. Actualiza la página.");
     const record=mapRequest(rows[0] as RequestRow);
     let slug:string|null=null;
-    if (decision === "approve") {
+    if (record.kind === "republish") {
+      if (decision === "approve" && input.confirmed !== true) throw new PublicationError(400,"Confirma que revisaste el anuncio antes de aprobar.");
+      slug=await reviewRepublish(connection,record,decision === "approve");
+    } else if (decision === "approve" && (input.confirmed !== true || input.latitude === "" || input.longitude === "" || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -23 || lat > -9 || lng < -70 || lng > -57)) {
+      throw new PublicationError(400,"Confirma la revisión y una ubicación válida dentro de Bolivia.");
+    } else if (decision === "approve") {
       const details=parsePublicationDetails(record.details);
       if (!details) throw new PublicationError(400,"Faltan datos estructurados. Solicita al propietario un nuevo envío completo.");
       const [owners]=await connection.execute<RowDataPacket[]>("SELECT * FROM client_accounts WHERE id=? AND kind='owner' AND status='active'",[record.accountId]);
@@ -124,8 +130,95 @@ export async function correctApprovedPublicationPrice(id:string,admin:string,inp
   });
 }
 
-function publicationRequirements(details:PublicationDetails) {
-  const label=details.currency === "BOB" ? "Bs" : "USD";
-  return ["1 mes adelantado",details.guarantee === "Otro monto" ? `Garantía: ${label} ${details.guaranteeAmount}` : details.guarantee.replace("de alquiler", "de garantía"),
-    details.commonExpenses ? `Expensas: ${label} ${details.commonExpenses}` : "Expensas incluidas", "Sin comisión de intermediación"];
+// A hidden listing goes live again only here, after an admin approves it; nothing else is touched.
+async function reviewRepublish(connection:PoolConnection,record:PublicationRequest,approve:boolean) {
+  const slug=record.propertySlug;
+  if (!slug) throw new PublicationError(409,"La solicitud no indica qué anuncio volver a publicar.");
+  const [links]=await connection.execute<RowDataPacket[]>("SELECT id,status FROM client_account_properties WHERE account_id=? AND property_slug=? FOR UPDATE",[record.accountId,slug]);
+  const [properties]=await connection.execute<RowDataPacket[]>("SELECT published FROM properties WHERE slug=? FOR UPDATE",[slug]);
+  if (!links.length || !properties.length || links[0].status === "closed") throw new PublicationError(409,"Este anuncio ya no está vinculado a la cuenta del propietario.");
+  if (approve) {
+    const [owners]=await connection.execute<RowDataPacket[]>("SELECT id FROM client_accounts WHERE id=? AND kind='owner' AND status='active'",[record.accountId]);
+    if (!owners.length) throw new PublicationError(409,"El propietario ya no tiene una cuenta activa.");
+    await connection.execute("UPDATE properties SET published=1,availability_confirmed_at=CURRENT_TIMESTAMP WHERE slug=?",[slug]);
+    await connection.execute("UPDATE client_account_properties SET status='active' WHERE id=?",[links[0].id]);
+  } else {
+    const previous=record.listing?.previousStatus === "rented" ? "rented" : "paused";
+    await connection.execute("UPDATE client_account_properties SET status=? WHERE id=? AND status='review'",[previous,links[0].id]);
+  }
+  return slug;
+}
+
+export type ListingAction = "confirm" | "rented";
+
+// Every page that can show a listing or its availability.
+export function revalidateListingPages(slug:string|null) {
+  for (const route of ["/","/bienvenida","/propiedades","/mapa","/cliente","/cliente/solicitudes","/admin","/admin/solicitudes","/sitemap.xml"]) revalidatePath(route);
+  revalidatePath("/[operation]/[city]/[zone]","page");
+  revalidatePath("/departamentos/[zone]","page");
+  if (slug) revalidatePath(`/propiedades/${slug}`);
+}
+
+// "Sigue disponible" renews the confirmation date; "Ya se alquiló" hides the listing without deleting it.
+// accountId limits the change to that owner's listing; null is the administrator.
+export async function updateListingAvailability(slug:string,action:ListingAction,accountId:string|null) {
+  return withTransaction(async connection=>{
+    if (accountId) {
+      const [links]=await connection.execute<RowDataPacket[]>("SELECT id FROM client_account_properties WHERE account_id=? AND property_slug=? AND status<>'closed' FOR UPDATE",[accountId,slug]);
+      if (!links.length) throw new PublicationError(403,"No tienes permiso para cambiar este anuncio.");
+    }
+    const [rows]=await connection.execute<RowDataPacket[]>("SELECT published FROM properties WHERE slug=? FOR UPDATE",[slug]);
+    if (!rows.length) throw new PublicationError(409,"Esta ficha no está guardada en la base de datos; no se puede cambiar desde aquí.");
+    if (!rows[0].published) throw new PublicationError(409,"Este anuncio ya está oculto. Actualiza la página.");
+    if (action === "confirm") {
+      // Confirming is not an edit of the listing, so its update date stays as it was.
+      await connection.execute("UPDATE properties SET availability_confirmed_at=CURRENT_TIMESTAMP,updated_at=updated_at WHERE slug=?",[slug]);
+    } else {
+      // Listings written in the site's code would keep showing from there; a developer retires them.
+      if (getCuratedRentalBySlug(slug)) throw new PublicationError(409,"Esta ficha está cargada en el código del sitio. Pide a desarrollo que la retire.");
+      await connection.execute("UPDATE properties SET published=0 WHERE slug=?",[slug]);
+      await connection.execute(`UPDATE client_account_properties SET status='rented' WHERE property_slug=? AND status<>'closed'${accountId ? " AND account_id=?" : ""}`,accountId ? [slug,accountId] : [slug]);
+    }
+    return {slug,action};
+  });
+}
+
+// "Volver a publicar": the listing stays hidden until an admin approves this request.
+export async function requestListingRepublish(accountId:string,slug:string) {
+  return withTransaction(async connection=>{
+    const [rows]=await connection.execute<RowDataPacket[]>(
+      `SELECT cap.id AS link_id,cap.status,p.published,p.title,p.zone,p.price,p.currency,p.images,p.whatsapp,p.availability_confirmed_at,ca.display_name,ca.email
+         FROM client_account_properties cap
+         JOIN properties p ON p.slug=cap.property_slug
+         JOIN client_accounts ca ON ca.id=cap.account_id AND ca.kind='owner' AND ca.status='active'
+        WHERE cap.account_id=? AND cap.property_slug=? AND cap.status<>'closed' FOR UPDATE`,[accountId,slug]);
+    if (!rows.length) throw new PublicationError(403,"No tienes permiso para cambiar este anuncio.");
+    const row=rows[0];
+    if (row.status === "review") {
+      const [pending]=await connection.execute<RowDataPacket[]>("SELECT id FROM publication_requests WHERE account_id=? AND property_slug=? AND status='pending_review' ORDER BY created_at DESC LIMIT 1",[accountId,slug]);
+      return {requestId:(pending[0]?.id as string|undefined) ?? null,status:"pending_review"};
+    }
+    if (row.published) throw new PublicationError(409,"Tu anuncio ya está publicado.");
+    const id=`publication_${randomUUID().replaceAll("-","").slice(0,24)}`;
+    const images=parseDbJson<unknown>(row.images);
+    const payload:Omit<PublicationRequest,"id"|"accountId"|"status"|"createdAt">={
+      kind:"republish",accountEmail:row.email ?? "",contactName:row.display_name,whatsapp:row.whatsapp ?? "",
+      sourceText:`El propietario pidió volver a publicar «${row.title}».`,photos:[],
+      listing:{title:row.title,zone:row.zone,price:Number(row.price),currency:row.currency,
+        images:Array.isArray(images) ? images.filter((image):image is string=>typeof image === "string").slice(0,15) : [],
+        previousStatus:row.status,availabilityConfirmedAt:row.availability_confirmed_at ? new Date(row.availability_confirmed_at).toISOString() : null},
+    };
+    await connection.execute("INSERT INTO publication_requests (id,account_id,idempotency_key,payload,property_slug) VALUES (?,?,?,?,?)",[id,accountId,`republish_${id.slice(12)}`,JSON.stringify(payload),slug]);
+    await connection.execute("UPDATE client_account_properties SET status='review' WHERE id=?",[row.link_id]);
+    return {requestId:id,status:"pending_review"};
+  });
+}
+
+// Photos of an owner's own listing, also while it is hidden from the public.
+export async function readOwnerPhoto(accountId:string,id:string,filename:string) {
+  return queryOne<{bytes:Buffer}>(
+    `SELECT f.public_data AS bytes FROM publication_photos f
+       JOIN publication_requests r ON r.id=f.request_id AND r.status='approved'
+       JOIN client_account_properties cap ON cap.property_slug=r.property_slug AND cap.account_id=:accountId AND cap.status<>'closed'
+      WHERE f.request_id=:id AND f.filename=:filename AND f.public_data IS NOT NULL LIMIT 1`,{accountId,id,filename});
 }

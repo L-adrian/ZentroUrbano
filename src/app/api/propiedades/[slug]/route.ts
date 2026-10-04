@@ -6,6 +6,7 @@ import { isDisplayCurrency, parseCurrencyAmount, parsePropertyExchangeRate } fro
 import { revalidatePath } from "next/cache";
 import { getPropertyVideoUrl } from "@/lib/property-video";
 import { allowedOwnerImage, ownerMapUrl, ownerWhatsapp, parseJsonArray } from "@/lib/owner-listing-edit";
+import { petsPolicies } from "@/lib/publication-input";
 
 export async function PATCH(
   request: NextRequest,
@@ -66,6 +67,9 @@ export async function PATCH(
     return NextResponse.json({ ok: false, stored: false, message: "Revisa la moneda y el tipo de cambio: debe ser mayor a 0 y de hasta 1000 Bs por USD." }, { status: 400 });
   }
 
+  // "Sí", "No" or "A consultar" from the editor; older clients only send the pets checkbox.
+  const petsPolicy = (petsPolicies as readonly unknown[]).includes(payload.petsPolicy) ? String(payload.petsPolicy) : null;
+
   let whatsapp: string | null | undefined;
   let mapUrl: string | null | undefined;
   try {
@@ -90,7 +94,9 @@ export async function PATCH(
             type = :type,
             operation = :operation,
             price = :price,
-            rental_details = case when rental_details is not null then JSON_SET(rental_details, '$.price', :price) else null end,
+            rental_details = case when rental_details is null then null
+              when :petsPolicy is null then JSON_SET(rental_details, '$.price', :price)
+              else JSON_SET(rental_details, '$.price', :price, '$.petsPolicy', :petsPolicy) end,
             currency = :currency,
             exchange_rate = case when :replaceExchangeRate = 1 then :exchangeRate else exchange_rate end,
             city = :city,
@@ -136,7 +142,8 @@ export async function PATCH(
       bathrooms: number(payload.bathrooms),
       garage: number(payload.garage),
       area: number(payload.area),
-      pets: boolean(payload.pets),
+      pets: petsPolicy ? petsPolicy === "allowed" : boolean(payload.pets),
+      petsPolicy,
       furnished: boolean(payload.furnished),
       security: boolean(payload.security),
       pool: boolean(payload.pool),

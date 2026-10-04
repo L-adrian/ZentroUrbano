@@ -1,4 +1,5 @@
 import { getPropertyBySlug, type Property } from "@/lib/properties";
+import type { OwnerListingStatus } from "@/lib/listing-moderation";
 
 export type DemoAccountKind = "owner" | "agency";
 export type DemoPlan = "Básico" | "Pro" | "Premium";
@@ -26,7 +27,38 @@ export type WeeklyReport = {
   action: string;
 };
 
+// Real numbers for Mi cuenta: distinct people (one per phone or computer) per listing.
+export type OwnerListingAudience = {
+  views7: number;
+  views30: number;
+  viewsTotal: number;
+  contacts7: number;
+  contacts30: number;
+  contactsTotal: number;
+};
+
+export type OwnerListingState = {
+  slug: string;
+  status: OwnerListingStatus;
+  audience: OwnerListingAudience | null;
+};
+
+export type OwnerRequestSummary = {
+  id: string;
+  kind: "new" | "republish";
+  title: string;
+  status: string;
+  createdAt: string;
+  reviewedAt: string | null;
+  reason: string | null;
+  slug: string | null;
+};
+
 export type DemoAccount = {
+  // Present for MySQL accounts; demo data keeps using performance and reports.
+  listings?: OwnerListingState[];
+  requests?: OwnerRequestSummary[];
+  audienceUnavailable?: boolean;
   id: string;
   kind: DemoAccountKind;
   displayName: string;

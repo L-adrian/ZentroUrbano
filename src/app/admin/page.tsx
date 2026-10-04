@@ -3,7 +3,8 @@ import Link from "next/link";
 import { Box, ClipboardList } from "lucide-react";
 import { AdminAccountsOverview } from "@/components/admin-accounts-overview";
 import { AdminContactLeads } from "@/components/admin-contact-leads";
-import { getAdminAccountsOverview } from "@/lib/admin-accounts";
+import { AdminListingHealth } from "@/components/admin-listing-health";
+import { getAdminAccountsOverview, getAdminListingHealth } from "@/lib/admin-accounts";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { buildSeoMetadata } from "@/lib/seo";
 
@@ -21,6 +22,7 @@ export default async function AdminPage() {
     getPublishedPropertiesData(),
     getAdminAccountsOverview(),
   ]);
+  const health = await getAdminListingHealth(properties);
 
   return (
     <main className="bg-neutral-50">
@@ -43,8 +45,13 @@ export default async function AdminPage() {
 
       <section className="py-8 sm:py-12">
         <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-          <Link href="/admin/solicitudes" className="zu-button zu-button-primary"><ClipboardList size={18} />Revisar solicitudes y fotos recibidas</Link>
-          <Link href="/admin/recorridos" className="zu-button zu-button-secondary"><Box size={18} />Gestionar recorridos 3D</Link>
+          <div className="flex flex-wrap gap-3">
+            <Link href="/admin/solicitudes" className="zu-button zu-button-primary"><ClipboardList size={18} />Revisar solicitudes y fotos recibidas</Link>
+            <Link href="/admin/recorridos" className="zu-button zu-button-secondary"><Box size={18} />Gestionar recorridos 3D</Link>
+            <a href="#anuncios-con-avisos" className="zu-button zu-button-secondary">Avisos ({health.reported.length})</a>
+            <a href="#disponibilidad-por-confirmar" className="zu-button zu-button-secondary">Por confirmar ({health.checks.length})</a>
+          </div>
+          <AdminListingHealth checks={health.checks} reported={health.reported} />
           <AdminAccountsOverview
             databaseReady={accountsOverview.databaseReady}
             accounts={accountsOverview.accounts}
