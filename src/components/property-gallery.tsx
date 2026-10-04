@@ -137,7 +137,7 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
           {getPropertyContactCopy(property).shortLabel}
         </a>
       </div>}
-      {opened && <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>}
+      {opened && <div className="gallery-thumbs">{property.images.map((src, index) => <button key={src + index} type="button" onClick={() => setActive(index)} aria-label={`Ir a foto ${index + 1}`} aria-pressed={active === index}><ListingPhoto src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="h-full w-full object-cover" /></button>)}{videoUrl && <button type="button" className="gallery-video-thumb" onClick={() => setActive(photoCount)} aria-label="Ir al video" aria-pressed={showingVideo}><Play size={19} aria-hidden="true" /><span>Video</span></button>}</div>}
     </dialog>
   </>;
 }

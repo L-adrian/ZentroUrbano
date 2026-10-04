@@ -799,3 +799,4 @@ button, a { -webkit-tap-highlight-color: transparent; }
 /* Photo that could not load: card, gallery and gallery dialog. */
 .listing-photo-missing { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: var(--subtle); color: var(--muted); font-size: 13px; font-weight: 600; text-align: center; }
 .gallery-slide .listing-photo-missing { position: relative; min-height: 50vh; width: 100%; background: transparent; color: #d4d4d4; }
+.gallery-thumbs button { position: relative; }.gallery-thumbs .listing-photo-missing { font-size: 0; gap: 0; background: #242d28; color: #a3a3a3; }
