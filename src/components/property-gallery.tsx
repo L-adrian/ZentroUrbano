@@ -52,6 +52,17 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
   }, [opened]);
   function open(index: number) { trigger.current = document.activeElement as HTMLElement; setVideoFailed(false); setActive(index); }
   function move(direction: number) { setActive(index => index === null ? null : (index + direction + count) % count); }
+  // Horizontal swipes change the photo on phones; vertical drags and pinch zoom are left alone.
+  const swipe = useRef<{ x: number; y: number } | null>(null);
+  function startSwipe(event: React.TouchEvent) { swipe.current = event.touches.length === 1 ? { x: event.touches[0].clientX, y: event.touches[0].clientY } : null; }
+  function endSwipe(event: React.TouchEvent) {
+    const start = swipe.current;
+    swipe.current = null;
+    if (!start || showingVideo || count < 2) return;
+    const dx = event.changedTouches[0].clientX - start.x;
+    const dy = event.changedTouches[0].clientY - start.y;
+    if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) move(dx < 0 ? 1 : -1);
+  }
   if (!count) return <div className="zu-empty"><Images size={30} /><p>Las fotos aún no están disponibles.</p></div>;
   return <>
     {photoCount > 0 && <div className={`property-gallery ${photoCount === 1 ? "single-photo" : ""}`}>
@@ -80,7 +91,7 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
       }
     }}>
       {active !== null && <div className="gallery-toolbar"><div><p>{property.title}</p><span aria-live="polite">{showingVideo ? "Video de la vivienda" : `Foto ${active + 1} de ${photoCount}`}</span></div><button type="button" onClick={() => setActive(null)} aria-label="Cerrar galería" title="Cerrar galería"><X size={23} /></button></div>}
-      {(opened || warm) && <div className={`gallery-full-image${showingVideo ? " gallery-showing-video" : ""}`}>
+      {(opened || warm) && <div className={`gallery-full-image${showingVideo ? " gallery-showing-video" : ""}`} onTouchStart={startSwipe} onTouchEnd={endSwipe} onTouchCancel={() => { swipe.current = null; }}>
           {showingVideo ? <div className="gallery-video-container">
             <video key={videoUrl} src={videoUrl!} controls playsInline preload="metadata" aria-label={`Video: ${property.title}`} onError={() => setVideoFailed(true)} />
             {videoFailed && <p role="alert">No se pudo reproducir el video. <a href={videoUrl!} target="_blank" rel="noreferrer">Abrir video</a></p>}

@@ -149,3 +149,12 @@ test("gallery photos cannot be selected, so quick double clicks on the arrows ne
   assert.match(rule[1], /(^|;)\s*user-select: none;/);
   assert.match(rule[1], /-webkit-user-select: none;/);
 });
+
+test("the open gallery changes photo with a horizontal swipe on phones", async () => {
+  const gallery = await readFile(new URL("../src/components/property-gallery.tsx", import.meta.url), "utf8");
+  assert.match(gallery, /onTouchStart=\{startSwipe\}/);
+  assert.match(gallery, /onTouchEnd=\{endSwipe\}/);
+  assert.match(gallery, /move\(dx < 0 \? 1 : -1\)/);
+  const css = await readFile(new URL("../src/app/redesign.css", import.meta.url), "utf8");
+  assert.match(css, /\.gallery-full-image \{ touch-action: pan-y pinch-zoom; \}/);
+});
