@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import type { Property } from "@/lib/properties";
-import { withoutContactEmail } from "@/lib/rentals";
+import { withoutOwnerContact } from "@/lib/rentals";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import {
   countRentalNeedListings,
@@ -119,7 +119,7 @@ export default async function OperationZonePage({ params }: { params: Params }) 
       </div>
       {/* The whole city catalog with this zone selected: "Todas las zonas" really shows everything,
           and "Cerca de {zona}" can offer homes from neighboring zones. */}
-      <DirectRentalExplorer properties={withoutContactEmail(route.cityProperties)} initialFilters={{ zone: zoneName }} />
+      <DirectRentalExplorer properties={withoutOwnerContact(route.cityProperties)} initialFilters={{ zone: zoneName }} />
     </main>
   );
 }
@@ -162,7 +162,7 @@ function NeedPage({
             ))}
         </nav>
       </div>
-      <DirectRentalExplorer properties={withoutContactEmail(properties)} initialFilters={need.filters} />
+      <DirectRentalExplorer properties={withoutOwnerContact(properties)} initialFilters={need.filters} />
     </main>
   );
 }

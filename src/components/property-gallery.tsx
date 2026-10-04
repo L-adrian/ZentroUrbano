@@ -7,6 +7,7 @@ import { PriceDisplay } from "@/components/currency-preference";
 import type { Property } from "@/lib/properties";
 import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyVideoUrl } from "@/lib/property-video";
+import { ListingPhoto } from "@/components/listing-photo";
 import { PropertyTourButton } from "@/components/property-tour";
 import type { PublicTour } from "@/lib/property-tour-contract";
 
@@ -88,14 +89,14 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
   return <>
     {photoCount > 0 && <div className={`property-gallery ${photoCount === 1 ? "single-photo" : ""}`}>
       <button type="button" className="gallery-main" onClick={() => open(0)} aria-label="Ver galería de fotos">
-        <Image src={property.images[0]} alt={property.title} fill priority quality={72} sizes="(min-width: 1024px) 780px, 100vw" />
+        <ListingPhoto src={property.images[0]} alt={property.title} fill priority quality={72} sizes="(min-width: 1024px) 780px, 100vw" />
         <span><Images size={17} />{photoCount === 1 ? "Ver foto" : `Ver las ${photoCount} fotos`}</span>
       </button>
-      {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><Image src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
+      {photoCount > 1 && <div className="gallery-side">{property.images.slice(1, 3).map((src, index) => <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={`Ver foto ${index + 2}`}><ListingPhoto src={src} alt={`${property.title}, foto ${index + 2}`} fill sizes="400px" quality={72} /></button>)}</div>}
     </div>}
     {photoCount > 1 && <div className="gallery-strip" aria-label="Más fotos">{property.images.slice(1, 5).map((src, index) => {
       const remaining = photoCount - 5;
-      return <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={index === 3 && remaining > 0 ? `Ver ${remaining + 1} fotos más` : `Ver foto ${index + 2}`}><Image src={src} alt="" fill sizes="25vw" quality={68} />{index === 3 && remaining > 0 && <span className="gallery-strip-more">+{remaining + 1}</span>}</button>;
+      return <button key={src + index} type="button" onClick={() => open(index + 1)} aria-label={index === 3 && remaining > 0 ? `Ver ${remaining + 1} fotos más` : `Ver foto ${index + 2}`}><ListingPhoto src={src} alt="" fill sizes="25vw" quality={68} />{index === 3 && remaining > 0 && <span className="gallery-strip-more">+{remaining + 1}</span>}</button>;
     })}</div>}
     {(videoUrl || tour) && <div className="gallery-media-actions">{videoUrl && <button type="button" className="zu-button zu-button-secondary" onClick={() => open(photoCount)}><Play size={16} aria-hidden="true" />Ver video</button>}{tour && <PropertyTourButton tour={tour} />}</div>}
     {property.rentalDetails?.mediaNote && <p className="gallery-media-note">{property.rentalDetails.mediaNote}</p>}
@@ -124,7 +125,7 @@ export function PropertyGallery({ property, tour }: { property: Property; tour?:
                 <Image src={src} alt="" width={160} height={100} sizes="85px" quality={68} className="gallery-slide-placeholder" />
                 <span className="gallery-loader" role="status"><span className="gallery-loader-mark"><Home size={18} strokeWidth={2.2} aria-hidden="true" /></span><span>Cargando foto…</span></span>
               </>}
-              {(current || shouldMount(index)) && <Image src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={72} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} className="gallery-full-photo" />}
+              {(current || shouldMount(index)) && <ListingPhoto src={src} alt={`${property.title}, foto ${index + 1}`} width={1400} height={1000} sizes="(min-width: 1400px) 1280px, 100vw" quality={72} loading="eager" fetchPriority={current ? "high" : "low"} onLoad={() => markLoaded(index)} onError={() => markLoaded(index)} className="gallery-full-photo" />}
             </div>;
           })}</div>}
           {opened && count > 1 && <><button type="button" className="gallery-prev" onClick={() => move(-1)} aria-label={videoUrl ? "Contenido anterior" : "Foto anterior"} title="Anterior"><ChevronLeft size={24} /></button><button type="button" className="gallery-next" onClick={() => move(1)} aria-label={videoUrl ? "Siguiente contenido" : "Siguiente foto"} title="Siguiente"><ChevronRight size={24} /></button></>}

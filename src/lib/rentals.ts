@@ -1,3 +1,4 @@
+import { isExternalContactUrl } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
 
 export const rentalPropertyTypes = ["Casa", "Departamento"] as const;
@@ -24,9 +25,16 @@ export function getRentalZones(properties: Property[]) {
     .sort((first, second) => first.localeCompare(second, "es"));
 }
 
-// Catalog and map payloads are serialized into the page; contact emails are only needed on the listing page.
-export function withoutContactEmail(properties: Property[]) {
-  return properties.map((property) => ({ ...property, agent: { ...property.agent, email: "" } }));
+// Catalog and map payloads are serialized into the page, so they leave out the owners' email and
+// phone: one request would otherwise hand every number to a scraper. The listing page still shows
+// them, and every card contacts through /api/propiedades/<slug>/whatsapp. A link to an original
+// ad is not a phone, so it stays (the card shows "Ver anuncio original" for it).
+export function withoutOwnerContact(properties: Property[]) {
+  return properties.map((property) => ({
+    ...property,
+    whatsapp: isExternalContactUrl(property.whatsapp) ? property.whatsapp : "",
+    agent: { ...property.agent, email: "", phone: "", whatsapp: "" },
+  }));
 }
 
 export type RentalSummary = Pick<

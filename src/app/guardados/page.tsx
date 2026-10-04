@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { SavedListings } from "@/components/saved-listings";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
+import { getDirectRentals, withoutOwnerContact } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export const metadata: Metadata = buildSeoMetadata({
 });
 
 export default async function SavedListingsPage() {
-  const properties = withoutContactEmail(getDirectRentals(await getPublishedPropertiesData()));
+  const properties = withoutOwnerContact(getDirectRentals(await getPublishedPropertiesData()));
 
   return (
     <main id="contenido" className="saved-listings-page zu-container">

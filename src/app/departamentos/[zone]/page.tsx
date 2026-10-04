@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
-import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
+import { getDirectRentals, withoutOwnerContact } from "@/lib/rentals";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { filterDepartmentsByZone } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -58,7 +58,7 @@ export default async function DepartmentZonePage({
       </div>
       {/* The whole catalog with this zone and type selected, so clearing them shows everything. */}
       <DirectRentalExplorer
-        properties={withoutContactEmail(getDirectRentals(all))}
+        properties={withoutOwnerContact(getDirectRentals(all))}
         initialFilters={{ zone: zoneName, type: "Departamento" }}
       />
     </main>

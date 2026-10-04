@@ -14,6 +14,7 @@ import {
   type KnownPlace,
 } from "../src/lib/catalog-geo";
 import { getMonthlyCost } from "../src/lib/listing-summary";
+import { withoutOwnerContact } from "../src/lib/rentals";
 import {
   addRecentListing,
   isNewSinceVisit,
@@ -357,4 +358,17 @@ test("need pages are offered to Google only with 3 or more real listings that fu
   assert.equal(countRentalNeedListings(pets, [rental("p1", { pets: true }), rental("p2"), rental("p3", { pets: true })]), 2);
   const cheap = getRentalNeedRoute("hasta-2000-bs")!;
   assert.equal(countRentalNeedListings(cheap, [rental("c1", { price: 2000 }), rental("c2", { price: 2100 }), rental("c3", { price: 150, currency: "USD", exchangeRate: 6.96 })]), 2);
+});
+
+test("catalog payloads leave out owner phones and emails but keep links to original ads", () => {
+  const [owner] = directRentalDemoProperties;
+  const external = { ...owner, slug: "referencia", whatsapp: "https://example.com/aviso" };
+  const [stripped, reference] = withoutOwnerContact([owner, external]);
+  assert.equal(stripped.whatsapp, "");
+  assert.equal(stripped.agent.phone, "");
+  assert.equal(stripped.agent.whatsapp, "");
+  assert.equal(stripped.agent.email, "");
+  assert.equal(stripped.agent.name, owner.agent.name);
+  assert.equal(reference.whatsapp, "https://example.com/aviso");
+  assert.ok(owner.agent.phone, "the original object is not changed");
 });

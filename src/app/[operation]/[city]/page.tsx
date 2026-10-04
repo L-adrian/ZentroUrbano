@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
-import { getRentalZones, withoutContactEmail } from "@/lib/rentals";
+import { getRentalZones, withoutOwnerContact } from "@/lib/rentals";
 import { countRentalNeedListings, filterPropertiesByCity, rentalNeedRoutes, slugifyForRoute } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
@@ -77,7 +77,7 @@ export default async function OperationCityPage({ params }: { params: Params }) 
           Casas, departamentos y monoambientes en alquiler publicados por sus propios dueños. Escribes directo al propietario por WhatsApp, sin inmobiliarias ni comisiones de intermediación.
         </p>
       </div>
-      <DirectRentalExplorer properties={withoutContactEmail(properties)} />
+      <DirectRentalExplorer properties={withoutOwnerContact(properties)} />
       <section className="mx-auto max-w-[1500px] px-4 py-10 sm:px-6 lg:px-8" aria-labelledby="zonas-title">
         <h2 id="zonas-title" className="text-xl font-semibold tracking-tight">Alquileres por zona en {name}</h2>
         <ul className="mt-4 flex flex-wrap gap-2">
