@@ -4,6 +4,7 @@ import { getAvailabilityState, getEntryCost, getGuaranteeLabel, getListingHighli
 import type { Property } from "../src/lib/properties";
 import { buildOwnerWhatsappMessage, ownerFirstName } from "../src/lib/property-contact";
 import { countReportsSince } from "../src/lib/property-reports";
+import { isSameSiteRequest, visibleOrigin } from "../src/lib/request-origin";
 
 const day = 86_400_000;
 
@@ -66,4 +67,16 @@ test("first WhatsApp message names the home, price and link, and greets real nam
   assert.equal(ownerFirstName("Propietario de la vivienda"), null);
   assert.equal(ownerFirstName("María José"), "María");
   assert.match(buildOwnerWhatsappMessage({ ...property, agent: { ...property.agent, name: "Familia Rivero" } }, "Bs 1", "u"), /^Hola, vi/);
+});
+
+test("same-site check uses the address people see, not the server's own address", () => {
+  const behindProxy = (headers: Record<string, string>) =>
+    new Request("http://0.0.0.0:3000/api/propiedades/x/reportar", { method: "POST", headers: { host: "0.0.0.0:3000", "x-forwarded-host": "zentrourbano.com", "x-forwarded-proto": "https", ...headers } });
+  assert.equal(isSameSiteRequest(behindProxy({ origin: "https://zentrourbano.com" })), true);
+  assert.equal(isSameSiteRequest(behindProxy({ origin: "https://otro-sitio.com" })), false);
+  assert.equal(isSameSiteRequest(behindProxy({ origin: "https://zentrourbano.com", "sec-fetch-site": "cross-site" })), false);
+  assert.equal(isSameSiteRequest(behindProxy({})), true);
+  assert.equal(visibleOrigin(behindProxy({})), "https://zentrourbano.com");
+  const direct = new Request("http://localhost:3112/api/x", { method: "POST", headers: { host: "127.0.0.1:3112", origin: "http://127.0.0.1:3112" } });
+  assert.equal(isSameSiteRequest(direct), true);
 });

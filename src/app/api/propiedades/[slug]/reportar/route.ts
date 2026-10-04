@@ -3,6 +3,7 @@ import { recordPropertyReport } from "@/lib/property-audience";
 import { getPropertyBySlugData } from "@/lib/property-data";
 import { isReportReason, reportNoteMaxLength } from "@/lib/property-reports";
 import { hasDatabaseConfig } from "@/lib/mysql";
+import { isSameSiteRequest } from "@/lib/request-origin";
 import { getOrCreateVisitorId } from "@/lib/visitor-id";
 
 // Tenant reports ("ya se alquiló", "pidió dinero"...). Five "ya se alquiló" reports since the
@@ -11,8 +12,7 @@ export async function POST(
   request: NextRequest,
   context: RouteContext<"/api/propiedades/[slug]/reportar">,
 ) {
-  const origin = request.headers.get("origin");
-  if (origin && origin !== request.nextUrl.origin) {
+  if (!isSameSiteRequest(request)) {
     return NextResponse.json({ ok: false, message: "Origen no permitido." }, { status: 403 });
   }
   let body: { reason?: unknown; note?: unknown };

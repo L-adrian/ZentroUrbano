@@ -3,6 +3,7 @@ import { formatPriceInCurrency } from "@/lib/currency";
 import { buildOwnerWhatsappMessage, isExternalContactUrl, whatsappContactSources } from "@/lib/property-contact";
 import { absoluteUrl } from "@/lib/site";
 import { getPropertyBySlugData } from "@/lib/property-data";
+import { visibleOrigin } from "@/lib/request-origin";
 import { trackServerEvent } from "@/lib/tracking";
 import { getOrCreateVisitorId } from "@/lib/visitor-id";
 
@@ -14,7 +15,7 @@ export async function GET(
   const property = await getPropertyBySlugData(slug);
 
   if (!property) {
-    return NextResponse.redirect(new URL("/propiedades", request.url));
+    return NextResponse.redirect(new URL("/propiedades", visibleOrigin(request)));
   }
 
   const source = request.nextUrl.searchParams.get("desde");
