@@ -224,7 +224,7 @@ export default async function PropertyDetailPage({
                   href={whatsappContactPath(property.slug, "ficha")}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex h-12 items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
+                  className="zu-whatsapp-cta inline-flex h-12 items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
                 >
                   <MessageCircle className="h-4 w-4" aria-hidden="true" />
                   Contactar por WhatsApp
@@ -256,7 +256,10 @@ export default async function PropertyDetailPage({
                 </p>
               ) : null}
               <CostsBlock property={property} />
-              <SafetyNotice slug={property.slug} className="mt-4" />
+              {/* On desktop the same notice sits in the contact card beside the gallery. */}
+              <div className="lg:hidden">
+                <SafetyNotice slug={property.slug} className="mt-4" />
+              </div>
             </div>
 
             <div className="quick-facts border-y border-neutral-200 py-3 sm:py-4">

@@ -99,7 +99,7 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
               }
             }}
             disabled={!canZoomIn}
-            className="flex h-10 w-10 items-center justify-center text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-11 w-11 items-center justify-center text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-45"
             aria-label="Acercar mapa"
             title={canZoomIn ? "Acercar" : "Zoom máximo"}
           >
@@ -116,7 +116,7 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
               }
             }}
             disabled={!canZoomOut}
-            className="flex h-10 w-10 items-center justify-center text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-11 w-11 items-center justify-center text-neutral-800 transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-45"
             aria-label="Alejar mapa"
             title={canZoomOut ? "Alejar" : "Zoom mínimo"}
           >
@@ -137,7 +137,7 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
 
             map.flyTo(position, MAP_FOCUS_ZOOM, { duration: 0.45 });
           }}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white/95 text-neutral-800 shadow-sm backdrop-blur transition hover:bg-neutral-100"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/10 bg-white/95 text-neutral-800 shadow-sm backdrop-blur transition hover:bg-neutral-100"
           aria-label="Centrar propiedad"
           title="Centrar"
         >

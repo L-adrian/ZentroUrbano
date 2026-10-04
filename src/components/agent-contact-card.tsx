@@ -50,7 +50,7 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
           href={whatsappContactPath(property.slug, "ficha")}
           target="_blank"
           rel="noreferrer"
-          className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
+          className="zu-whatsapp-cta mt-4 inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
         >
           {contactUsesReference ? (
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
@@ -116,7 +116,7 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
           href={whatsappContactPath(property.slug, "ficha")}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b] lg:hidden"
+          className="zu-whatsapp-cta inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b] lg:hidden"
         >
           {contactUsesReference ? (
             <ExternalLink className="h-4 w-4" aria-hidden="true" />

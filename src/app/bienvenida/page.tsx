@@ -40,7 +40,7 @@ export default async function WelcomePage() {
         <h1 id="welcome-title">Zentro <span>Urbano</span></h1>
         <p className="welcome-promise">Tu próximo hogar.<br />Directo con su propietario.</p>
         <ul className="welcome-principles" aria-label="Alquiler directo">
-          <li><Check size={15} />Sin inmobiliarias</li><li><Check size={15} />Sin comisiones de intermediación</li>
+          <li><Check size={15} />Sin inmobiliarias</li><li><Check size={15} />Sin comisiones para nadie</li><li><Check size={15} />Publicar es gratis</li>
         </ul>
         <div className="welcome-actions">
           <Link className="zu-button zu-button-primary" href="/propiedades"><Search size={18} />Buscar alquiler<ArrowRight size={17} /></Link>

@@ -7,6 +7,7 @@ import {
 } from "@/lib/seo-routes";
 import { absoluteUrl } from "@/lib/site";
 import { getDirectRentals } from "@/lib/rentals";
+import { guides } from "@/lib/guides";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,8 @@ const staticRoutes = [
   "/ayuda",
   "/requisitos",
   "/seguridad",
+  "/guias",
+  ...guides.map((guide) => `/guias/${guide.slug}`),
   "/publicidad",
   "/contacto",
   "/terminos",

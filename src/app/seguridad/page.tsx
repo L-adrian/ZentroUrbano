@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { supportHoursLabel } from "@/lib/property-reports";
@@ -44,6 +45,7 @@ export default function SafetyPage() {
     <section><h2>Qué hacemos con tu reporte</h2><p>En cada ficha está el botón &quot;Reportar este anuncio&quot;. Guardamos el motivo sin tu nombre ni tu número y lo revisamos {supportHoursLabel}. Los avisos de dinero pedido antes de la visita van primero. Podemos corregir la ficha, pedir al dueño que confirme o retirarla.</p></section>
     <section><h2>Protege tu cuenta</h2><p>No compartas tu contraseña ni códigos de acceso. El equipo de ayuda no necesita esos datos. Comprueba que estás en zentrourbano.com antes de ingresar tus credenciales.</p></section>
   </div>
+  <p className="guide-note">¿Vas a visitar o firmar? Lee las <Link href="/guias">guías para alquilar</Link>: qué revisar en la visita, qué confirmar en el contrato y el recibo de la garantía.</p>
   <div className="safety-questions">{questions.map(item => <section key={item.question}><h2>{item.question}</h2><p>{item.answer}</p></section>)}</div>
   <SupportWhatsAppButton /></main>;
 }

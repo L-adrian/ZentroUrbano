@@ -42,7 +42,7 @@ export function MobileStickyContact({ property }: MobileStickyContactProps) {
           href={whatsappContactPath(property.slug, "barra")}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-[#176b4d] px-4 text-sm font-semibold text-white"
+          className="zu-whatsapp-cta inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-[#176b4d] px-4 text-sm font-semibold text-white"
         >
           {contactUsesReference ? (
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
