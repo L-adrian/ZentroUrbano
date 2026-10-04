@@ -21,6 +21,7 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrencyPreference } from "@/components/currency-preference";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyMap } from "@/components/property-map";
+import { SearchAlertButton } from "@/components/search-alert-button";
 import { RecentlyViewed, SavedListingsLink } from "@/components/recently-viewed";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import {
@@ -608,16 +609,19 @@ export function DirectRentalExplorer({
                       Limpiar todos los filtros ({properties.length} {properties.length === 1 ? "alquiler" : "alquileres"})
                     </button>
                   ) : null}
-                  <a
-                    href={whatsappUrl(alertMessage)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="zu-button support-whatsapp"
-                  >
-                    <WhatsAppIcon />
-                    Avísame cuando haya una así
-                  </a>
-                  <p className="text-xs text-neutral-500">Se abre WhatsApp con tu búsqueda ya escrita.</p>
+                  <SearchAlertButton
+                    params={serializedFilters}
+                    summary={searchSummary}
+                    whatsappHref={whatsappUrl(alertMessage)}
+                    className="zu-button zu-button-primary"
+                  />
+                  <p className="text-xs text-neutral-500">
+                    Guardamos tu búsqueda y te escribimos cuando se publique una así. Si prefieres,{" "}
+                    <a href={whatsappUrl(alertMessage)} target="_blank" rel="noopener noreferrer" className="font-semibold underline">
+                      envíanos tu búsqueda por WhatsApp
+                    </a>
+                    .
+                  </p>
                 </div>
               </div>
             )}
