@@ -31,8 +31,6 @@ import {
   getNearbyListings,
   getZoneCenters,
   knownPlaces,
-  roundMapArea,
-  type MapArea,
 } from "@/lib/catalog-geo";
 import { convertPrice } from "@/lib/currency";
 import {
@@ -273,10 +271,6 @@ export function DirectRentalExplorer({
       else types.delete(type);
       return { ...current, type: toRentalTypeFilter(types) };
     });
-  }
-
-  function searchArea(area: MapArea) {
-    updateFilter("area", roundMapArea(area));
   }
 
   const formatMoney = (amountBob: number) => {
@@ -700,7 +694,6 @@ export function DirectRentalExplorer({
                   mapClassName="rental-results-map relative min-h-[70svh] w-full overflow-hidden border border-neutral-300 bg-[#e9ece3] lg:min-h-[calc(100svh-11rem)]"
                   showZoneShortcuts={false}
                   loadOnView
-                  onSearchArea={searchArea}
                   preserveView={Boolean(filters.area)}
                 />
               ) : (
