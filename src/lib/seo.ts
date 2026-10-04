@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 
 export const defaultSeoImage = {
-  url: absoluteUrl("/opengraph-image"),
+  url: absoluteUrl("/images/og/zentro-urbano.png"),
   width: 1200,
   height: 630,
   alt: "Zentro Urbano, alquileres directos con propietarios en Santa Cruz",

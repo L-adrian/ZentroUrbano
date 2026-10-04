@@ -50,7 +50,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: absoluteUrl("/opengraph-image"),
+        url: absoluteUrl("/images/og/zentro-urbano.png"),
         width: 1200,
         height: 630,
         alt: "Zentro Urbano, alquiler directo con propietarios en Bolivia",
@@ -61,7 +61,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Zentro Urbano | Alquiler directo con dueños en Santa Cruz",
     description: siteConfig.description,
-    images: [absoluteUrl("/opengraph-image")],
+    images: [absoluteUrl("/images/og/zentro-urbano.png")],
   },
   robots: {
     index: true,

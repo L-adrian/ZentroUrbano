@@ -13,7 +13,7 @@ import { buildSeoMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Alquiler directo con dueños en Santa Cruz de la Sierra",
+  title: "Zentro Urbano: alquiler directo con dueños en Santa Cruz",
   description: "Casas, departamentos y monoambientes en alquiler en Santa Cruz de la Sierra, directo con el dueño. Sin inmobiliarias ni comisiones.",
   path: "/", keywords: ["alquiler Santa Cruz de la Sierra", "alquiler dueño directo Santa Cruz", "alquiler directo Santa Cruz", "alquiler SCZ", "departamentos en alquiler Santa Cruz", "casas en alquiler Santa Cruz"],
 });
