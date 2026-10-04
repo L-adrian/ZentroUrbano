@@ -1,10 +1,29 @@
 import {
   convertPrice,
+  getPropertyExchangeRate,
   getPropertyPriceInCurrency,
   parseCurrencyAmount,
   type DisplayCurrency,
 } from "@/lib/currency";
+import {
+  distanceKm,
+  formatMapArea,
+  getKnownPlace,
+  isInsideArea,
+  knownPlaces,
+  parseMapArea,
+  type KnownPlace,
+  type MapArea,
+} from "@/lib/catalog-geo";
+import { getAvailabilityState, getEntryCost, getMonthlyCost } from "@/lib/listing-summary";
 import type { Operation, Property, PropertyType } from "@/lib/properties";
+import {
+  compareWithZoneAverage,
+  getZoneAverages,
+  isBelowZoneAverage,
+  type ZoneAverage,
+  type ZoneAverageComparison,
+} from "@/lib/zone-prices";
 
 export type PropertySearchEvaluation = {
   matches: boolean;
@@ -22,11 +41,26 @@ type SearchAmenity =
   | "grill"
   | "elevator";
 
+type SearchIntent =
+  | { kind: "place"; indexes: number[]; place: KnownPlace }
+  | { kind: "monoambiente"; indexes: number[] }
+  | { kind: "type"; indexes: number[]; type: PropertyType }
+  | { kind: "operation"; indexes: number[]; operation: Operation }
+  | { kind: "bedrooms"; indexes: number[]; count: number }
+  | { kind: "amenity"; indexes: number[]; amenity: SearchAmenity }
+  | { kind: "price"; indexes: number[]; amount: number; currency: DisplayCurrency };
+
+type QueryWord = { text: string; tokenIndexes: number[] };
+
 type ParsedSearchQuery = {
   normalized: string;
   tokens: string[];
+  words: QueryWord[];
   meaningfulTokens: string[];
   consumedIndexes: Set<number>;
+  // Free words that no published listing has anywhere ("No usamos: ..."); they do not filter.
+  ignoredIndexes: Set<number>;
+  intents: SearchIntent[];
   propertyType?: PropertyType;
   operation?: Operation;
   bedroomCount?: number;
@@ -39,6 +73,8 @@ type ParsedSearchQuery = {
 type PropertySearchOptions = {
   // Currency for amounts written without one ("hasta 3000").
   currency?: DisplayCurrency;
+  // Well-known places the text can name ("cerca de la UAGRM").
+  places?: KnownPlace[];
 };
 
 const stopWords = new Set([
@@ -133,10 +169,6 @@ const typeAliases: Array<{ type: PropertyType; aliases: string[] }> = [
       "deptos",
       "dpto",
       "dptos",
-      "monoambiente",
-      "mono ambiente",
-      "studio",
-      "estudio",
     ],
   },
   {
@@ -144,6 +176,8 @@ const typeAliases: Array<{ type: PropertyType; aliases: string[] }> = [
     aliases: ["lote", "lotes", "terreno", "terrenos"],
   },
 ];
+
+const monoambienteAliases = ["monoambiente", "mono ambiente", "mono ambientes", "studio", "estudio"];
 
 const operationAliases: Array<{ operation: Operation; aliases: string[] }> = [
   {
@@ -198,6 +232,16 @@ const amenityAliases: Array<{ amenity: SearchAmenity; aliases: string[] }> = [
 const currencyUsdTerms = new Set(["dolar", "dolares", "usd", "us"]);
 const currencyBobTerms = new Set(["bob", "boliviano", "bolivianos", "bs"]);
 const priceLimitTerms = new Set(["hasta", "max", "maximo", "menos", "presupuesto", "tope"]);
+const amenityLabels: Record<SearchAmenity, string> = {
+  garage: "Con parqueo",
+  pets: "Acepta mascotas",
+  furnished: "Amoblado",
+  security: "Seguridad",
+  pool: "Piscina",
+  patio: "Patio o jardín",
+  grill: "Churrasquera",
+  elevator: "Ascensor",
+};
 
 export function hasSearchQuery(value: string | null | undefined) {
   const parsed = parseSearchQuery(value ?? "");
@@ -222,8 +266,7 @@ function evaluateParsedSearch(property: Property, parsed: ParsedSearchQuery): Pr
     return { matches: false, score: 0, hasIntent: true };
   }
 
-  const searchableText = normalizeSearchText(buildPropertySearchText(property));
-  const searchableWords = getSearchableWords(searchableText);
+  const { text: searchableText, words: searchableWords } = getSearchableText(property);
   const softTokens = getSoftSearchTokens(parsed);
   let textScore = 0;
   let matchedSoftTokens = 0;
@@ -237,13 +280,7 @@ function evaluateParsedSearch(property: Property, parsed: ParsedSearchQuery): Pr
     }
   }
 
-  const hasHardIntent =
-    Boolean(parsed.propertyType) ||
-    Boolean(parsed.operation) ||
-    parsed.bedroomCount !== undefined ||
-    parsed.amenities.length > 0 ||
-    parsed.maxPriceBob !== undefined ||
-    parsed.maxPriceUsd !== undefined;
+  const hasHardIntent = parsed.intents.length > 0;
   const matches = hasHardIntent || softTokens.length === 0 || matchedSoftTokens > 0;
 
   return {
@@ -256,7 +293,7 @@ function evaluateParsedSearch(property: Property, parsed: ParsedSearchQuery): Pr
 export function normalizeSearchText(value: string) {
   return value
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .replace(/\$us/giu, " usd ")
     .replace(/\bu\$s\b/giu, " usd ")
     .toLowerCase()
@@ -274,77 +311,99 @@ function normalizeQueryAmounts(query: string) {
     );
 }
 
+// Each written word keeps the indexes of its normalized tokens, so a part the search understood
+// can be removed from the text ("Monoambiente ×") without touching the rest.
+function tokenizeQuery(query: string) {
+  const words: QueryWord[] = [];
+  const tokens: string[] = [];
+  for (const text of normalizeQueryAmounts(query).split(/\s+/).filter(Boolean)) {
+    const wordTokens = normalizeSearchText(text).split(" ").filter(Boolean);
+    words.push({ text, tokenIndexes: wordTokens.map((_, offset) => tokens.length + offset) });
+    tokens.push(...wordTokens);
+  }
+  return { words, tokens, normalized: tokens.join(" ") };
+}
+
 function parseSearchQuery(query: string, options: PropertySearchOptions = {}): ParsedSearchQuery {
-  const normalized = normalizeSearchText(normalizeQueryAmounts(query));
-  const tokens = normalized.split(" ").filter(Boolean);
+  const { words, tokens, normalized } = tokenizeQuery(query);
   const meaningfulTokens = tokens.filter(isMeaningfulToken);
   const consumedIndexes = new Set<number>();
-  const propertyType = detectPropertyType(normalized, tokens, consumedIndexes);
-  const operation = detectOperation(normalized, tokens, consumedIndexes);
-  const monoambiente =
-    normalized.includes("mono ambiente") ||
-    tokens.some((token) => isSimilarToken(token, "monoambiente")) ||
-    tokens.some((token) => isSimilarToken(token, "studio")) ||
-    tokens.some((token) => isSimilarToken(token, "estudio"));
-  const bedroomCount = monoambiente ? 1 : detectBedroomCount(tokens, consumedIndexes);
-  const amenities = detectAmenities(tokens, consumedIndexes);
-  const { maxPriceUsd, maxPriceBob } = detectPriceIntent(
-    tokens,
-    consumedIndexes,
-    options.currency ?? "BOB",
-  );
+  const intents: SearchIntent[] = [];
+  const record = (intent: SearchIntent) => {
+    intent.indexes.forEach((index) => consumedIndexes.add(index));
+    intents.push(intent);
+  };
+
+  for (const place of options.places ?? knownPlaces) {
+    const indexes = findAliasMatch(tokens, place.aliases, consumedIndexes, true);
+    if (indexes) {
+      record({ kind: "place", indexes, place });
+      break;
+    }
+  }
+
+  // Same rule as the "Tipo: Monoambiente" filter (isMonoambiente), not "any 1-bedroom apartment".
+  const monoambienteIndexes = findAliasMatch(tokens, monoambienteAliases, consumedIndexes);
+  if (monoambienteIndexes) record({ kind: "monoambiente", indexes: monoambienteIndexes });
+
+  for (const group of typeAliases) {
+    const indexes = findAliasMatch(tokens, group.aliases, consumedIndexes);
+    if (indexes) {
+      record({ kind: "type", indexes, type: group.type });
+      break;
+    }
+  }
+
+  for (const group of operationAliases) {
+    const indexes = findAliasMatch(tokens, group.aliases, consumedIndexes);
+    if (indexes) {
+      record({ kind: "operation", indexes, operation: group.operation });
+      break;
+    }
+  }
+
+  const bedrooms = monoambienteIndexes ? null : detectBedroomCount(tokens, consumedIndexes);
+  if (bedrooms) record({ kind: "bedrooms", indexes: bedrooms.indexes, count: bedrooms.count });
+
+  for (const group of amenityAliases) {
+    const index = tokens.findIndex(
+      (token, tokenIndex) => !consumedIndexes.has(tokenIndex) && group.aliases.some((alias) => isSimilarToken(token, alias)),
+    );
+    if (index >= 0) record({ kind: "amenity", indexes: [index], amenity: group.amenity });
+  }
+
+  for (const price of detectPriceIntent(tokens, consumedIndexes, options.currency ?? "BOB")) record(price);
+
+  const typeIntent = intents.find((intent) => intent.kind === "type");
+  const operationIntent = intents.find((intent) => intent.kind === "operation");
+  const bedroomIntent = intents.find((intent) => intent.kind === "bedrooms");
+  const priceIntents = intents.filter((intent) => intent.kind === "price");
+  const maxPrice = (currency: DisplayCurrency) => {
+    const amounts = priceIntents.filter((intent) => intent.currency === currency).map((intent) => intent.amount);
+    return amounts.length ? Math.max(...amounts) : undefined;
+  };
 
   return {
     normalized,
     tokens,
+    words,
     meaningfulTokens,
     consumedIndexes,
-    propertyType,
-    operation,
-    bedroomCount,
-    monoambiente,
-    amenities,
-    maxPriceUsd,
-    maxPriceBob,
+    ignoredIndexes: new Set<number>(),
+    intents,
+    propertyType: typeIntent?.kind === "type" ? typeIntent.type : undefined,
+    operation: operationIntent?.kind === "operation" ? operationIntent.operation : undefined,
+    bedroomCount: bedroomIntent?.kind === "bedrooms" ? bedroomIntent.count : undefined,
+    monoambiente: Boolean(monoambienteIndexes),
+    amenities: intents.flatMap((intent) => (intent.kind === "amenity" ? [intent.amenity] : [])),
+    maxPriceUsd: maxPrice("USD"),
+    maxPriceBob: maxPrice("BOB"),
   };
-}
-
-function detectPropertyType(
-  normalized: string,
-  tokens: string[],
-  consumedIndexes: Set<number>,
-) {
-  for (const group of typeAliases) {
-    const match = findAliasMatch(normalized, tokens, group.aliases);
-
-    if (match) {
-      match.indexes.forEach((index) => consumedIndexes.add(index));
-      return group.type;
-    }
-  }
-
-  return undefined;
-}
-
-function detectOperation(
-  normalized: string,
-  tokens: string[],
-  consumedIndexes: Set<number>,
-) {
-  for (const group of operationAliases) {
-    const match = findAliasMatch(normalized, tokens, group.aliases);
-
-    if (match) {
-      match.indexes.forEach((index) => consumedIndexes.add(index));
-      return group.operation;
-    }
-  }
-
-  return undefined;
 }
 
 function detectBedroomCount(tokens: string[], consumedIndexes: Set<number>) {
   for (let index = 0; index < tokens.length; index += 1) {
+    if (consumedIndexes.has(index)) continue;
     const count = getTokenNumber(tokens[index]);
 
     if (count === null || count < 0 || count > 20) {
@@ -353,79 +412,59 @@ function detectBedroomCount(tokens: string[], consumedIndexes: Set<number>) {
 
     const nearbyRoomIndex = findNearbyIndex(tokens, index, roomTerms, 3);
 
-    if (nearbyRoomIndex !== null) {
-      consumedIndexes.add(index);
-      consumedIndexes.add(nearbyRoomIndex);
-      return count;
+    if (nearbyRoomIndex !== null && !consumedIndexes.has(nearbyRoomIndex)) {
+      return { count, indexes: [index, nearbyRoomIndex] };
     }
   }
 
-  return undefined;
-}
-
-function detectAmenities(tokens: string[], consumedIndexes: Set<number>) {
-  const amenities: SearchAmenity[] = [];
-
-  for (const group of amenityAliases) {
-    for (let index = 0; index < tokens.length; index += 1) {
-      if (group.aliases.some((alias) => isSimilarToken(tokens[index], alias))) {
-        amenities.push(group.amenity);
-        consumedIndexes.add(index);
-        break;
-      }
-    }
-  }
-
-  return amenities;
+  return null;
 }
 
 function detectPriceIntent(
   tokens: string[],
   consumedIndexes: Set<number>,
   defaultCurrency: DisplayCurrency,
-) {
-  let maxPriceUsd: number | undefined;
-  let maxPriceBob: number | undefined;
+): SearchIntent[] {
+  const prices: SearchIntent[] = [];
 
   for (let index = 0; index < tokens.length; index += 1) {
     const amount = getTokenNumber(tokens[index]);
 
-    if (amount === null || amount <= 20) {
+    if (amount === null || amount <= 20 || consumedIndexes.has(index)) {
       continue;
     }
 
-    const nearbyCurrency =
-      findNearbyCurrency(tokens, index) ??
-      (tokens.slice(Math.max(0, index - 2), index).some((token) => priceLimitTerms.has(token))
-        ? defaultCurrency
-        : null);
+    const currencyIndex = findNearbyCurrencyIndex(tokens, index);
+    const limitIndex = [index - 1, index - 2].find((candidate) => candidate >= 0 && priceLimitTerms.has(tokens[candidate]));
+    const currency: DisplayCurrency | null =
+      currencyIndex !== null
+        ? currencyUsdTerms.has(tokens[currencyIndex]) ? "USD" : "BOB"
+        : limitIndex !== undefined
+          ? defaultCurrency
+          : null;
 
-    if (nearbyCurrency === "USD") {
-      maxPriceUsd = maxPriceUsd === undefined ? amount : Math.max(maxPriceUsd, amount);
-      consumedIndexes.add(index);
-    }
-
-    if (nearbyCurrency === "BOB") {
-      maxPriceBob = maxPriceBob === undefined ? amount : Math.max(maxPriceBob, amount);
-      consumedIndexes.add(index);
+    if (currency) {
+      const indexes = [index, ...(currencyIndex !== null ? [currencyIndex] : []), ...(limitIndex !== undefined ? [limitIndex] : [])];
+      prices.push({ kind: "price", indexes, amount, currency });
     }
   }
 
-  return { maxPriceUsd, maxPriceBob };
+  return prices;
 }
 
-function findAliasMatch(normalized: string, tokens: string[], aliases: string[]) {
+// Single words ("depto") or consecutive words ("mono ambiente", "terminal bimodal").
+function findAliasMatch(tokens: string[], aliases: string[], consumedIndexes: Set<number>, exact = false) {
   for (const alias of aliases) {
-    const normalizedAlias = normalizeSearchText(alias);
+    const aliasTokens = normalizeSearchText(alias).split(" ").filter(Boolean);
+    if (!aliasTokens.length) continue;
 
-    if (normalizedAlias.includes(" ") && normalized.includes(normalizedAlias)) {
-      return { indexes: [] };
-    }
-
-    for (let index = 0; index < tokens.length; index += 1) {
-      if (isSimilarToken(tokens[index], normalizedAlias)) {
-        return { indexes: [index] };
-      }
+    for (let start = 0; start + aliasTokens.length <= tokens.length; start += 1) {
+      const indexes = aliasTokens.map((_, offset) => start + offset);
+      const matches = indexes.every((index, offset) =>
+        !consumedIndexes.has(index) &&
+        (exact || aliasTokens.length > 1 ? tokens[index] === aliasTokens[offset] : isSimilarToken(tokens[index], aliasTokens[offset])),
+      );
+      if (matches) return indexes;
     }
   }
 
@@ -449,13 +488,15 @@ function getConstraintScore(property: Property, parsed: ParsedSearchQuery) {
     score += 28;
   }
 
+  if (parsed.monoambiente) {
+    if (!isMonoambiente(property)) {
+      return null;
+    }
+    score += 36;
+  }
+
   if (parsed.bedroomCount !== undefined) {
-    if (parsed.monoambiente) {
-      if (property.type !== "Departamento" || property.bedrooms !== 1) {
-        return null;
-      }
-      score += 36;
-    } else if (property.bedrooms < parsed.bedroomCount) {
+    if (property.bedrooms < parsed.bedroomCount) {
       return null;
     } else {
       score += property.bedrooms === parsed.bedroomCount ? 32 : 24;
@@ -488,12 +529,43 @@ function getConstraintScore(property: Property, parsed: ParsedSearchQuery) {
 
 function getSoftSearchTokens(parsed: ParsedSearchQuery) {
   return parsed.tokens.filter((token, index) => {
-    if (parsed.consumedIndexes.has(index)) {
+    if (parsed.consumedIndexes.has(index) || parsed.ignoredIndexes.has(index)) {
       return false;
     }
 
     return isMeaningfulToken(token);
   });
+}
+
+function getSoftTokenIndexes(parsed: ParsedSearchQuery) {
+  return parsed.tokens.flatMap((token, index) =>
+    !parsed.consumedIndexes.has(index) && isMeaningfulToken(token) ? [index] : [],
+  );
+}
+
+// Free words that appear in no listing at all do not empty the results; they are listed as
+// "No usamos" instead, so the person knows they were left out.
+function markIgnoredTokens(parsed: ParsedSearchQuery, properties: Property[]) {
+  for (const index of getSoftTokenIndexes(parsed)) {
+    const token = parsed.tokens[index];
+    const known = properties.some((property) => {
+      const { text, words } = getSearchableText(property);
+      return getTokenMatchScore(token, text, words) > 0;
+    });
+    if (!known) parsed.ignoredIndexes.add(index);
+  }
+}
+
+const searchableTextCache = new WeakMap<Property, { text: string; words: string[] }>();
+
+function getSearchableText(property: Property) {
+  let cached = searchableTextCache.get(property);
+  if (!cached) {
+    const text = normalizeSearchText(buildPropertySearchText(property));
+    cached = { text, words: getSearchableWords(text) };
+    searchableTextCache.set(property, cached);
+  }
+  return cached;
 }
 
 function isMeaningfulToken(token: string) {
@@ -642,7 +714,11 @@ function getAmenitySearchTerms(property: Property) {
   }
 
   if (property.type === "Departamento" && property.bedrooms === 1) {
-    terms.push("un dormitorio una habitacion monoambiente mono ambiente studio estudio");
+    terms.push("un dormitorio una habitacion");
+  }
+
+  if (isMonoambiente(property)) {
+    terms.push("monoambiente mono ambiente studio estudio");
   }
 
   return terms;
@@ -677,7 +753,7 @@ function findNearbyIndex(tokens: string[], originIndex: number, aliases: string[
   return closest;
 }
 
-function findNearbyCurrency(tokens: string[], originIndex: number) {
+function findNearbyCurrencyIndex(tokens: string[], originIndex: number) {
   for (
     let index = Math.max(0, originIndex - 2);
     index <= Math.min(tokens.length - 1, originIndex + 2);
@@ -685,12 +761,8 @@ function findNearbyCurrency(tokens: string[], originIndex: number) {
   ) {
     const token = tokens[index];
 
-    if (currencyUsdTerms.has(token)) {
-      return "USD";
-    }
-
-    if (currencyBobTerms.has(token)) {
-      return "BOB";
+    if (currencyUsdTerms.has(token) || currencyBobTerms.has(token)) {
+      return index;
     }
   }
 
@@ -768,6 +840,10 @@ function levenshteinDistance(source: string, target: string, maxDistance: number
 export type RentalTypeFilter = "" | "Casa" | "Departamento" | "Monoambiente";
 export type PetsPolicy = "allowed" | "consult" | "not_allowed";
 export type PriceBound = { amount: number; currency: DisplayCurrency };
+export type GuaranteeFilter = "" | "sin" | "hasta-1-mes";
+export type RentalSort = "" | "recientes" | "menor-precio" | "mayor-precio" | "menor-entrada" | "cercania";
+// Data the owner did not give: those homes go last, in a "pendiente de consulta" group.
+export type PendingReason = "pets" | "expenses" | "guarantee" | "entry";
 
 export type RentalSearchFilters = {
   query: string;
@@ -781,11 +857,35 @@ export type RentalSearchFilters = {
   bathrooms: string;
   pets: boolean;
   garage: boolean;
+  furnished: boolean;
+  guarantee: GuaranteeFilter;
+  // The budget (Mín./Máx.) is compared with rent plus expenses.
+  includeExpenses: boolean;
+  // "Para entrar, hasta Bs …": first month, expenses and guarantee together.
+  maxEntry: string;
+  // Optional and off by default (owner's decision): only homes priced below their zone's average.
+  belowZoneAverage: boolean;
+  // Id of a well-known place (catalog-geo knownPlaces).
+  near: string;
+  // Visible map area chosen with "Buscar en esta zona del mapa".
+  area: MapArea | null;
+  sort: RentalSort;
 };
 
-export type RentalFilterKey = Exclude<keyof RentalSearchFilters, "priceCurrency">;
+export type RentalFilterKey = Exclude<keyof RentalSearchFilters, "priceCurrency" | "sort">;
 
-export type RentalSearchMatch = { property: Property; petsPolicy: PetsPolicy };
+export type RentalSearchMatch = {
+  property: Property;
+  petsPolicy: PetsPolicy;
+  pending: PendingReason[];
+  distanceKm: number | null;
+  zoneAverage: ZoneAverageComparison | null;
+};
+
+export type RentalSearchOptions = {
+  places?: KnownPlace[];
+  zoneAverages?: Map<string, ZoneAverage>;
+};
 
 type SearchParamsReader = {
   get(name: string): string | null;
@@ -803,20 +903,42 @@ export const emptyRentalSearchFilters: RentalSearchFilters = {
   bathrooms: "",
   pets: false,
   garage: false,
+  furnished: false,
+  guarantee: "",
+  includeExpenses: false,
+  maxEntry: "",
+  belowZoneAverage: false,
+  near: "",
+  area: null,
+  sort: "",
 };
 
 export const rentalBedroomOptions = ["1", "2", "3", "4"];
 export const rentalBathroomOptions = ["1", "2", "3"];
+export const rentalSortOptions: Array<{ value: RentalSort; label: string }> = [
+  { value: "", label: "Normal (destacados primero)" },
+  { value: "recientes", label: "Confirmados hace poco" },
+  { value: "menor-precio", label: "Menor precio" },
+  { value: "mayor-precio", label: "Mayor precio" },
+  { value: "menor-entrada", label: "Menor costo para entrar" },
+];
 export const rentalSearchParamKeys = [
   "q",
   "zone",
   "type",
   "minPrice",
   "maxPrice",
+  "maxEntrada",
   "currency",
   "bedrooms",
   "bathrooms",
   "amenity",
+  "garantia",
+  "expensas",
+  "promedio",
+  "cerca",
+  "area",
+  "orden",
 ];
 
 const rentalFilterKeys: RentalFilterKey[] = [
@@ -825,11 +947,20 @@ const rentalFilterKeys: RentalFilterKey[] = [
   "type",
   "minPrice",
   "maxPrice",
+  "includeExpenses",
+  "maxEntry",
   "bedrooms",
   "bathrooms",
   "pets",
   "garage",
+  "furnished",
+  "guarantee",
+  "belowZoneAverage",
+  "near",
+  "area",
 ];
+
+const rentalSorts = new Set<string>(["recientes", "menor-precio", "mayor-precio", "menor-entrada", "cercania"]);
 
 // Reads "3.000", "3,000", "3 mil", "3k", "Bs 3000" or "$us 450". Null when it is not an amount.
 export function parsePriceInput(
@@ -881,10 +1012,15 @@ export function isMonoambiente(property: Property) {
   );
 }
 
+export function isRentalSort(value: string | null | undefined): value is RentalSort {
+  return value === "" || (typeof value === "string" && rentalSorts.has(value));
+}
+
 // URL values win over the page defaults (for example the zone of a zone page).
 export function readRentalSearchParams(
   params: SearchParamsReader,
   defaults: Partial<RentalSearchFilters> = {},
+  places: KnownPlace[] = knownPlaces,
 ): RentalSearchFilters {
   const base = { ...emptyRentalSearchFilters, ...defaults };
   const text = (key: string, max: number) => {
@@ -896,7 +1032,13 @@ export function readRentalSearchParams(
   const amenityParams = params.getAll("amenity");
   const amenities = new Set(amenityParams.flatMap((value) => value.split(",").map((item) => item.trim())));
   const currencyParam = params.get("currency");
-  const hasPriceParam = params.get("minPrice") !== null || params.get("maxPrice") !== null;
+  const hasPriceParam = ["minPrice", "maxPrice", "maxEntrada"].some((key) => params.get(key) !== null);
+  const guaranteeParam = text("garantia", 20);
+  const expensesParam = text("expensas", 20);
+  const averageParam = text("promedio", 20);
+  const nearParam = text("cerca", 60);
+  const areaParam = text("area", 80);
+  const sortParam = text("orden", 20);
 
   let type = base.type;
   if (typeParam === "Monoambiente" || bedroomsParam === "Monoambiente") type = "Monoambiente";
@@ -916,30 +1058,60 @@ export function readRentalSearchParams(
     bathrooms: optionParam(text("bathrooms", 20), rentalBathroomOptions, base.bathrooms),
     pets: amenityParams.length ? amenities.has("pets") : base.pets,
     garage: amenityParams.length ? amenities.has("garage") : base.garage,
+    furnished: amenityParams.length ? amenities.has("furnished") : base.furnished,
+    guarantee:
+      guaranteeParam === null
+        ? base.guarantee
+        : guaranteeParam === "sin" || guaranteeParam === "hasta-1-mes"
+          ? guaranteeParam
+          : "",
+    includeExpenses: expensesParam === null ? base.includeExpenses : expensesParam === "incluidas",
+    maxEntry: text("maxEntrada", 40) ?? base.maxEntry,
+    belowZoneAverage: averageParam === null ? base.belowZoneAverage : averageParam === "bajo",
+    near: nearParam === null ? base.near : getKnownPlace(nearParam, places) ? nearParam : "",
+    area: areaParam === null ? base.area : parseMapArea(areaParam),
+    sort: sortParam === null ? base.sort : isRentalSort(sortParam) ? sortParam : "",
   };
 }
 
+// Page defaults that the person cleared are written empty ("zone="), so a reload or a shared
+// link keeps "Todas las zonas" on a zone page instead of going back to the page's zone.
 export function buildRentalSearchParams(
   filters: RentalSearchFilters,
   displayCurrency: DisplayCurrency,
+  defaults: Partial<RentalSearchFilters> = {},
 ) {
   const params = new URLSearchParams();
   const query = filters.query.trim();
   const { min, max } = getPriceBounds(filters, displayCurrency);
-  const currency = (max ?? min)?.currency;
+  const entry = getEntryBound(filters, displayCurrency);
+  const currency = (max ?? min ?? entry)?.currency;
+  const inCurrency = (bound: PriceBound) => formatAmountParam(convertPrice(bound.amount, bound.currency, currency ?? bound.currency));
 
   if (query) params.set("q", query);
   if (filters.zone) params.set("zone", filters.zone);
+  else if (defaults.zone) params.set("zone", "");
   if (filters.type) params.set("type", filters.type);
-  if (min && currency) {
-    params.set("minPrice", formatAmountParam(convertPrice(min.amount, min.currency, currency)));
-  }
-  if (max) params.set("maxPrice", formatAmountParam(max.amount));
+  else if (defaults.type) params.set("type", "");
+  if (min) params.set("minPrice", inCurrency(min));
+  if (max) params.set("maxPrice", inCurrency(max));
+  else if (defaults.maxPrice) params.set("maxPrice", "");
+  if (entry) params.set("maxEntrada", inCurrency(entry));
   if (currency) params.set("currency", currency);
   if (filters.bedrooms) params.set("bedrooms", filters.bedrooms);
   if (filters.bathrooms) params.set("bathrooms", filters.bathrooms);
   if (filters.pets) params.append("amenity", "pets");
   if (filters.garage) params.append("amenity", "garage");
+  if (filters.furnished) params.append("amenity", "furnished");
+  if (!filters.pets && !filters.garage && !filters.furnished && (defaults.pets || defaults.garage || defaults.furnished)) {
+    params.set("amenity", "");
+  }
+  if (filters.guarantee) params.set("garantia", filters.guarantee);
+  if (filters.includeExpenses) params.set("expensas", "incluidas");
+  if (filters.belowZoneAverage) params.set("promedio", "bajo");
+  if (filters.near) params.set("cerca", filters.near);
+  if (filters.area) params.set("area", formatMapArea(filters.area));
+  if (filters.sort) params.set("orden", filters.sort);
   return params;
 }
 
@@ -951,10 +1123,16 @@ export function getPriceBounds(filters: RentalSearchFilters, displayCurrency: Di
   };
 }
 
+export function getEntryBound(filters: RentalSearchFilters, displayCurrency: DisplayCurrency) {
+  return parsePriceInput(filters.maxEntry, filters.priceCurrency ?? displayCurrency);
+}
+
 export function getActiveRentalFilters(filters: RentalSearchFilters) {
   return rentalFilterKeys.filter((key) => {
     const value = filters[key];
-    return typeof value === "boolean" ? value : value.trim() !== "";
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") return value.trim() !== "";
+    return value !== null;
   });
 }
 
@@ -963,73 +1141,196 @@ export function withoutRentalFilter(
   key: RentalFilterKey,
 ): RentalSearchFilters {
   const next = { ...filters, [key]: emptyRentalSearchFilters[key] };
-  if (!next.minPrice.trim() && !next.maxPrice.trim()) next.priceCurrency = null;
+  if (!next.minPrice.trim() && !next.maxPrice.trim() && !next.maxEntry.trim()) next.priceCurrency = null;
+  if (key === "near" && next.sort === "cercania") next.sort = "";
   return next;
 }
 
-// Featured listings first; with a text search, relevance first. With "Acepta mascotas",
-// listings where pets are "a consultar" come after the confirmed ones and "no" never shows.
+// Order: homes with every asked datum first, "pendiente de consulta" last. Within each group the
+// normal order puts featured listings first (relevance first with a text search); any other order
+// the person picks applies to all, featured or not.
 export function searchRentals(
   properties: Property[],
   filters: RentalSearchFilters,
   displayCurrency: DisplayCurrency,
+  options: RentalSearchOptions = {},
 ): RentalSearchMatch[] {
-  const parsed = parseSearchQuery(filters.query, { currency: displayCurrency });
+  const places = options.places ?? knownPlaces;
+  const parsed = parseSearchQuery(filters.query, { currency: displayCurrency, places });
   const hasQuery = parsed.meaningfulTokens.length > 0;
+  if (hasQuery) markIgnoredTokens(parsed, properties);
   const { min, max } = getPriceBounds(filters, displayCurrency);
+  const entryBound = getEntryBound(filters, displayCurrency);
   const bedrooms = Number(filters.bedrooms) || 0;
   const bathrooms = Number(filters.bathrooms) || 0;
+  const textPlace = parsed.intents.find((intent) => intent.kind === "place");
+  const place = getKnownPlace(filters.near, places) ?? (textPlace?.kind === "place" ? textPlace.place : undefined);
+  const zoneAverages = filters.belowZoneAverage ? (options.zoneAverages ?? getZoneAverages(properties)) : null;
+  const sort = filters.sort === "cercania" && !place ? "" : filters.sort;
 
-  return properties
-    .map((property, index) => ({
+  const matches = properties.flatMap((property, index) => {
+    const evaluation = evaluateParsedSearch(property, parsed);
+    const petsPolicy = getPetsPolicy(property);
+    const pending: PendingReason[] = [];
+    const inCurrency = (amount: number, currency: DisplayCurrency) =>
+      convertPrice(amount, property.currency, currency, getPropertyExchangeRate(property));
+
+    if (hasQuery && !evaluation.matches) return [];
+    if (filters.zone && property.zone !== filters.zone) return [];
+    if (filters.type && (filters.type === "Monoambiente" ? !isMonoambiente(property) : property.type !== filters.type)) return [];
+
+    const monthly = filters.includeExpenses ? getMonthlyCost(property) : property.price;
+    if (min || max) {
+      if (monthly === null) {
+        // Rent alone already over the budget: out. Otherwise the expenses decide, so ask.
+        if (max && inCurrency(property.price, max.currency) > max.amount) return [];
+        pending.push("expenses");
+      } else {
+        if (min && inCurrency(monthly, min.currency) < min.amount) return [];
+        if (max && inCurrency(monthly, max.currency) > max.amount) return [];
+      }
+    }
+
+    if (property.bedrooms < bedrooms || property.bathrooms < bathrooms) return [];
+    if (filters.pets && petsPolicy === "not_allowed") return [];
+    if (filters.pets && petsPolicy === "consult") pending.unshift("pets");
+    if (filters.garage && property.garage <= 0) return [];
+    if (filters.furnished && !property.furnished) return [];
+
+    const entry = filters.guarantee || entryBound || sort === "menor-entrada" ? getEntryCost(property) : null;
+    if (filters.guarantee) {
+      if (!entry) pending.push("guarantee");
+      else if (filters.guarantee === "sin" ? entry.deposit > 0 : entry.deposit > property.price + 0.005) return [];
+    }
+    if (entryBound) {
+      if (!entry) pending.push("entry");
+      else if (inCurrency(entry.total, entryBound.currency) > entryBound.amount + 0.005) return [];
+    }
+
+    const zoneAverage = zoneAverages ? compareWithZoneAverage(property, zoneAverages) : null;
+    if (zoneAverages && !isBelowZoneAverage(zoneAverage)) return [];
+    if (filters.area && !isInsideArea(property.coordinates, filters.area)) return [];
+
+    return [{
       property,
       index,
-      evaluation: evaluateParsedSearch(property, parsed),
-      petsPolicy: getPetsPolicy(property),
-    }))
-    .filter(({ property, evaluation, petsPolicy }) => {
-      const matchesType =
-        !filters.type ||
-        (filters.type === "Monoambiente"
-          ? isMonoambiente(property)
-          : property.type === filters.type);
+      petsPolicy,
+      pending,
+      score: evaluation.score,
+      distanceKm: place ? distanceKm(place.coordinates, property.coordinates) : null,
+      zoneAverage,
+      priceBob: convertPrice(monthly ?? property.price, property.currency, "BOB", getPropertyExchangeRate(property)),
+      entryBob: entry ? convertPrice(entry.total, property.currency, "BOB", getPropertyExchangeRate(property)) : Infinity,
+    }];
+  });
 
-      return (
-        (!hasQuery || evaluation.matches) &&
-        (!filters.zone || property.zone === filters.zone) &&
-        matchesType &&
-        (!min || getPropertyPriceInCurrency(property, min.currency) >= min.amount) &&
-        (!max || getPropertyPriceInCurrency(property, max.currency) <= max.amount) &&
-        property.bedrooms >= bedrooms &&
-        property.bathrooms >= bathrooms &&
-        (!filters.pets || petsPolicy !== "not_allowed") &&
-        (!filters.garage || property.garage > 0)
-      );
-    })
+  const byDistance = (first: (typeof matches)[number], second: (typeof matches)[number]) =>
+    (first.distanceKm ?? Infinity) - (second.distanceKm ?? Infinity);
+  const compare = (first: (typeof matches)[number], second: (typeof matches)[number]) => {
+    switch (sort) {
+      case "recientes":
+        return confirmationRank(first.property) - confirmationRank(second.property);
+      case "menor-precio":
+        return first.priceBob - second.priceBob;
+      case "mayor-precio":
+        return second.priceBob - first.priceBob;
+      case "menor-entrada":
+        return first.entryBob === second.entryBob ? 0 : first.entryBob - second.entryBob;
+      case "cercania":
+        return byDistance(first, second);
+      default:
+        return (
+          (hasQuery ? second.score - first.score : 0) ||
+          (textPlace && !filters.near ? byDistance(first, second) : 0) ||
+          featuredRank(first.property) - featuredRank(second.property)
+        );
+    }
+  };
+
+  return matches
     .sort(
       (first, second) =>
-        (filters.pets ? petsRank(first.petsPolicy) - petsRank(second.petsPolicy) : 0) ||
-        (hasQuery ? second.evaluation.score - first.evaluation.score : 0) ||
-        featuredRank(first.property) - featuredRank(second.property) ||
+        Number(first.pending.length > 0) - Number(second.pending.length > 0) ||
+        compare(first, second) ||
         first.index - second.index,
     )
-    .map(({ property, petsPolicy }) => ({ property, petsPolicy }));
+    .map(({ property, petsPolicy, pending, distanceKm, zoneAverage }) => ({ property, petsPolicy, pending, distanceKm, zoneAverage }));
+}
+
+// Words for the chips of active filters ("Hasta Bs 3.000 ×").
+export function describeRentalFilter(
+  key: RentalFilterKey,
+  filters: RentalSearchFilters,
+  displayCurrency: DisplayCurrency,
+  places: KnownPlace[] = knownPlaces,
+) {
+  const { min, max } = getPriceBounds(filters, displayCurrency);
+  const entry = getEntryBound(filters, displayCurrency);
+  const bedrooms = Number(filters.bedrooms);
+  const bathrooms = Number(filters.bathrooms);
+  switch (key) {
+    case "query":
+      return `Búsqueda: “${shortenText(filters.query.trim(), 28)}”`;
+    case "zone":
+      return `Zona: ${filters.zone}`;
+    case "type":
+      return filters.type;
+    case "minPrice":
+      return min ? `Desde ${formatPriceBound(min)}` : `Mín.: “${shortenText(filters.minPrice.trim(), 16)}”`;
+    case "maxPrice":
+      return max ? `Hasta ${formatPriceBound(max)}` : `Máx.: “${shortenText(filters.maxPrice.trim(), 16)}”`;
+    case "includeExpenses":
+      return "Presupuesto con expensas";
+    case "maxEntry":
+      return entry ? `Para entrar hasta ${formatPriceBound(entry)}` : `Para entrar: “${shortenText(filters.maxEntry.trim(), 16)}”`;
+    case "bedrooms":
+      return `${bedrooms}+ ${bedrooms === 1 ? "dormitorio" : "dormitorios"}`;
+    case "bathrooms":
+      return `${bathrooms}+ ${bathrooms === 1 ? "baño" : "baños"}`;
+    case "pets":
+      return "Acepta mascotas";
+    case "garage":
+      return "Con parqueo";
+    case "furnished":
+      return "Amoblado";
+    case "guarantee":
+      return filters.guarantee === "sin" ? "Sin garantía" : "Garantía hasta 1 mes";
+    case "belowZoneAverage":
+      return "Bajo el promedio de la zona";
+    case "near":
+      return `Cerca de ${getKnownPlace(filters.near, places)?.name ?? filters.near}`;
+    case "area":
+      return "Zona del mapa";
+  }
 }
 
 // Plain-language summary of the search, for the price hint and the WhatsApp messages.
-export function describeRentalSearch(filters: RentalSearchFilters, displayCurrency: DisplayCurrency) {
+export function describeRentalSearch(
+  filters: RentalSearchFilters,
+  displayCurrency: DisplayCurrency,
+  places: KnownPlace[] = knownPlaces,
+) {
   const { min, max } = getPriceBounds(filters, displayCurrency);
+  const entry = getEntryBound(filters, displayCurrency);
   const query = filters.query.trim();
   const bedrooms = Number(filters.bedrooms);
   const bathrooms = Number(filters.bathrooms);
   const kind = filters.type ? filters.type.toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
+  const place = getKnownPlace(filters.near, places);
   return [
     kind ? `${kind}${filters.zone ? ` en ${filters.zone}` : ""}` : null,
     describePriceBounds(min, max),
+    filters.includeExpenses && (min || max) ? "con expensas incluidas en el presupuesto" : null,
+    entry ? `para entrar hasta ${formatPriceBound(entry)}` : null,
     bedrooms ? `${bedrooms} ${bedrooms === 1 ? "dormitorio" : "dormitorios"} o más` : null,
     bathrooms ? `${bathrooms} ${bathrooms === 1 ? "baño" : "baños"} o más` : null,
     filters.pets ? "que acepte mascotas" : null,
     filters.garage ? "con parqueo" : null,
+    filters.furnished ? "amoblada" : null,
+    filters.guarantee === "sin" ? "sin garantía" : filters.guarantee === "hasta-1-mes" ? "con garantía de hasta 1 mes" : null,
+    filters.belowZoneAverage ? "bajo el promedio de su zona" : null,
+    place ? `cerca de ${place.name}` : null,
+    filters.area ? "en la zona marcada del mapa" : null,
     query ? `búsqueda “${query}”` : null,
   ].filter((part): part is string => Boolean(part));
 }
@@ -1039,6 +1340,82 @@ export function describePriceBounds(min: PriceBound | null, max: PriceBound | nu
   if (max) return `hasta ${formatPriceBound(max)} por mes`;
   if (min) return `desde ${formatPriceBound(min)} por mes`;
   return null;
+}
+
+export type SearchUnderstandingChip = { key: string; label: string; query: string };
+export type SearchUnderstanding = { chips: SearchUnderstandingChip[]; unused: string[] };
+
+// How the search box understood the text: one chip per understood part (its X removes those
+// words from the text) and, apart, the words no listing has ("No usamos: …").
+export function understandRentalQuery(
+  query: string,
+  properties: Property[],
+  displayCurrency: DisplayCurrency,
+  places: KnownPlace[] = knownPlaces,
+): SearchUnderstanding {
+  const parsed = parseSearchQuery(query, { currency: displayCurrency, places });
+  if (parsed.meaningfulTokens.length === 0) return { chips: [], unused: [] };
+  markIgnoredTokens(parsed, properties);
+
+  const chips: SearchUnderstandingChip[] = parsed.intents.map((intent, index) => ({
+    key: `${intent.kind}-${index}`,
+    label: describeSearchIntent(intent),
+    query: queryWithoutTokens(parsed, new Set(intent.indexes)),
+  }));
+  const unused: string[] = [];
+
+  parsed.words.forEach((word, wordIndex) => {
+    const soft = word.tokenIndexes.filter(
+      (index) => !parsed.consumedIndexes.has(index) && isMeaningfulToken(parsed.tokens[index]),
+    );
+    if (!soft.length) return;
+    if (soft.every((index) => parsed.ignoredIndexes.has(index))) {
+      unused.push(word.text);
+      return;
+    }
+    chips.push({
+      key: `word-${wordIndex}`,
+      label: `“${shortenText(word.text, 24)}”`,
+      query: queryWithoutTokens(parsed, new Set(word.tokenIndexes)),
+    });
+  });
+
+  return { chips, unused };
+}
+
+// A well-known place named in the text ("cerca de la UAGRM"), used like "Cerca de".
+export function findPlaceInQuery(query: string, places: KnownPlace[] = knownPlaces) {
+  const intent = parseSearchQuery(query, { places }).intents.find((item) => item.kind === "place");
+  return intent?.kind === "place" ? intent.place : undefined;
+}
+
+function describeSearchIntent(intent: SearchIntent) {
+  switch (intent.kind) {
+    case "place":
+      return `Cerca de ${intent.place.name}`;
+    case "monoambiente":
+      return "Monoambiente";
+    case "type":
+      return intent.type;
+    case "operation":
+      return intent.operation === "Compra" ? "Venta" : intent.operation;
+    case "bedrooms":
+      return `${intent.count}+ ${intent.count === 1 ? "dormitorio" : "dormitorios"}`;
+    case "amenity":
+      return amenityLabels[intent.amenity];
+    case "price":
+      return `Hasta ${formatPriceBound({ amount: intent.amount, currency: intent.currency })}`;
+  }
+}
+
+function queryWithoutTokens(parsed: ParsedSearchQuery, remove: Set<number>) {
+  const kept = parsed.words.filter(
+    (word) => !(word.tokenIndexes.length > 0 && word.tokenIndexes.every((index) => remove.has(index))),
+  );
+  const isFiller = (word: QueryWord) => word.tokenIndexes.every((index) => !isMeaningfulToken(parsed.tokens[index]));
+  while (kept.length && isFiller(kept[0])) kept.shift();
+  while (kept.length && isFiller(kept[kept.length - 1])) kept.pop();
+  return kept.map((word) => word.text).join(" ");
 }
 
 // Zentro Urbano only publishes monthly rentals of whole homes ("Por ahora SOLO ALQUILER").
@@ -1069,10 +1446,17 @@ function formatAmountParam(amount: number) {
   return String(Math.round(amount * 100) / 100);
 }
 
-function petsRank(policy: PetsPolicy) {
-  return policy === "allowed" ? 0 : 1;
-}
-
 function featuredRank(property: Property) {
   return property.listingPlan === "featured" ? 0 : 1;
+}
+
+// Fresh confirmations first, newest first; old or missing ones after.
+function confirmationRank(property: Property) {
+  const confirmedAt = property.availabilityConfirmedAt ? Date.parse(property.availabilityConfirmedAt) : NaN;
+  const age = Number.isFinite(confirmedAt) ? -confirmedAt : 0;
+  return (getAvailabilityState(property).fresh ? 0 : 1e15) + age + (Number.isFinite(confirmedAt) ? 0 : 1e14);
+}
+
+function shortenText(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }

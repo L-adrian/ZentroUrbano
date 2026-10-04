@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
-import { withoutContactEmail } from "@/lib/rentals";
+import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { filterDepartmentsByZone } from "@/lib/seo-routes";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -40,7 +40,8 @@ export default async function DepartmentZonePage({
   params: Promise<{ zone: string }>;
 }) {
   const { zone } = await params;
-  const properties = filterDepartmentsByZone(zone, await getPublishedPropertiesData());
+  const all = await getPublishedPropertiesData();
+  const properties = filterDepartmentsByZone(zone, all);
 
   if (properties.length === 0) {
     notFound();
@@ -55,10 +56,10 @@ export default async function DepartmentZonePage({
         </h1>
         <p className="mt-1 text-sm text-neutral-600">Contacto directo con el propietario.</p>
       </div>
+      {/* The whole catalog with this zone and type selected, so clearing them shows everything. */}
       <DirectRentalExplorer
-        properties={withoutContactEmail(properties)}
-        initialZone={zoneName}
-        initialPropertyType="Departamento"
+        properties={withoutContactEmail(getDirectRentals(all))}
+        initialFilters={{ zone: zoneName, type: "Departamento" }}
       />
     </main>
   );

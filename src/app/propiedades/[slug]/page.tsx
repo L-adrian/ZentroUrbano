@@ -28,6 +28,7 @@ import { PropertyLocationMap } from "@/components/property-location-map";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { PropertyViewTracker } from "@/components/property-view-tracker";
+import { ListingSaveButton } from "@/components/save-listing-button";
 import { PublisherBadge } from "@/components/publisher-badge";
 import { SafetyNotice } from "@/components/safety-notice";
 import { toSafeMobileImageUrl } from "@/components/safe-mobile-image";
@@ -178,6 +179,7 @@ export default async function PropertyDetailPage({
               Volver al catálogo
             </Link>
             <div className="flex items-center gap-2">
+              <ListingSaveButton slug={property.slug} title={property.title} />
               <PropertyShareButton
                 property={property}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950"

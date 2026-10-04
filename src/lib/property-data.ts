@@ -53,6 +53,7 @@ export type PropertyRow = {
   owner_profile?: unknown;
   rental_details?: unknown;
   availability_confirmed_at?: Date | string | null;
+  created_at?: Date | string | null;
   is_seeded: boolean;
   coordinates: unknown;
 };
@@ -243,6 +244,7 @@ export function mapPropertyRow(row: PropertyRow): Property {
       ? new Date(row.availability_confirmed_at).toISOString()
       : undefined,
     locationConfirmedAt: parseLocationConfirmedAt(row.rental_details),
+    publishedAt: row.created_at && Number.isFinite(new Date(row.created_at).getTime()) ? new Date(row.created_at).toISOString() : undefined,
     isSeeded: Boolean(row.is_seeded),
     coordinates,
     neighborhoodHighlights: parseStringArray(

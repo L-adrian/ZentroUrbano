@@ -3,6 +3,7 @@ import { getPublishedPropertiesData } from "@/lib/property-data";
 import {
   getCitySeoRoutes,
   getDepartmentSeoRoutes,
+  getNeedSeoRoutes,
   getOperationSeoRoutes,
 } from "@/lib/seo-routes";
 import { absoluteUrl } from "@/lib/site";
@@ -65,6 +66,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: "weekly" as const,
       priority: 0.76,
+    })),
+    // Need pages ("monoambientes", "con mascotas", "hasta Bs 2.000") only with 3 or more real listings.
+    ...getNeedSeoRoutes(publishedProperties).map((route) => ({
+      url: absoluteUrl(`/${route.operation}/${route.city}/${route.need}`),
+      lastModified: now,
+      changeFrequency: "weekly" as const,
+      priority: 0.74,
     })),
   ];
 }

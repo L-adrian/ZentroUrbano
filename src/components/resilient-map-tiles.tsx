@@ -13,7 +13,9 @@ import {
 
 const MAX_TILE_ERRORS_BEFORE_FALLBACK = 4;
 
-export function ResilientMapTiles() {
+// The message fits the page: the catalog adds that the results are still in the list; a listing's
+// own map does not talk about "resultados".
+export function ResilientMapTiles({ errorMessage = "El mapa no pudo cargar. Revisa tu conexión e inténtalo de nuevo." }: { errorMessage?: string }) {
   const [providerIndex, setProviderIndex] = useState(0);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -52,6 +54,6 @@ export function ResilientMapTiles() {
           }
         },
       }}
-    />{failed && <div className="map-tile-error" role="status"><span>El mapa no pudo cargar. Tus resultados siguen disponibles.</span><button type="button" className="zu-icon-button" aria-label="Reintentar mapa" title="Reintentar mapa" onClick={() => { tileErrorCount.current = 0; setFailed(false); setAttempt(value => value + 1); }}><RefreshCw size={16} /></button></div>}</>
+    />{failed && <div className="map-tile-error" role="status"><span>{errorMessage}</span><button type="button" className="zu-icon-button" aria-label="Reintentar mapa" title="Reintentar mapa" onClick={() => { tileErrorCount.current = 0; setFailed(false); setAttempt(value => value + 1); }}><RefreshCw size={16} /></button></div>}</>
   );
 }

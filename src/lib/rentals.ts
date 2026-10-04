@@ -28,3 +28,22 @@ export function getRentalZones(properties: Property[]) {
 export function withoutContactEmail(properties: Property[]) {
   return properties.map((property) => ({ ...property, agent: { ...property.agent, email: "" } }));
 }
+
+export type RentalSummary = Pick<
+  Property,
+  "slug" | "title" | "zone" | "images" | "price" | "currency" | "exchangeRate" | "operation"
+>;
+
+// Just what a small strip ("Vistos recientemente") needs, so a page does not send every listing in full.
+export function toRentalSummaries(properties: Property[]): RentalSummary[] {
+  return properties.map(({ slug, title, zone, images, price, currency, exchangeRate, operation }) => ({
+    slug,
+    title,
+    zone,
+    images: images.slice(0, 1),
+    price,
+    currency,
+    exchangeRate,
+    operation,
+  }));
+}

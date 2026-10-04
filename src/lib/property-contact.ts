@@ -53,7 +53,8 @@ export function buildOwnerWhatsappMessage(
   ].join("\n");
 }
 
-export const whatsappContactSources = ["ficha", "tarjeta", "barra", "galeria", "recorrido", "mapa"] as const;
+// "guardados": cards on /guardados; "cercanos": cards under "Cerca de {zona}" in the catalog.
+export const whatsappContactSources = ["ficha", "tarjeta", "barra", "galeria", "recorrido", "mapa", "guardados", "cercanos"] as const;
 export type WhatsappContactSource = (typeof whatsappContactSources)[number];
 
 export function whatsappContactPath(slug: string, source: WhatsappContactSource) {
