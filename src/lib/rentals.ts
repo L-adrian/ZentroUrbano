@@ -32,7 +32,7 @@ export function getRentalZones(properties: Property[]) {
 export function withoutOwnerContact(properties: Property[]) {
   return properties.map((property) => ({
     ...property,
-    whatsapp: isExternalContactUrl(property.whatsapp) ? property.whatsapp : "",
+    whatsapp: catalogContactUrl(property.whatsapp),
     agent: { ...property.agent, email: "", phone: "", whatsapp: "" },
   }));
 }
@@ -54,4 +54,11 @@ export function toRentalSummaries(properties: Property[]): RentalSummary[] {
     exchangeRate,
     operation,
   }));
+}
+
+// A wa.me link carries the phone number, so it keeps only its kind (still an external link).
+function catalogContactUrl(value: string) {
+  if (!isExternalContactUrl(value)) return "";
+  const host = new URL(value).hostname.toLowerCase();
+  return host === "wa.me" || host === "whatsapp.com" || host.endsWith(".whatsapp.com") ? "https://wa.me/" : value;
 }

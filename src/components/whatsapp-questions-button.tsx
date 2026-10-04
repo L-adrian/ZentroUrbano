@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { whatsappContactPath, type WhatsappContactSource } from "@/lib/property-contact";
 import {
   emptyQuestionChoices,
+  maxPeopleChoice,
   moveInOptions,
   questionLines,
   questionsQuery,
@@ -62,7 +63,7 @@ export function WhatsappQuestionsButton({
               <span>¿Cuántas personas vivirían?</span>
               <select value={choices.people ?? ""} onChange={(event) => setChoices({ ...choices, people: Number(event.target.value) || null })}>
                 <option value="">Prefiero no decir</option>
-                {[1, 2, 3, 4, 5, 6].map((count) => <option key={count} value={count}>{count === 6 ? "6 o más" : count}</option>)}
+                {Array.from({ length: maxPeopleChoice }, (_, index) => index + 1).map((count) => <option key={count} value={count}>{count === maxPeopleChoice ? `${count} o más` : count}</option>)}
               </select>
             </label>
             <label className="report-dialog-note">

@@ -5,7 +5,7 @@ import { AdminSearchAlertActions } from "@/components/admin-search-alert-actions
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { readRentalSearchParams, searchRentals } from "@/lib/property-search";
 import { getDirectRentals } from "@/lib/rentals";
-import { formatAlertWhatsapp } from "@/lib/search-alert-input";
+import { formatAlertWhatsapp, normalizeAlertEmail } from "@/lib/search-alert-input";
 import { listSearchAlerts, type SearchAlert } from "@/lib/search-alerts";
 import { buildSeoMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site";
@@ -37,9 +37,17 @@ export default async function AdminAlertsPage() {
   const [alerts, properties] = await Promise.all([listSearchAlerts(), getPublishedPropertiesData()]);
   const rentals = getDirectRentals(properties);
   const rows = (alerts ?? []).map((alert) => {
-    const filters = readRentalSearchParams(new URLSearchParams(alert.params));
-    const matches = searchRentals(rentals, filters, filters.priceCurrency ?? "BOB").map(({ property }) => ({ title: property.title, slug: property.slug }));
-    return { alert, matches, text: noticeText(alert, matches) };
+    const search = new URLSearchParams(alert.params);
+    const filters = readRentalSearchParams(search);
+    // A price typed in the search text is read in the currency the person was using.
+    const currency = search.get("currency") === "USD" ? "USD" : "BOB";
+    const results = searchRentals(rentals, filters, filters.priceCurrency ?? currency);
+    const toLink = ({ property }: (typeof results)[number]) => ({ title: property.title, slug: property.slug });
+    // Homes that may fit but did not say (pets "a consultar"...) are listed apart and never sent as matches.
+    const matches = results.filter((match) => match.pending.length === 0).map(toLink);
+    const toAsk = results.filter((match) => match.pending.length > 0).map(toLink);
+    const email = alert.email && normalizeAlertEmail(alert.email) === alert.email ? alert.email : null;
+    return { alert, matches, toAsk, email, text: noticeText(alert, matches) };
   });
   rows.sort((first, second) => Number(second.matches.length > 0) - Number(first.matches.length > 0));
 
@@ -57,7 +65,7 @@ export default async function AdminAlertsPage() {
         <p className="guide-note">Todavía no hay alertas activas.</p>
       ) : (
         <ul className="admin-alert-list">
-          {rows.map(({ alert, matches, text }) => (
+          {rows.map(({ alert, matches, toAsk, email, text }) => (
             <li key={alert.id}>
               <div className="admin-alert-head">
                 <strong>{alert.name ?? "Sin nombre"}</strong>
@@ -73,12 +81,17 @@ export default async function AdminAlertsPage() {
               <p className={matches.length ? "admin-alert-matches has-matches" : "admin-alert-matches"}>
                 {matches.length === 0 ? "Ninguna vivienda coincide por ahora." : `${matches.length} ${matches.length === 1 ? "vivienda coincide" : "viviendas coinciden"}: ${matches.slice(0, 3).map((match) => match.title).join(" · ")}${matches.length > 3 ? "…" : ""}`}
               </p>
+              {toAsk.length > 0 ? (
+                <p className="admin-alert-meta">
+                  {`${toAsk.length} a consultar con el dueño (no dijo si cumple): ${toAsk.slice(0, 3).map((match) => match.title).join(" · ")}${toAsk.length > 3 ? "…" : ""}`}
+                </p>
+              ) : null}
               <div className="admin-alert-contact">
                 {matches.length > 0 && alert.whatsapp ? (
                   <a href={`https://wa.me/${alert.whatsapp}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"><MessageCircle size={16} aria-hidden="true" /> Escribir por WhatsApp</a>
                 ) : null}
-                {matches.length > 0 && alert.email ? (
-                  <a href={`mailto:${alert.email}?subject=${encodeURIComponent("Zentro Urbano: viviendas para tu alerta")}&body=${encodeURIComponent(text)}`}><Mail size={16} aria-hidden="true" /> Escribir por correo</a>
+                {matches.length > 0 && email ? (
+                  <a href={`mailto:${encodeURIComponent(email).replace(/%40/g, "@")}?subject=${encodeURIComponent("Zentro Urbano: viviendas para tu alerta")}&body=${encodeURIComponent(text)}`}><Mail size={16} aria-hidden="true" /> Escribir por correo</a>
                 ) : null}
                 <AdminSearchAlertActions id={alert.id} />
               </div>

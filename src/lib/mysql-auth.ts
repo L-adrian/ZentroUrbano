@@ -399,10 +399,18 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
   };
 }
 
-// "Corregir y reenviar": a request with a newer copy that corrects it.
-function markCorrected<T extends { id: string; correctionOf?: string }>(requests: T[]) {
+// "Corregir y reenviar": a request with a newer copy that corrects it. An owner who sent the home
+// again from the normal /publicar (not through the correction link) also answered the request.
+function markCorrected<T extends { id: string; kind?: string; status: string; createdAt: string; reviewedAt?: string | null; correctionOf?: string }>(requests: T[]) {
   const corrected = new Set(requests.map((request) => request.correctionOf).filter(Boolean));
-  return requests.map((request) => ({ ...request, corrected: corrected.has(request.id) }));
+  const askedAt = (request: T) => new Date(request.reviewedAt ?? request.createdAt).getTime();
+  return requests.map((request) => ({
+    ...request,
+    corrected:
+      corrected.has(request.id) ||
+      (request.status === "changes_requested" &&
+        requests.some((other) => other.id !== request.id && other.kind !== "republish" && new Date(other.createdAt).getTime() > askedAt(request))),
+  }));
 }
 
 const emptyAudience = { views7: 0, views30: 0, viewsTotal: 0, contacts7: 0, contacts30: 0, contactsTotal: 0 };

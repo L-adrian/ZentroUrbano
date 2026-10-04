@@ -96,6 +96,9 @@ test("optional WhatsApp questions travel as codes and become plain lines", () =>
   // Unknown codes, repeated codes and odd values are dropped, never echoed into the message.
   const tampered = readQuestionChoices(new URLSearchParams("preguntas=garantia,garantia,hola&personas=40&mascota=si&mudanza=ayer"));
   assert.deepEqual(tampered, { questions: ["garantia"], people: null, pet: false, moveIn: null });
+  // "6 o más" never tells the owner an exact 6.
+  assert.deepEqual(questionLines({ ...readQuestionChoices(new URLSearchParams("personas=6")) }), ["Seríamos 6 o más personas."]);
+  assert.equal(readQuestionChoices(new URLSearchParams("personas=8")).people, null);
   const base = { requirements: ["Garantía: consultar"], rentalDetails: undefined, bathrooms: 0 };
   assert.deepEqual(suggestedQuestions(base), ["garantia", "expensas", "banos", "servicios", "desde", "contrato"]);
   assert.deepEqual(suggestedQuestions({ ...base, requirements: ["Garantía de 1 mes"], bathrooms: 2 }), ["expensas", "servicios", "desde", "contrato"]);

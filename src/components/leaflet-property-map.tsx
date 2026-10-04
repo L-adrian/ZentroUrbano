@@ -293,7 +293,7 @@ export function LeafletPropertyMap({
                 </span>
                 {selected.listingPlan === "featured" ? (
                   <span className="absolute right-2 top-2 rounded-full bg-[#d6a16b] px-2 py-1 text-[11px] font-bold text-neutral-950 backdrop-blur sm:right-4 sm:top-4 sm:px-3 sm:text-xs">
-                    Destacada
+                    Destacada · servicio pagado
                   </span>
                 ) : null}
               </div>
@@ -789,7 +789,7 @@ function createPropertyIcon(
     className: "morada-marker",
     html: `
       <span class="morada-marker-root${featuredClass}${compactClass}">
-        <span class="sr-only">${escapeHtml(property.title)}, ${escapeHtml(price)}${property.listingPlan === "featured" ? ", destacada" : ""}</span>
+        <span class="sr-only">${escapeHtml(property.title)}, ${escapeHtml(price)}${property.listingPlan === "featured" ? ", destacada, servicio pagado" : ""}</span>
         <span class="morada-marker-pin${selectedClass}${featuredClass}${logoClass}" aria-hidden="true">
           <span class="morada-marker-logo">${publisherLogo}</span>
         </span>

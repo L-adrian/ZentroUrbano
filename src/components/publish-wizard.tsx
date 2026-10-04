@@ -393,8 +393,9 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
     }
     setProcessingPhotos(false);
     setPhotoProgress(null);
-    if (files.length < list.length) { setMessage("Algunas fotos no se pudieron cargar. Agrégalas de nuevo."); setStatus("error"); }
     await addFiles(files, categories, "Revisando las fotos");
+    // After addFiles, which clears the message when every photo it got is fine.
+    if (mounted.current && files.length < list.length) { setMessage("Algunas fotos no se pudieron cargar. Agrégalas de nuevo."); setStatus("error"); }
   }
 
   function removePhoto(index: number) {

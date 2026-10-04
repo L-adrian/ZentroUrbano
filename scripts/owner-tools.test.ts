@@ -11,14 +11,15 @@ import {
   readBeforeVisit,
   withBeforeVisit,
 } from "../src/lib/before-visit";
-import { buildListingFunnel, funnelShare } from "../src/lib/listing-funnel";
+import { buildListingFunnel, funnelShare, funnelWhatsappSources } from "../src/lib/listing-funnel";
 import { recentOwnerRequests } from "../src/lib/listing-moderation";
 import { getEntryCost } from "../src/lib/listing-summary";
 import { generatedMapUrl, isGeneratedMapUrl, ownerLocationStatus, parseOwnerCoordinates } from "../src/lib/owner-location";
 import { fitWithin, needsShrinking, shrunkFileName, uploadMaxSide } from "../src/lib/photo-resize";
 import type { Property } from "../src/lib/properties";
+import { whatsappContactSources } from "../src/lib/property-contact";
 import { getPublicationCosts } from "../src/lib/publication-costs";
-import { validatePublicationDetails, type PublicationDetails } from "../src/lib/publication-input";
+import { parsePublicationDetails, validatePublicationDetails, type PublicationDetails } from "../src/lib/publication-input";
 import { correctionFormValues, localPhone, photoCategoriesFromText, similarUnitFormValues, validPhotoCategory } from "../src/lib/publish-prefill";
 import { ownerShareText, shareImagePath, sharedListingPath } from "../src/lib/share-kit";
 import { isServerTrackedEvent, serverTrackedEvents } from "../src/lib/tracking-events";
@@ -68,6 +69,11 @@ test("antes de visitar: optional, validated, and unknown is not the same as none
   assert.deepEqual(parseBeforeVisitInput({ includedServices: ["ninguno"] }).values, { includedServices: [] });
   assert.deepEqual(parseBeforeVisitInput({ includedServices: [] }).values, {});
   assert.equal(beforeVisitRows({ includedServices: [] })?.[3].value, "Ninguno");
+  // Approval and "Corregir y reenviar" parse the stored request again: "Ninguno" (stored as []) survives.
+  const stored = JSON.parse(JSON.stringify(details({ includedServices: ["ninguno"], advanceMonths: "2" })));
+  assert.deepEqual(parsePublicationDetails(stored)?.includedServices, []);
+  assert.equal(parsePublicationDetails(stored)?.advanceMonths, 2);
+  assert.equal("includedServices" in (parsePublicationDetails(JSON.parse(JSON.stringify(details()))) ?? {}), false);
   for (const bad of [{ availableFrom: "2026-02-30" }, { minContractMonths: "0" }, { advanceMonths: "13" }, { includedServices: ["cochera"] }, { includedServices: ["agua", "ninguno"] }]) {
     assert.equal(Object.keys(parseBeforeVisitInput(bad).errors).length, 1, JSON.stringify(bad));
     assert.ok(Object.keys(validatePublicationDetails({ ...form, ...bad }).fieldErrors).length > 0);
@@ -184,4 +190,9 @@ test("new events are accepted by /api/track", () => {
   }
   assert.equal(isServerTrackedEvent("property_report"), false);
   assert.equal(new Set(serverTrackedEvents).size, serverTrackedEvents.length);
+});
+
+test("every WhatsApp contact source has its own row in the admin funnel", () => {
+  const labelled = new Set<string>(funnelWhatsappSources.map(([source]) => source));
+  for (const source of whatsappContactSources) assert.ok(labelled.has(source), source);
 });

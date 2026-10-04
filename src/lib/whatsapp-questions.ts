@@ -30,6 +30,8 @@ export type WhatsappQuestionChoices = {
   moveIn: MoveIn | null;
 };
 
+export const maxPeopleChoice = 6;
+
 export const emptyQuestionChoices: WhatsappQuestionChoices = { questions: [], people: null, pet: false, moveIn: null };
 
 // Questions offered for a listing: first what the listing leaves "pendiente de consulta".
@@ -58,7 +60,8 @@ export function readQuestionChoices(params: { get(name: string): string | null }
   const moveIn = params.get("mudanza");
   return {
     questions,
-    people: Number.isInteger(people) && people >= 1 && people <= 9 ? people : null,
+    // The form offers 1 to 5 and "6 o más" (6).
+    people: Number.isInteger(people) && people >= 1 && people <= maxPeopleChoice ? people : null,
     pet: params.get("mascota") === "1",
     moveIn: moveIn && Object.hasOwn(moveInOptions, moveIn) ? (moveIn as MoveIn) : null,
   };
@@ -67,7 +70,13 @@ export function readQuestionChoices(params: { get(name: string): string | null }
 // Extra lines for the first message, in the order an owner reads them.
 export function questionLines(choices: WhatsappQuestionChoices) {
   return [
-    choices.people ? (choices.people === 1 ? "Sería solo para mí." : `Seríamos ${choices.people} personas.`) : null,
+    choices.people
+      ? choices.people === 1
+        ? "Sería solo para mí."
+        : choices.people >= maxPeopleChoice
+          ? `Seríamos ${maxPeopleChoice} o más personas.`
+          : `Seríamos ${choices.people} personas.`
+      : null,
     choices.pet ? "Tengo una mascota, ¿la aceptan?" : null,
     choices.moveIn ? `Me mudaría ${moveInOptions[choices.moveIn]}.` : null,
     ...choices.questions.map((code) => whatsappQuestionLabels[code]),

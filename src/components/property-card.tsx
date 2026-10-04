@@ -40,7 +40,7 @@ export function PropertyCard({ property, compact = false, eagerImage = false, pe
       <Link href={`/propiedades/${property.slug}`} className="rental-card-image">
         {property.images[0] ? <ListingPhoto src={property.images[0]} alt={property.title} fill loading={eagerImage ? "eager" : "lazy"} quality={72} sizes="(max-width: 540px) calc(100vw - 40px), (max-width: 768px) 45vw, (max-width: 1100px) 30vw, 285px" /> : <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-neutral-500"><Images size={20} />Fotos pendientes</span>}
         <span className={`rental-status${availability.fresh ? "" : " is-unconfirmed"}`} suppressHydrationWarning>{availability.fresh ? <Check /> : <Clock3 />}{availability.shortLabel}</span>
-        <span className="rental-card-badges">{featured ? <span className="rental-badge is-featured">Destacada</span> : null}<NewListingBadge publishedAt={property.publishedAt} /></span>
+        <span className="rental-card-badges">{featured ? <span className="rental-badge is-featured">Destacada · servicio pagado</span> : null}<NewListingBadge publishedAt={property.publishedAt} /></span>
         <span className="rental-image-count"><Images size={13} />{property.images.length}</span>
       </Link>
       <SaveHeartButton slug={property.slug} title={property.title} />

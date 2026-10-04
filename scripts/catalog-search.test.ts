@@ -15,6 +15,7 @@ import {
 } from "../src/lib/catalog-geo";
 import { getMonthlyCost } from "../src/lib/listing-summary";
 import { withoutOwnerContact } from "../src/lib/rentals";
+import { normalizeAlertEmail, normalizeAlertWhatsapp } from "../src/lib/search-alert-input";
 import {
   addRecentListing,
   isNewSinceVisit,
@@ -370,5 +371,20 @@ test("catalog payloads leave out owner phones and emails but keep links to origi
   assert.equal(stripped.agent.email, "");
   assert.equal(stripped.agent.name, owner.agent.name);
   assert.equal(reference.whatsapp, "https://example.com/aviso");
+  const [waLink, apiLink] = withoutOwnerContact([
+    { ...owner, whatsapp: "https://wa.me/59171234567" },
+    { ...owner, whatsapp: "https://api.whatsapp.com/send?phone=59171234567" },
+  ]);
+  assert.equal(waLink.whatsapp, "https://wa.me/");
+  assert.equal(apiLink.whatsapp, "https://wa.me/");
   assert.ok(owner.agent.phone, "the original object is not changed");
+});
+
+test("Avísame contact: phones and emails are told apart, and emails cannot carry link parameters", () => {
+  assert.equal(normalizeAlertWhatsapp("7123 4567"), "59171234567");
+  assert.equal(normalizeAlertWhatsapp("+591 71234567"), "59171234567");
+  assert.equal(normalizeAlertWhatsapp("ana.70012345@gmail.com"), null);
+  assert.equal(normalizeAlertEmail("Ana.70012345@Gmail.com"), "ana.70012345@gmail.com");
+  assert.equal(normalizeAlertEmail("victim@example.com?cc=attacker%40evil.com&body=x"), null);
+  assert.equal(normalizeAlertEmail("a#b@example.com"), null);
 });

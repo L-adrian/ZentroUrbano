@@ -8,6 +8,8 @@ export const funnelWhatsappSources = [
   ["tarjeta", "Tarjeta"],
   ["mapa", "Mapa"],
   ["recorrido", "Recorrido 3D"],
+  ["guardados", "Guardados"],
+  ["cercanos", "Cerca de la zona"],
   ["otro", "Otro"],
 ] as const;
 

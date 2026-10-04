@@ -47,7 +47,7 @@ export function PublicationReviewControls({id,address,canApprove,republish=false
     {error && <p role="alert" className="auth-error">{error}</p>}
     <div className="review-actions">
       <button type="button" className="zu-button zu-button-primary" disabled={busy || !canApprove} onClick={()=>review("approve")}>{busy ? <LoaderCircle size={17} className="zu-spin"/> : <Check size={17}/>}{republish ? "Aprobar y volver a publicar" : "Aprobar y publicar"}</button>
-      {!republish && <button type="button" className="zu-button zu-button-secondary" disabled={busy} onClick={()=>review("changes")}><MessageSquareWarning size={17}/>Pedir corrección</button>}
+      {!republish && <button type="button" className="zu-button zu-button-secondary" disabled={busy || !canApprove} onClick={()=>review("changes")}><MessageSquareWarning size={17}/>Pedir corrección</button>}
       <button type="button" className="zu-button zu-button-secondary" disabled={busy} onClick={()=>review("reject")}><X size={17}/>{republish ? "Mantener oculto" : "Rechazar"}</button>
     </div>
   </div>;

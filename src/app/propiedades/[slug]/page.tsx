@@ -34,22 +34,17 @@ import { PublisherBadge } from "@/components/publisher-badge";
 import { SafetyNotice } from "@/components/safety-notice";
 import { toSafeMobileImageUrl } from "@/components/safe-mobile-image";
 import type { Property } from "@/lib/properties";
-import {
-  getPropertyBySlugData,
-  getRetiredPropertyBySlugData,
-  getSimilarPropertiesData,
-} from "@/lib/property-data";
+import { findListingPage } from "@/lib/listing-page-lookup";
+import { getPublishedPropertiesData, getSimilarPropertiesData } from "@/lib/property-data";
 import { buildSeoMetadata } from "@/lib/seo";
-import { citySlug, operationSlug, zoneSlug } from "@/lib/seo-routes";
+import { citySlug, filterPropertiesByCity, filterPropertiesBySeoRoute, operationSlug, zoneSlug } from "@/lib/seo-routes";
 import { breadcrumbJsonLd, jsonLdScript } from "@/lib/structured-data";
 import { absoluteUrl } from "@/lib/site";
-import { isDirectRental } from "@/lib/rentals";
 import { getAvailabilityState, getEntryCost, getGuaranteeLabel } from "@/lib/listing-summary";
 import { getPublicViewStats } from "@/lib/property-audience";
 import { whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
-import { getPrivateTourShowcase } from "@/lib/private-tour-showcase";
 import { PrivateTourShowcaseViewer } from "@/components/private-tour-showcase";
 
 // Prices and availability must not survive edits in an external CDN cache.
@@ -61,21 +56,18 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const privateShowcase = await getPrivateTourShowcase(slug);
+  const found = await findListingPage(slug);
 
-  if (privateShowcase) {
+  if (found?.kind === "showcase") {
     return {
-      title: privateShowcase.title,
+      title: found.showcase.title,
       description: "Muestra privada de un recorrido 3D experimental.",
       robots: { index: false, follow: false, noarchive: true },
     };
   }
-  const property = await getPropertyBySlugData(slug);
-
-  if (!property || !isDirectRental(property)) {
-    const retired = property ? undefined : await getRetiredPropertyBySlugData(slug);
+  if (found?.kind !== "listing") {
     return {
-      title: retired ? `Ya no está disponible: ${retired.title}` : "Vivienda no encontrada",
+      title: found ? `Ya no está disponible: ${found.property.title}` : "Vivienda no encontrada",
       robots: {
         index: false,
         follow: true,
@@ -83,6 +75,7 @@ export async function generateMetadata({
     };
   }
 
+  const property = found.property;
   const seoTitle = /alquiler/i.test(property.title) ? property.title : `Alquiler: ${property.title}`;
   const seoDescription = `Alquiler directo con el dueño en ${property.zone}, ${property.city}. ${property.shortDescription}`.slice(0, 300);
   return buildSeoMetadata({
@@ -110,18 +103,26 @@ export default async function PropertyDetailPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const privateShowcase = await getPrivateTourShowcase(slug);
+  const found = await findListingPage(slug);
 
-  if (privateShowcase) {
-    return <PrivateTourShowcaseViewer showcase={privateShowcase} />;
+  if (!found) notFound();
+  if (found.kind === "showcase") {
+    return <PrivateTourShowcaseViewer showcase={found.showcase} />;
   }
-  const property = await getPropertyBySlugData(slug);
-
-  if (!property || !isDirectRental(property)) {
-    const retired = property ? undefined : await getRetiredPropertyBySlugData(slug);
-    if (!retired) notFound();
-    return <RetiredListing property={retired} similar={await getSimilarPropertiesData(retired, 3)} />;
+  if (found.kind === "retired") {
+    const retired = found.property;
+    const [similar, published] = await Promise.all([getSimilarPropertiesData(retired, 3), getPublishedPropertiesData()]);
+    // The zone page answers 404 once its last listing leaves, so link the city instead (or nothing).
+    const route = { operationSlugParam: operationSlug(retired.operation), citySlugParam: citySlug(retired), properties: published };
+    const cityPath = `/${route.operationSlugParam}/${route.citySlugParam}`;
+    const browse = filterPropertiesBySeoRoute({ ...route, zoneSlugParam: zoneSlug(retired) }).length > 0
+      ? { href: `${cityPath}/${zoneSlug(retired)}`, label: `Ver alquileres en ${retired.zone}` }
+      : filterPropertiesByCity(route).length > 0
+        ? { href: cityPath, label: `Ver alquileres en ${retired.city}` }
+        : null;
+    return <RetiredListing property={retired} similar={similar} browse={browse} />;
   }
+  const property = found.property;
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -530,9 +531,8 @@ function CostsBlock({ property }: { property: Property }) {
   );
 }
 
-function RetiredListing({ property, similar }: { property: Property; similar: Property[] }) {
+function RetiredListing({ property, similar, browse }: { property: Property; similar: Property[]; browse: { href: string; label: string } | null }) {
   const kind = (property.rentalDetails?.type ?? property.type).toLocaleLowerCase("es");
-  const cityPath = `/${operationSlug(property.operation)}/${citySlug(property)}`;
   return (
     <main id="contenido" className="property-detail bg-white py-10 sm:py-16">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -551,10 +551,12 @@ function RetiredListing({ property, similar }: { property: Property; similar: Pr
           </div>
         ) : null}
         <div className="mt-8 flex flex-wrap gap-3">
-          <Link href={`${cityPath}/${zoneSlug(property)}`} className="zu-button zu-button-primary">
-            Ver alquileres en {property.zone}
-          </Link>
-          <Link href="/propiedades" className="zu-button zu-button-secondary">
+          {browse ? (
+            <Link href={browse.href} className="zu-button zu-button-primary">
+              {browse.label}
+            </Link>
+          ) : null}
+          <Link href="/propiedades" className={`zu-button ${browse ? "zu-button-secondary" : "zu-button-primary"}`}>
             Ver todos los alquileres
           </Link>
         </div>

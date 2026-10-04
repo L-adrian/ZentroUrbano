@@ -1,4 +1,4 @@
-import { beforeVisitFields, parseBeforeVisitInput, type BeforeVisit } from "@/lib/before-visit";
+import { beforeVisitFields, parseBeforeVisitInput, readBeforeVisit, type BeforeVisit } from "@/lib/before-visit";
 import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 
 export const petsPolicies = ["allowed", "not_allowed", "consult"] as const;
@@ -111,8 +111,11 @@ export function getPublicationStepErrors(step: number, value: unknown, contactNa
   return Object.fromEntries(Object.entries(errors).filter(([field]) => publicationFieldStep(field) === step));
 }
 
+// Stored request details were normalized once already ("Ninguno" is stored as []), so their
+// "Antes de visitar" answers are kept as stored instead of being parsed like form input again.
 export function parsePublicationDetails(value: unknown): PublicationDetails | null {
-  return validatePublicationDetails(value).details;
+  const details = validatePublicationDetails(value).details;
+  return details ? { ...details, ...readBeforeVisit(value) } : null;
 }
 
 // Entry conditions shown on the listing. Only what the owner answered; nothing is assumed.

@@ -167,6 +167,12 @@ export function DirectRentalExplorer({
     () => buildRentalSearchParams(appliedFilters, displayCurrency, initialFilters).toString(),
     [appliedFilters, displayCurrency, initialFilters],
   );
+  // Alerts always carry the currency, so a price typed in the text keeps meaning $us or Bs.
+  const alertParams = useMemo(() => {
+    const params = new URLSearchParams(serializedFilters);
+    if (!params.has("currency")) params.set("currency", displayCurrency);
+    return params.toString();
+  }, [serializedFilters, displayCurrency]);
   const shareUrl = absoluteUrl(`${pathname}${serializedFilters ? `?${serializedFilters}` : ""}`);
   const searchSummary = describeRentalSearch(appliedFilters, displayCurrency).join(", ");
   const unsupportedIntent = getUnsupportedSearchIntent(deferredQuery);
@@ -623,7 +629,7 @@ export function DirectRentalExplorer({
                     </button>
                   ) : null}
                   <SearchAlertButton
-                    params={serializedFilters}
+                    params={alertParams}
                     summary={searchSummary}
                     whatsappHref={whatsappUrl(alertMessage)}
                     className="zu-button zu-button-primary"
