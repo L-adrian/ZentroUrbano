@@ -32,6 +32,6 @@ export default function PropertyTourViewer({ tour, preview, onReady, onError }: 
       </>}
     </div>
     <div className="tour-disclaimer"><AlertTriangle size={16} aria-hidden="true" /><p>{TOUR_DISCLAIMER}</p></div>
-    <footer className="tour-footer"><small>Generado con World Labs / Marble</small>{!preview && <a className="zu-button zu-button-primary" href={`/api/propiedades/${tour.slug}/whatsapp`} target="_blank" rel="noreferrer"><MessageCircle size={17} />Contactar al propietario</a>}</footer>
+    <footer className="tour-footer"><small>Generado con World Labs / Marble</small>{!preview && <a className="zu-button zu-button-primary" href={`/api/propiedades/${tour.slug}/whatsapp?desde=recorrido`} target="_blank" rel="noreferrer"><MessageCircle size={17} />Contactar al propietario</a>}</footer>
   </>;
 }

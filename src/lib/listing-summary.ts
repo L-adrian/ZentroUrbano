@@ -10,19 +10,64 @@ export function getAvailabilityDays(property: Pick<Property, "availabilityConfir
   return Math.max(0, Math.floor((now - confirmedAt) / 86_400_000));
 }
 
-export function getAvailabilityLabel(property: Pick<Property, "availabilityConfirmedAt">, now = Date.now()) {
-  const days = getAvailabilityDays(property, now);
-  if (days === null) return "Confirma disponibilidad antes de visitar";
-  if (days === 0) return "Confirmado hoy";
-  return `Confirmado hace ${days} ${days === 1 ? "día" : "días"}`;
-}
+// Product rule: a confirmation is valid for 21 days, or until 5 people report
+// that the home is no longer available. After that the listing asks tenants to check first.
+export const availabilityFreshDays = 21;
+export const availabilityReportLimit = 5;
 
-// Short form for cards. Only recent confirmations are advertised; older ones stay on the listing page.
-export function getAvailabilityShortLabel(property: Pick<Property, "availabilityConfirmedAt">, now = Date.now()) {
+export type AvailabilityState = {
+  fresh: boolean;
+  reason: "confirmed" | "old" | "missing" | "reported";
+  days: number | null;
+  label: string;
+  detail: string;
+  shortLabel: string;
+};
+
+export function getAvailabilityState(
+  property: Pick<Property, "availabilityConfirmedAt" | "availabilityReports">,
+  now = Date.now(),
+): AvailabilityState {
   const days = getAvailabilityDays(property, now);
-  if (days === null || days > 30) return null;
-  if (days === 0) return "hoy";
-  return `hace ${days} ${days === 1 ? "día" : "días"}`;
+  const when = days === null ? "" : days === 0 ? "hoy" : `hace ${days} ${days === 1 ? "día" : "días"}`;
+  if ((property.availabilityReports ?? 0) >= availabilityReportLimit) {
+    return {
+      fresh: false,
+      reason: "reported",
+      days,
+      label: "Disponibilidad por confirmar",
+      detail: "Varias personas avisaron que ya no estaría disponible. Pregunta antes de ir.",
+      shortLabel: "Por confirmar",
+    };
+  }
+  if (days === null) {
+    return {
+      fresh: false,
+      reason: "missing",
+      days,
+      label: "Disponibilidad por confirmar",
+      detail: "Pregunta si sigue disponible antes de ir.",
+      shortLabel: "Por confirmar",
+    };
+  }
+  if (days > availabilityFreshDays) {
+    return {
+      fresh: false,
+      reason: "old",
+      days,
+      label: "Disponibilidad por confirmar",
+      detail: `El dueño la confirmó ${when}. Pregunta si sigue disponible antes de ir.`,
+      shortLabel: "Por confirmar",
+    };
+  }
+  return {
+    fresh: true,
+    reason: "confirmed",
+    days,
+    label: "Disponible",
+    detail: `Confirmado ${when}`,
+    shortLabel: `Disponible · ${when}`,
+  };
 }
 
 export function getGuaranteeLabel(property: Pick<Property, "requirements">) {

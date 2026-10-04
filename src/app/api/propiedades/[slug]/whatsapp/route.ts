@@ -1,8 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { isExternalContactUrl } from "@/lib/property-contact";
+import { formatPriceInCurrency } from "@/lib/currency";
+import { buildOwnerWhatsappMessage, isExternalContactUrl, whatsappContactSources } from "@/lib/property-contact";
 import { absoluteUrl } from "@/lib/site";
 import { getPropertyBySlugData } from "@/lib/property-data";
+import { visibleOrigin } from "@/lib/request-origin";
 import { trackServerEvent } from "@/lib/tracking";
+import { getOrCreateVisitorId } from "@/lib/visitor-id";
 
 export async function GET(
   request: NextRequest,
@@ -12,9 +15,10 @@ export async function GET(
   const property = await getPropertyBySlugData(slug);
 
   if (!property) {
-    return NextResponse.redirect(new URL("/propiedades", request.url));
+    return NextResponse.redirect(new URL("/propiedades", visibleOrigin(request)));
   }
 
+  const source = request.nextUrl.searchParams.get("desde");
   await trackServerEvent({
     eventType: "property_whatsapp_click",
     propertySlug: property.slug,
@@ -24,6 +28,8 @@ export async function GET(
       city: property.city,
       zone: property.zone,
       listing_plan: property.listingPlan,
+      source: whatsappContactSources.find((item) => item === source) ?? "otro",
+      visitor_id: await getOrCreateVisitorId(),
     },
   });
 
@@ -31,10 +37,11 @@ export async function GET(
     return NextResponse.redirect(property.whatsapp);
   }
 
-  const agent = property.agent;
-  const message = encodeURIComponent(
-    `Hola ${agent.name}, quiero recibir más información sobre ${property.title} en Zentro Urbano: ${absoluteUrl(`/propiedades/${property.slug}`)}`,
+  const message = buildOwnerWhatsappMessage(
+    property,
+    formatPriceInCurrency(property, property.currency),
+    absoluteUrl(`/propiedades/${property.slug}`),
   );
 
-  return NextResponse.redirect(`https://wa.me/${agent.whatsapp}?text=${message}`);
+  return NextResponse.redirect(`https://wa.me/${property.agent.whatsapp}?text=${encodeURIComponent(message)}`);
 }

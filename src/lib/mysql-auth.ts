@@ -14,8 +14,11 @@ import {
   upsertLocalGoogleAccount,
   type LocalAuthAccount,
 } from "@/lib/local-auth-store";
-import type { DemoAccount, DemoAccountKind, DemoPlan } from "@/lib/demo-accounts";
-import type { PropertyPerformance, WeeklyReport } from "@/lib/demo-accounts";
+import type { DemoAccount, DemoAccountKind } from "@/lib/demo-accounts";
+import { getListingAudience, getUnavailableReportTimes } from "@/lib/property-audience";
+import { countReportsSince } from "@/lib/property-reports";
+import { ownerListingStatus, recentOwnerRequests } from "@/lib/listing-moderation";
+import { listPublicationRequests } from "@/lib/publication-requests";
 
 export const authSessionCookie = "morada_session";
 const sessionDays = 30;
@@ -47,28 +50,6 @@ type AccountPropertyRow = {
   property_slug: string;
   plan_slug: string | null;
   status: string;
-};
-
-type PerformanceRow = {
-  account_property_id: string;
-  views: number;
-  property_clicks: number | null;
-  map_views: number;
-  whatsapp_clicks: number;
-  gallery_opens: number;
-  weekly_views: unknown;
-  recommendation: string | null;
-};
-
-type WeeklyReportRow = {
-  id: string;
-  period_label: string;
-  headline: string;
-  summary: string;
-  views: number;
-  property_clicks: number | null;
-  whatsapp_clicks: number;
-  action: string;
 };
 
 export type RegisterInput = {
@@ -325,11 +306,13 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
       avatarUrl: account.avatar_url ?? undefined,
       roleLabel: account.role_label,
       location: account.location ?? "Bolivia",
-      planSummary: "0 propiedades activas",
+      planSummary: "0 anuncios publicados",
       propertySlugs: [],
       properties: [],
       performance: [],
       reports: [],
+      listings: [],
+      requests: [],
     };
   }
 
@@ -342,29 +325,6 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
           and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')`,
       { accountId: account.id },
     )) ?? [];
-  const performanceRows =
-    propertyRows.length > 0
-      ? ((await queryRows<PerformanceRow>(
-          `select account_property_id, views, property_clicks, map_views, whatsapp_clicks,
-                  gallery_opens, weekly_views, recommendation
-             from property_performance_snapshots
-            where account_property_id in (${propertyRows.map((_, index) => `:id${index}`).join(",")})`,
-          Object.fromEntries(
-            propertyRows.map((row, index) => [`id${index}`, row.id]),
-          ) as Record<string, DbQueryValue>,
-        )) ?? [])
-      : [];
-  const reports =
-    (await queryRows<WeeklyReportRow>(
-      `select id, period_label, headline, summary, views, property_clicks, whatsapp_clicks, action
-         from weekly_reports
-        where account_id = :accountId
-        order by period_start desc`,
-      { accountId: account.id },
-    )) ?? [];
-  const performanceByPropertyId = new Map(
-    performanceRows.map((performance) => [performance.account_property_id, performance]),
-  );
   const slugs = propertyRows.map((row) => row.property_slug);
   const properties =
     slugs.length > 0
@@ -382,6 +342,27 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
         )) ?? []).map(mapPropertyRow)
       : [];
 
+  // Views, WhatsApp taps and "ya no está disponible" reports come from tracking_events;
+  // the panel still opens if those queries fail.
+  const [audience, reportTimes, requests] = await Promise.all([
+    getListingAudience(slugs).catch((error) => {
+      console.error("owner audience query failed", error);
+      return null;
+    }),
+    getUnavailableReportTimes(),
+    listPublicationRequests(account.id).catch((error) => {
+      console.error("owner requests query failed", error);
+      return [];
+    }),
+  ]);
+  const statusBySlug = new Map(propertyRows.map((row) => [row.property_slug, row.status]));
+  const listings = properties.map((property) => ({
+    slug: property.slug,
+    status: ownerListingStatus(statusBySlug.get(property.slug) ?? "active", property.published),
+    audience: audience ? audience.get(property.slug) ?? emptyAudience : null,
+  }));
+  const publishedCount = properties.filter((property) => property.published).length;
+
   return {
     id: account.id,
     kind: account.kind,
@@ -393,23 +374,38 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
     avatarUrl: account.avatar_url ?? undefined,
     roleLabel: account.role_label,
     location: account.location ?? "Bolivia",
-    planSummary: buildPlanSummary(propertyRows),
+    planSummary: `${publishedCount} anuncio${publishedCount === 1 ? "" : "s"} publicado${publishedCount === 1 ? "" : "s"}`,
     propertySlugs: slugs,
-    properties,
-    performance: propertyRows.map((row) => toPropertyPerformance(row, performanceByPropertyId.get(row.id))),
-    reports: reports.map(toWeeklyReport),
+    properties: properties.map((property) => ({
+      ...property,
+      availabilityReports: countReportsSince(reportTimes.get(property.slug), property.availabilityConfirmedAt),
+    })),
+    performance: [],
+    reports: [],
+    listings,
+    // Older decided requests stay in /cliente/solicitudes.
+    requests: recentOwnerRequests(requests).map((request) => ({
+      id: request.id,
+      kind: request.kind === "republish" ? "republish" as const : "new" as const,
+      title: request.listing?.title || request.details?.title || "Vivienda sin título",
+      status: request.status,
+      createdAt: request.createdAt,
+      reviewedAt: request.reviewedAt ?? null,
+      reason: request.reviewReason ?? null,
+      slug: request.propertySlug ?? null,
+    })),
+    audienceUnavailable: audience === null,
   };
 }
 
-export async function canEditProperty(propertySlug: string) {
+const emptyAudience = { views7: 0, views30: 0, viewsTotal: 0, contacts7: 0, contacts30: 0, contactsTotal: 0 };
+
+// The signed-in owner, only when that owner manages this rental listing. Owner routes check this first.
+export async function getListingOwner(propertySlug: string) {
   const account = await getCurrentAccount();
 
-  if (!account || account.kind !== "owner") {
-    return false;
-  }
-
-  if (account.storage === "local") {
-    return false;
+  if (!account || account.kind !== "owner" || account.storage === "local") {
+    return null;
   }
 
   try {
@@ -422,10 +418,14 @@ export async function canEditProperty(propertySlug: string) {
       { accountId: account.id, propertySlug },
     );
 
-    return Boolean(ownership);
+    return ownership ? account : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+export async function canEditProperty(propertySlug: string) {
+  return Boolean(await getListingOwner(propertySlug));
 }
 
 export async function clearCurrentSession() {
@@ -493,86 +493,6 @@ async function createFallbackSession(userId: string, accountId: string) {
     expiresAt,
   });
   return { token, expiresAt };
-}
-
-function toPropertyPerformance(
-  propertyRow: AccountPropertyRow,
-  performance?: PerformanceRow,
-): PropertyPerformance {
-  return {
-    propertySlug: propertyRow.property_slug,
-    plan: planLabel(propertyRow.plan_slug),
-    status: propertyRow.status === "paused" ? "Pausada" : "Activa",
-    views: performance?.views ?? 0,
-    propertyClicks: performance?.property_clicks ?? performance?.views ?? 0,
-    mapViews: performance?.map_views ?? 0,
-    whatsappClicks: performance?.whatsapp_clicks ?? 0,
-    galleryOpens: performance?.gallery_opens ?? 0,
-    weeklyViews: normalizeWeeklyViews(performance?.weekly_views),
-    recommendation:
-      performance?.recommendation ?? "Revisar fotos, precio y descripcion en el reporte semanal.",
-  };
-}
-
-function toWeeklyReport(row: WeeklyReportRow): WeeklyReport {
-  return {
-    id: row.id,
-    period: row.period_label,
-    headline: row.headline,
-    summary: row.summary,
-    views: row.views,
-    propertyClicks: row.property_clicks ?? row.views,
-    whatsappClicks: row.whatsapp_clicks,
-    action: row.action,
-  };
-}
-
-function buildPlanSummary(properties: AccountPropertyRow[]) {
-  const count = properties.length;
-  const premiumCount = properties.filter((property) => property.plan_slug === "premium").length;
-
-  if (premiumCount > 0) {
-    return `${count} propiedad${count === 1 ? "" : "es"} activa${count === 1 ? "" : "s"} - ${premiumCount} Premium`;
-  }
-
-  return `${count} propiedad${count === 1 ? "" : "es"} activa${count === 1 ? "" : "s"}`;
-}
-
-function planLabel(planSlug: string | null): DemoPlan {
-  if (planSlug === "premium") {
-    return "Premium";
-  }
-
-  if (planSlug === "pro") {
-    return "Pro";
-  }
-
-  return "B\u00e1sico";
-}
-
-function normalizeWeeklyViews(value: unknown) {
-  if (!value) {
-    return [0, 0, 0, 0, 0, 0, 0];
-  }
-
-  if (Array.isArray(value) && value.every((item) => typeof item === "number")) {
-    return value;
-  }
-
-  if (typeof value !== "string") {
-    return [0, 0, 0, 0, 0, 0, 0];
-  }
-
-  try {
-    const parsed = JSON.parse(value);
-    if (Array.isArray(parsed) && parsed.every((item) => typeof item === "number")) {
-      return parsed;
-    }
-  } catch {
-    return [0, 0, 0, 0, 0, 0, 0];
-  }
-
-  return [0, 0, 0, 0, 0, 0, 0];
 }
 
 function normalizeEmail(email: string) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, Camera, ChevronDown, CircleDollarSign, ClipboardCheck, House, MapPin, ShieldCheck, UserRound } from "lucide-react";
+import { OwnerServicesNote } from "@/components/owner-services-note";
 import { PublicationGuideActions } from "@/components/publication-guide-actions";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -29,14 +30,14 @@ const sections: { id: string; title: string; icon: typeof House; items: GuideIte
     { id: "tipo", title: "Título y tipo de vivienda", detail: "Casa, departamento o monoambiente. Un título descriptivo, por ejemplo: Departamento de 2 dormitorios en Urbari." },
     { id: "ubicacion", title: "Zona y dirección aproximada", detail: "Barrio, avenida, calle, anillo o una referencia que permita ubicar la vivienda." },
     { id: "distribucion", title: "Dormitorios y parqueos", detail: "Cantidad de dormitorios y espacios de parqueo. Indica 0 cuando no tenga." },
-    { id: "caracteristicas", title: "Mascotas, equipamiento y comodidades", detail: "Confirma si aceptas mascotas y si tiene muebles, seguridad, piscina, patio o balcón, churrasquera y ascensor." },
+    { id: "caracteristicas", title: "Mascotas, equipamiento y comodidades", detail: "Indica si aceptas mascotas: sí, no o a consultar. Marca también si tiene muebles, seguridad, piscina, patio o balcón, churrasquera y ascensor." },
     { id: "descripcion", title: "Una descripción del alquiler", detail: "Al menos 30 caracteres. Incluye distribución, estado, servicios y condiciones que deba conocer el inquilino." },
     { id: "banos", title: "Cantidad de baños", detail: "Si no tienes el dato confirmado, puedes dejarlo vacío. La ficha mostrará Consultar.", note: "Opcional" },
     { id: "superficie", title: "Superficie en m²", detail: "Añade la superficie si la conoces. No es necesario inventar ni estimar este dato.", note: "Opcional" },
   ] },
   { id: "costos", title: "Precio y condiciones", icon: CircleDollarSign, items: [
     { id: "alquiler", title: "Alquiler mensual y moneda", detail: "Monto en bolivianos o dólares. Si eliges dólares, también debes indicar tu tipo de cambio en Bs por USD." },
-    { id: "expensas", title: "Expensas mensuales", detail: "Monto adicional en la misma moneda del alquiler. Si no hay un cobro adicional o ya están incluidas en el precio, indica 0 y acláralo en la descripción." },
+    { id: "expensas", title: "Expensas", detail: "Elige si están incluidas en el alquiler, si no se cobran o si se pagan aparte. Si se pagan aparte, indica el monto por mes en la misma moneda del alquiler." },
     { id: "garantia", title: "Garantía", detail: "Sin garantía, 1 mes, 2 meses u otro monto. Si eliges otro monto, indica la cantidad exacta." },
     { id: "condiciones", title: "Servicios y otras condiciones", detail: "Aclara en la descripción qué incluye el precio, qué paga el inquilino y cualquier condición adicional.", note: "Recomendado" },
   ] },
@@ -53,7 +54,7 @@ export default function PublicationRequirementsPage() {
     <header className="guide-heading">
       <p className="zu-eyebrow"><ClipboardCheck size={15} aria-hidden="true" /> GUÍA PARA PROPIETARIOS</p>
       <h1>Qué necesitas para publicar tu alquiler</h1>
-      <p>Fotos, datos y condiciones para preparar tu alquiler. Puedes consultar y compartir esta lista sin crear una cuenta.</p>
+      <p>Fotos, datos y condiciones para preparar tu alquiler. Publicar es gratis. Puedes consultar y compartir esta lista sin crear una cuenta.</p>
       <div className="guide-heading-bottom">
         <span className="guide-direct"><ShieldCheck size={17} aria-hidden="true" />Solo viviendas en alquiler. Trato directo, sin intermediarios.</span>
         <PublicationGuideActions url={url} />
@@ -76,7 +77,8 @@ export default function PublicationRequirementsPage() {
           </li>)}</ul>
         </section>)}
 
-        <section className="guide-review" aria-labelledby="revision-manual"><ClipboardCheck size={23} aria-hidden="true" /><div><h2 id="revision-manual">Enviar no significa publicar automáticamente</h2><p>Tu solicitud queda pendiente de revisión manual. El administrador puede aprobarla, rechazarla o pedir una aclaración. Puedes seguir su estado desde tu cuenta.</p></div></section>
+        <section className="guide-review" aria-labelledby="revision-manual"><ClipboardCheck size={23} aria-hidden="true" /><div><h2 id="revision-manual">Enviar no significa publicar automáticamente</h2><p>Una persona del equipo revisa las fotos, el precio y los datos antes de publicar. Puede aprobarla, pedirte una aclaración o rechazarla con el motivo. Por ahora no verificamos identidad. Sigues el estado en Mi cuenta.</p></div></section>
+        <OwnerServicesNote className="mt-6 rounded-[10px]" />
         <div className="guide-closing guide-screen-only"><Link href="/publicar" className="zu-button zu-button-primary">Ya tengo todo, empezar<ArrowRight size={17} aria-hidden="true" /></Link><SupportWhatsAppButton /></div>
         <div className="guide-document-footer"><span>{url.replace(/^https?:\/\//, "")}</span><span>Ayuda: {siteConfig.phoneDisplay}</span><span>{siteConfig.email}</span></div>
       </div>

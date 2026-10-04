@@ -145,6 +145,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-image img { object-fit: cover; }
 .rental-status { display: inline-flex; align-items: center; gap: 5px; position: absolute; left: 10px; top: 10px; padding: 5px 8px; border-radius: 4px; color: #174738; background: #fff; font-size: 10px; font-weight: 650; }
 .rental-status svg { width: 12px; height: 12px; }
+.rental-status.is-unconfirmed { color: #7a4b00; background: #fff4d6; }
+.rental-views { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px; }
 .rental-demo { position: absolute; bottom: 9px; left: 10px; color: white; background: #202726; border-radius: 4px; padding: 3px 7px; font-size: 10px; }
 .rental-image-count { position: absolute; right: 10px; bottom: 9px; display: flex; gap: 5px; align-items: center; color: white; background: #202726; border-radius: 4px; font-size: 10px; padding: 3px 7px; }
 .rental-card-content { padding-top: 13px; display: flex; flex-direction: column; flex: 1; }
@@ -360,3 +362,77 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .gallery-strip .gallery-strip-more { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(16 22 20 / 0.6); color: #fff; font-weight: 700; font-size: 14px; }
 }
 .dark .safety-notice { background: #3a2d16; color: #f3d39b; }
+
+/* Availability: green only while the owner's confirmation is recent (21 days, fewer than 5 reports). */
+.availability-box.is-fresh { border-color: #bddfce; background: #f1f8f4; }
+.availability-box.is-fresh .availability-box-label { color: #10533b; }
+.availability-box.is-unconfirmed { border-color: #f0d49a; background: #fff8e8; }
+.availability-box.is-unconfirmed .availability-box-label { color: #7a4b00; }
+.dark .availability-box.is-fresh { border-color: #285340; background: #12261d; }
+.dark .availability-box.is-fresh .availability-box-label { color: #7fd8b4; }
+.dark .availability-box.is-unconfirmed { border-color: #5c4718; background: #2e2412; }
+.dark .availability-box.is-unconfirmed .availability-box-label { color: #f3d39b; }
+.dark .rental-status.is-unconfirmed { color: #7a4b00; background: #fff4d6; }
+
+/* Report a listing: reasons are stored for the admin. */
+.report-listing-trigger { color: inherit; font-weight: 650; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; background: none; border: 0; padding: 0; font: inherit; }
+.report-dialog { margin: auto; width: min(440px, calc(100vw - 32px)); max-height: calc(100svh - 32px); border: 0; border-radius: 12px; padding: 0; background: var(--surface, #fff); color: var(--foreground, #111); box-shadow: 0 24px 60px rgb(0 0 0 / 0.25); }
+.report-dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+.report-dialog-body { padding: 18px 18px 20px; display: grid; gap: 14px; font-size: 14px; line-height: 1.45; }
+.report-dialog-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.report-dialog-head h2 { font-size: 18px; font-weight: 700; }
+.report-dialog-head button { display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -10px -10px 0; border-radius: 8px; color: var(--muted, #555); cursor: pointer; }
+.report-dialog form { display: grid; gap: 14px; }
+.report-dialog fieldset { display: grid; gap: 6px; border: 0; padding: 0; margin: 0; }
+.report-dialog legend { font-weight: 650; margin-bottom: 6px; }
+.report-dialog-option { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--line, #ddd); border-radius: 8px; cursor: pointer; }
+.report-dialog-option:has(input:checked) { border-color: #176b4d; background: #edf7f2; }
+.report-dialog-option input { accent-color: #176b4d; width: 18px; height: 18px; flex-shrink: 0; }
+.report-dialog-note { display: grid; gap: 6px; font-weight: 650; }
+.report-dialog-note textarea { font: inherit; font-weight: 400; border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 8px 10px; background: transparent; color: inherit; resize: vertical; }
+.report-dialog-hint { font-size: 12px; color: var(--muted, #555); }
+.report-dialog-error { color: #a12d1c; font-weight: 600; }
+.report-dialog-error a, .report-dialog-done a { color: inherit; font-weight: 650; text-decoration: underline; }
+.report-dialog-done { display: grid; gap: 12px; }
+.report-dialog-submit { height: 46px; border-radius: 8px; background: #176b4d; color: #fff; font-weight: 650; cursor: pointer; }
+.report-dialog-submit:disabled { opacity: 0.6; cursor: wait; }
+.dark .report-dialog-option:has(input:checked) { border-color: #43c49b; background: #12261d; }
+.dark .report-dialog-error { color: #ff9c8a; }
+
+/* Phones swipe between photos; the browser keeps vertical scroll and pinch zoom. */
+.gallery-full-image { touch-action: pan-y pinch-zoom; }
+.listing-views { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.listing-views svg { flex-shrink: 0; margin-top: 2px; }
+.listing-views small { display: block; font-size: 12px; }
+
+/* Listing cards: no text under 12px and a WhatsApp button with a 44px touch area. */
+.rental-card { container-type: inline-size; }
+.rental-status { font-size: 12px; padding: 5px 9px; }
+.rental-status svg { width: 13px; height: 13px; }
+.rental-demo, .rental-image-count { font-size: 12px; padding: 4px 8px; }
+.rental-card-location { font-size: 13px; }
+.rental-card-title { font-size: 15px; line-height: 1.45; min-height: 44px; }
+.rental-card-facts { font-size: 13px; gap: 6px 12px; }
+.rental-card-tags li { font-size: 12px; padding: 3px 9px; }
+.rental-card-tags li.is-unknown { color: #7a4b00; background: #fff4d6; }
+.dark .rental-card-tags li.is-unknown { color: #f3d39b; background: #3a2d16; }
+.rental-card-bottom { flex-wrap: wrap; row-gap: 10px; }
+.rental-card-pricing { min-width: 0; }
+.rental-card-price { font-size: 20px; }
+.rental-entry-label { font-size: 13px; }
+.rental-card-contact { width: auto; height: auto; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; padding: 0 12px; border-radius: 7px; border-color: #087c65; background: #087c65; color: #fff; font-size: 14px; font-weight: 650; white-space: nowrap; }
+.rental-card-contact:hover { background: #05624f; border-color: #05624f; }
+.dark .rental-card-contact { background: #43c49b; border-color: #43c49b; color: #08291e; }
+.dark .rental-card-contact:hover { background: #69d4b1; border-color: #69d4b1; }
+.rental-card-contact.is-external, .dark .rental-card-contact.is-external { background: transparent; border-color: var(--line); color: var(--brand); }
+.rental-card-contact.is-external:hover { background: var(--brand-soft); border-color: var(--brand); }
+.rental-owner-label { flex-wrap: wrap; row-gap: 2px; font-size: 12px; margin-top: 8px; }
+.rental-views { gap: 4px; margin-left: 6px; }
+@container (max-width: 279px) { .rental-card-pricing, .rental-card-contact { width: 100%; } }
+@media (max-width: 540px) { .rental-card-title { font-size: 17px; min-height: auto; }.rental-card-price { font-size: 22px; }.rental-card-location, .rental-card-facts { font-size: 14px; }.rental-entry-label { font-size: 14px; }.rental-owner-label { font-size: 13px; }.rental-card-contact { min-height: 46px; padding-inline: 16px; font-size: 15px; } }
+
+/* Home budget: shows how the amount was understood ("Hasta Bs 3.000 por mes"). */
+.home-search-hint { grid-column: 1/-1; padding: 8px 15px 2px; font-size: 12px; font-weight: 600; color: var(--brand); }
+.home-search-hint.is-error { color: #a12d1c; }
+.dark .home-search-hint.is-error { color: #ff9c8a; }
+@media (max-width: 768px) { .home-search-hint { padding: 0 12px 12px; } }

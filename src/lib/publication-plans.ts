@@ -1,5 +1,8 @@
 import { Building2, Layers3, Megaphone, type LucideIcon } from "lucide-react";
 
+// Legacy paid plans. Since 2026-10 publishing is free and no page shows these plans.
+// The publication_plans table and its rows stay in the database; nothing reads or deletes them.
+
 export const publicationExchangeRateBobPerUsd = 7;
 
 export type PublicationPlanTier = "basic" | "pro" | "premium";

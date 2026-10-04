@@ -2,21 +2,43 @@
 
 import {
   Car,
+  Check,
+  Info,
   List,
   Map,
   PawPrint,
   Search,
+  Share2,
   SlidersHorizontal,
   X,
 } from "lucide-react";
-import { useDeferredValue, useMemo, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useCurrencyPreference } from "@/components/currency-preference";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyMap } from "@/components/property-map";
-import { getPropertyPriceInCurrency } from "@/lib/currency";
-import { evaluatePropertySearch, hasSearchQuery } from "@/lib/property-search";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
+import {
+  buildRentalSearchParams,
+  describePriceBounds,
+  describeRentalSearch,
+  emptyRentalSearchFilters,
+  getActiveRentalFilters,
+  getPriceBounds,
+  getUnsupportedSearchIntent,
+  readRentalSearchParams,
+  rentalBathroomOptions,
+  rentalBedroomOptions,
+  rentalSearchParamKeys,
+  searchRentals,
+  withoutRentalFilter,
+  type RentalFilterKey,
+  type RentalSearchFilters,
+  type RentalTypeFilter,
+} from "@/lib/property-search";
 import type { Property, PropertyType } from "@/lib/properties";
 import { getRentalZones } from "@/lib/rentals";
+import { absoluteUrl, whatsappUrl } from "@/lib/site";
 
 type DirectRentalExplorerProps = {
   properties: Property[];
@@ -32,7 +54,24 @@ type DirectRentalExplorerProps = {
 };
 
 type ResultsView = "list" | "map";
-type RentalTypeFilter = "" | "Casa" | "Departamento" | "Monoambiente";
+
+const unsupportedSearchCopy = {
+  anticretico: "No hay anticréticos.",
+  venta: "No hay viviendas en venta.",
+  habitacion: "No hay habitaciones ni cuartos compartidos.",
+};
+
+const removeFilterLabels: Record<RentalFilterKey, (filters: RentalSearchFilters) => string> = {
+  query: (filters) => `Quitar “${shorten(filters.query.trim(), 28)}”`,
+  zone: (filters) => `Quitar zona ${filters.zone}`,
+  type: (filters) => `Quitar tipo ${filters.type}`,
+  minPrice: () => "Quitar precio mínimo",
+  maxPrice: () => "Quitar precio máximo",
+  bedrooms: () => "Quitar dormitorios",
+  bathrooms: () => "Quitar baños",
+  pets: () => "Quitar mascotas",
+  garage: () => "Quitar parqueo",
+};
 
 export function DirectRentalExplorer({
   properties,
@@ -46,115 +85,114 @@ export function DirectRentalExplorer({
   initialAmenity = "",
   initialView = "list",
 }: DirectRentalExplorerProps) {
-  const [query, setQuery] = useState(initialQuery);
-  const deferredQuery = useDeferredValue(query);
-  const [zone, setZone] = useState(initialZone);
-  const [propertyType, setPropertyType] = useState<RentalTypeFilter>(
-    initialBedrooms === "Monoambiente"
-      ? "Monoambiente"
-      : initialPropertyType === "Casa" || initialPropertyType === "Departamento"
-        ? initialPropertyType
-        : "",
-  );
-  const [minPrice, setMinPrice] = useState(initialMinPrice);
-  const [maxPrice, setMaxPrice] = useState(initialMaxPrice);
-  const [bedrooms, setBedrooms] = useState(
-    initialBedrooms === "Monoambiente" ? "" : initialBedrooms,
-  );
-  const [bathrooms, setBathrooms] = useState(initialBathrooms);
-  const [pets, setPets] = useState(initialAmenity === "pets");
-  const [garage, setGarage] = useState(initialAmenity === "garage");
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  // Filters live in the URL, so going back from a listing or opening a shared link restores them.
+  const [filters, setFilters] = useState<RentalSearchFilters>(() => {
+    const defaults = new URLSearchParams();
+    const values = {
+      q: initialQuery,
+      zone: initialZone,
+      type: initialPropertyType ?? "",
+      minPrice: initialMinPrice,
+      maxPrice: initialMaxPrice,
+      bedrooms: initialBedrooms,
+      bathrooms: initialBathrooms,
+      amenity: initialAmenity,
+    };
+    for (const [key, value] of Object.entries(values)) if (value) defaults.set(key, value);
+    return readRentalSearchParams(searchParams, readRentalSearchParams(defaults));
+  });
+  const deferredQuery = useDeferredValue(filters.query);
   const [showAdvanced, setShowAdvanced] = useState(
-    Boolean(initialBedrooms || initialBathrooms || initialAmenity),
+    Boolean(filters.bedrooms || filters.bathrooms || filters.minPrice || filters.pets || filters.garage),
   );
   const [view, setView] = useState<ResultsView>(initialView);
   const displayCurrency = useCurrencyPreference();
-  const zones = useMemo(() => getRentalZones(properties), [properties]);
+  const zones = useMemo(() => {
+    const available = getRentalZones(properties);
+    return filters.zone && !available.includes(filters.zone) ? [...available, filters.zone] : available;
+  }, [filters.zone, properties]);
 
-  const filteredProperties = useMemo(() => {
-    const parsedMin = parseNumber(minPrice);
-    const parsedMax = parseNumber(maxPrice);
-    const hasQuery = hasSearchQuery(deferredQuery);
+  const appliedFilters = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
+  const matches = useMemo(
+    () => searchRentals(properties, appliedFilters, displayCurrency),
+    [appliedFilters, displayCurrency, properties],
+  );
+  const results = useMemo(() => matches.map(({ property }) => property), [matches]);
+  const petsToConfirm = appliedFilters.pets ? matches.filter((match) => match.petsPolicy === "consult") : [];
+  const mainResults = appliedFilters.pets
+    ? matches.filter((match) => match.petsPolicy === "allowed").map(({ property }) => property)
+    : results;
 
-    return properties
-      .map((property, index) => ({
-        property,
-        index,
-        evaluation: evaluatePropertySearch(property, deferredQuery),
+  const activeFilters = getActiveRentalFilters(filters);
+  const relaxations = useMemo(() => {
+    if (matches.length > 0) return [];
+    return getActiveRentalFilters(appliedFilters)
+      .map((key) => ({
+        key,
+        label: removeFilterLabels[key](appliedFilters),
+        count: searchRentals(properties, withoutRentalFilter(appliedFilters, key), displayCurrency).length,
       }))
-      .filter(({ property, evaluation }) => {
-        const price = getPropertyPriceInCurrency(property, displayCurrency);
-        const matchesQuery = !hasQuery || evaluation.matches;
-        const matchesZone = !zone || property.zone === zone;
-        const matchesType =
-          !propertyType ||
-          (propertyType === "Monoambiente"
-            ? isMonoambiente(property)
-            : property.type === propertyType);
-        const matchesMin = parsedMin === null || price >= parsedMin;
-        const matchesMax = parsedMax === null || price <= parsedMax;
-        const matchesBedrooms = !bedrooms || property.bedrooms >= Number(bedrooms);
-        const matchesBathrooms = !bathrooms || property.bathrooms >= Number(bathrooms);
-        const matchesPets = !pets || property.pets;
-        const matchesGarage = !garage || property.garage > 0;
+      .filter((item) => item.count > 0)
+      .sort((first, second) => second.count - first.count);
+  }, [appliedFilters, displayCurrency, matches.length, properties]);
 
-        return (
-          matchesQuery &&
-          matchesZone &&
-          matchesType &&
-          matchesMin &&
-          matchesMax &&
-          matchesBedrooms &&
-          matchesBathrooms &&
-          matchesPets &&
-          matchesGarage
-        );
-      })
-      .sort((first, second) => {
-        if (!hasQuery) {
-          return first.index - second.index;
-        }
+  const serializedFilters = useMemo(
+    () => buildRentalSearchParams(appliedFilters, displayCurrency).toString(),
+    [appliedFilters, displayCurrency],
+  );
+  const shareUrl = absoluteUrl(`${pathname}${serializedFilters ? `?${serializedFilters}` : ""}`);
+  const searchSummary = describeRentalSearch(appliedFilters, displayCurrency).join(", ");
+  const unsupportedIntent = getUnsupportedSearchIntent(deferredQuery);
 
-        return second.evaluation.score - first.evaluation.score || first.index - second.index;
-      })
-      .map(({ property }) => property);
-  }, [
-    bathrooms,
-    bedrooms,
-    displayCurrency,
-    garage,
-    maxPrice,
-    minPrice,
-    pets,
-    properties,
-    propertyType,
-    deferredQuery,
-    zone,
-  ]);
+  const priceCurrency = filters.priceCurrency ?? displayCurrency;
+  const priceLabel = priceCurrency === "USD" ? "$us" : "Bs";
+  const priceBounds = getPriceBounds(filters, displayCurrency);
+  const priceHint = describePriceBounds(priceBounds.min, priceBounds.max);
+  const unreadablePrice = [
+    !priceBounds.min && filters.minPrice.trim() ? filters.minPrice.trim() : null,
+    !priceBounds.max && filters.maxPrice.trim() ? filters.maxPrice.trim() : null,
+  ].find(Boolean);
 
-  const activeFilterCount = [
-    query.trim(),
-    zone,
-    propertyType,
-    minPrice,
-    maxPrice,
-    bedrooms,
-    bathrooms,
-    pets ? "pets" : "",
-    garage ? "garage" : "",
-  ].filter(Boolean).length;
+  // Replace (not push) the URL so the back button still leaves the catalog in one step.
+  const writtenFilters = useRef<string | null>(null);
+  useEffect(() => {
+    if (writtenFilters.current === null) {
+      writtenFilters.current = serializedFilters;
+      return;
+    }
+    if (writtenFilters.current === serializedFilters) return;
+    const timer = window.setTimeout(() => {
+      writtenFilters.current = serializedFilters;
+      const params = new URLSearchParams(window.location.search);
+      for (const key of rentalSearchParamKeys) params.delete(key);
+      new URLSearchParams(serializedFilters).forEach((value, key) => params.append(key, value));
+      const search = params.toString();
+      window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [serializedFilters]);
+
+  function updateFilter<Key extends RentalFilterKey>(key: Key, value: RentalSearchFilters[Key]) {
+    setFilters((current) => {
+      const next = { ...current, [key]: value };
+      if (!next.minPrice.trim() && !next.maxPrice.trim()) next.priceCurrency = null;
+      return next;
+    });
+  }
+
+  function removeFilter(key: RentalFilterKey) {
+    setFilters((current) => withoutRentalFilter(current, key));
+  }
 
   function clearFilters() {
-    setQuery("");
-    setZone("");
-    setPropertyType("");
-    setMinPrice("");
-    setMaxPrice("");
-    setBedrooms("");
-    setBathrooms("");
-    setPets(false);
-    setGarage(false);
+    setFilters(emptyRentalSearchFilters);
   }
+
+  const alertMessage = searchSummary
+    ? `Hola, busco alquiler en Zentro Urbano y todavía no encuentro lo que necesito: ${searchSummary}. ¿Me avisan si aparece uno así? ${shareUrl}`
+    : "Hola, busco alquiler en Zentro Urbano. ¿Me avisan cuando haya nuevos alquileres?";
 
   return (
     <div className="zu-explorer">
@@ -164,8 +202,8 @@ export function DirectRentalExplorer({
             <label className="relative col-span-2 block md:col-span-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
               <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={filters.query}
+                onChange={(event) => updateFilter("query", event.target.value)}
                 type="search"
                 aria-label="Buscar alquiler por zona o características"
                 placeholder="Zona, avenida o característica"
@@ -173,7 +211,7 @@ export function DirectRentalExplorer({
               />
             </label>
 
-            <FilterSelect label="Zona" value={zone} onChange={setZone}>
+            <FilterSelect label="Zona" value={filters.zone} onChange={(value) => updateFilter("zone", value)}>
               <option value="">Todas las zonas</option>
               {zones.map((item) => (
                 <option key={item} value={item}>{item}</option>
@@ -182,8 +220,8 @@ export function DirectRentalExplorer({
 
             <FilterSelect
               label="Tipo"
-              value={propertyType}
-              onChange={(value) => setPropertyType(value as RentalTypeFilter)}
+              value={filters.type}
+              onChange={(value) => updateFilter("type", value as RentalTypeFilter)}
             >
               <option value="">Cualquier tipo</option>
               <option value="Casa">Casa</option>
@@ -192,14 +230,15 @@ export function DirectRentalExplorer({
             </FilterSelect>
 
             <label className="relative block">
-              <span className="sr-only">Precio máximo</span>
+              <span className="sr-only">Precio máximo por mes</span>
               <input
-                value={maxPrice}
-                onChange={(event) => setMaxPrice(event.target.value)}
-                type="number"
-                min="0"
+                value={filters.maxPrice}
+                onChange={(event) => updateFilter("maxPrice", event.target.value)}
+                type="text"
                 inputMode="numeric"
-                placeholder={`Máx. ${displayCurrency === "USD" ? "$us" : "Bs"}`}
+                autoComplete="off"
+                aria-describedby="rental-price-hint"
+                placeholder={`Máx. ${priceLabel}`}
                 className="h-11 w-full border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
               />
             </label>
@@ -212,9 +251,9 @@ export function DirectRentalExplorer({
             >
               <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
               Filtros
-              {activeFilterCount > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center bg-neutral-950 px-1 text-[11px] text-white">
-                  {activeFilterCount}
+              {activeFilters.length > 0 ? (
+                <span className="inline-flex h-5 min-w-5 items-center justify-center bg-neutral-950 px-1 text-[12px] text-white">
+                  {activeFilters.length}
                 </span>
               ) : null}
             </button>
@@ -222,43 +261,39 @@ export function DirectRentalExplorer({
 
           {showAdvanced ? (
             <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-neutral-200 pt-3">
-              <FilterSelect label="Dormitorios" value={bedrooms} onChange={setBedrooms} compact>
+              <FilterSelect label="Dormitorios" value={filters.bedrooms} onChange={(value) => updateFilter("bedrooms", value)} compact>
                 <option value="">Dormitorios</option>
-                <option value="1">1+</option>
-                <option value="2">2+</option>
-                <option value="3">3+</option>
-                <option value="4">4+</option>
+                {rentalBedroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
               </FilterSelect>
-              <FilterSelect label="Baños" value={bathrooms} onChange={setBathrooms} compact>
+              <FilterSelect label="Baños" value={filters.bathrooms} onChange={(value) => updateFilter("bathrooms", value)} compact>
                 <option value="">Baños</option>
-                <option value="1">1+</option>
-                <option value="2">2+</option>
-                <option value="3">3+</option>
+                {rentalBathroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
               </FilterSelect>
-              <label className="sr-only" htmlFor="min-rental-price">Precio mínimo</label>
+              <label className="sr-only" htmlFor="min-rental-price">Precio mínimo por mes</label>
               <input
                 id="min-rental-price"
-                value={minPrice}
-                onChange={(event) => setMinPrice(event.target.value)}
-                type="number"
-                min="0"
+                value={filters.minPrice}
+                onChange={(event) => updateFilter("minPrice", event.target.value)}
+                type="text"
                 inputMode="numeric"
-                placeholder={`Mín. ${displayCurrency === "USD" ? "$us" : "Bs"}`}
+                autoComplete="off"
+                aria-describedby="rental-price-hint"
+                placeholder={`Mín. ${priceLabel}`}
                 className="h-10 w-36 border border-neutral-300 bg-white px-3 text-sm font-medium outline-none focus:border-[#176b4d]"
               />
               <FilterToggle
-                active={pets}
+                active={filters.pets}
                 label="Acepta mascotas"
                 icon={<PawPrint className="h-4 w-4" />}
-                onClick={() => setPets((current) => !current)}
+                onClick={() => updateFilter("pets", !filters.pets)}
               />
               <FilterToggle
-                active={garage}
+                active={filters.garage}
                 label="Con parqueo"
                 icon={<Car className="h-4 w-4" />}
-                onClick={() => setGarage((current) => !current)}
+                onClick={() => updateFilter("garage", !filters.garage)}
               />
-              {activeFilterCount > 0 ? (
+              {activeFilters.length > 0 ? (
                 <button
                   type="button"
                   onClick={clearFilters}
@@ -274,43 +309,134 @@ export function DirectRentalExplorer({
       </div>
 
       <div className="mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
+        <div className="mb-4 flex items-start justify-between gap-4">
+          <div className="min-w-0">
             <p className="text-lg font-semibold text-neutral-950">
-              {filteredProperties.length} {filteredProperties.length === 1 ? "alquiler" : "alquileres"}
+              {results.length} {results.length === 1 ? "alquiler" : "alquileres"}
             </p>
-            <p className="text-sm text-neutral-500">Contacto directo con el propietario</p>
+            <p className="text-sm text-neutral-500">
+              {appliedFilters.pets && results.length > 0
+                ? `${mainResults.length} ${mainResults.length === 1 ? "acepta" : "aceptan"} mascotas · ${petsToConfirm.length} a consultar`
+                : "Contacto directo con el propietario"}
+            </p>
+            <p id="rental-price-hint" className="mt-1 text-sm" aria-live="polite">
+              {unreadablePrice ? (
+                <span className="text-[#a12d1c] dark:text-[#ff9c8a]">No entendimos “{shorten(unreadablePrice, 24)}”. Escribe solo el monto, por ejemplo 3.000.</span>
+              ) : priceHint ? (
+                <span className="font-semibold text-[#10533b]">{capitalize(priceHint)}</span>
+              ) : null}
+            </p>
           </div>
-          <div className="grid grid-cols-2 border border-neutral-300 lg:hidden">
+          <div className="grid shrink-0 grid-cols-2 border border-neutral-300 lg:hidden">
             <ViewButton active={view === "list"} label="Lista" icon={<List className="h-4 w-4" />} onClick={() => setView("list")} />
             <ViewButton active={view === "map"} label="Mapa" icon={<Map className="h-4 w-4" />} onClick={() => setView("map")} />
           </div>
         </div>
 
-        <div data-results aria-busy={query !== deferredQuery} className={`${query !== deferredQuery ? "results-pending" : ""} lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(430px,0.95fr)] lg:gap-5`}>
+        {activeFilters.length > 0 ? (
+          <SearchShareActions
+            url={shareUrl}
+            message={`Mira estos alquileres en Zentro Urbano${searchSummary ? `: ${searchSummary}` : ""}`}
+          />
+        ) : null}
+
+        {unsupportedIntent ? (
+          <p className="mb-4 flex gap-2 border border-[#f0d49a] bg-[#fff8e8] p-3 text-sm text-[#5c3b00]" role="note">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              Por ahora Zentro Urbano solo publica alquileres mensuales de casas, departamentos y monoambientes. {unsupportedSearchCopy[unsupportedIntent]}
+            </span>
+          </p>
+        ) : null}
+
+        <div data-results aria-busy={filters.query !== deferredQuery} className={`${filters.query !== deferredQuery ? "results-pending" : ""} lg:grid lg:grid-cols-[minmax(0,1.05fr)_minmax(430px,0.95fr)] lg:gap-5`}>
           <div className={view === "map" ? "hidden lg:block" : "block"}>
-            {filteredProperties.length > 0 ? (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {filteredProperties.map((property, index) => (
-                  <PropertyCard key={property.slug} property={property} eagerImage={index < 4} />
-                ))}
-              </div>
+            {results.length > 0 ? (
+              <>
+                {mainResults.length > 0 ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {mainResults.map((property, index) => (
+                      <PropertyCard key={property.slug} property={property} eagerImage={index < 4} />
+                    ))}
+                  </div>
+                ) : (
+                  <p className="border border-neutral-300 bg-neutral-50 p-4 text-sm text-neutral-600">
+                    Ningún anuncio con esta búsqueda confirma todavía que acepta mascotas.
+                  </p>
+                )}
+                {petsToConfirm.length > 0 ? (
+                  <section className="mt-8" aria-labelledby="pets-to-confirm-heading">
+                    <h2 id="pets-to-confirm-heading" className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+                      <PawPrint className="h-4 w-4" aria-hidden="true" />
+                      Mascotas: a consultar
+                    </h2>
+                    <p className="mt-1 text-sm text-neutral-600">
+                      El propietario no indicó si acepta mascotas. Pregúntale antes de visitar.
+                    </p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                      {petsToConfirm.map(({ property }, index) => (
+                        <PropertyCard
+                          key={property.slug}
+                          property={property}
+                          petsToConfirm
+                          eagerImage={mainResults.length === 0 && index < 4}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                ) : null}
+              </>
             ) : (
-              <div className="border border-neutral-300 bg-neutral-50 p-8 text-center">
+              <div className="border border-neutral-300 bg-neutral-50 p-6 text-center sm:p-8">
                 <Search className="mx-auto h-6 w-6 text-neutral-400" aria-hidden="true" />
-                <h2 className="mt-3 text-lg font-semibold">No encontramos coincidencias</h2>
-                <p className="mt-1 text-sm text-neutral-600">Prueba otra zona o elimina un filtro.</p>
-                <button type="button" onClick={clearFilters} className="mt-4 text-sm font-semibold text-[#176b4d] hover:underline">
-                  Limpiar filtros
-                </button>
+                <h2 className="mt-3 text-lg font-semibold">
+                  {activeFilters.length > 0 ? "No hay alquileres con esta búsqueda" : "Todavía no hay alquileres publicados aquí"}
+                </h2>
+                {relaxations.length > 0 ? (
+                  <>
+                    <p className="mt-1 text-sm text-neutral-600">Prueba quitando un filtro:</p>
+                    <div className="mt-4 flex flex-wrap justify-center gap-2">
+                      {relaxations.map(({ key, label, count }) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => removeFilter(key)}
+                          className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 border border-neutral-300 bg-white px-3 py-2 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
+                        >
+                          <X className="h-4 w-4 shrink-0" aria-hidden="true" />
+                          {label} ({count} {count === 1 ? "resultado" : "resultados"})
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : activeFilters.length > 1 ? (
+                  <p className="mt-1 text-sm text-neutral-600">Quitar un solo filtro no alcanza. Prueba limpiar la búsqueda.</p>
+                ) : null}
+                <div className="mt-4 flex flex-col items-center gap-3">
+                  {activeFilters.length > 0 ? (
+                    <button type="button" onClick={clearFilters} className="min-h-11 cursor-pointer px-3 text-sm font-semibold text-[#176b4d] hover:underline">
+                      Limpiar todos los filtros ({properties.length} {properties.length === 1 ? "alquiler" : "alquileres"})
+                    </button>
+                  ) : null}
+                  <a
+                    href={whatsappUrl(alertMessage)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="zu-button support-whatsapp"
+                  >
+                    <WhatsAppIcon />
+                    Avísame cuando haya una así
+                  </a>
+                  <p className="text-xs text-neutral-500">Se abre WhatsApp con tu búsqueda ya escrita.</p>
+                </div>
               </div>
             )}
           </div>
 
           <div className={`${view === "list" ? "hidden lg:block" : "block"} lg:sticky lg:top-[9.25rem] lg:self-start`}>
-            {filteredProperties.length > 0 ? (
+            {results.length > 0 ? (
               <PropertyMap
-                properties={filteredProperties}
+                properties={results}
                 sectionClassName="h-full bg-white"
                 containerClassName="h-full"
                 headerClassName="hidden"
@@ -326,6 +452,61 @@ export function DirectRentalExplorer({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SearchShareActions({ url, message }: { url: string; message: string }) {
+  const [status, setStatus] = useState<"idle" | "copied" | "manual">("idle");
+
+  async function shareSearch() {
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "Alquileres en Zentro Urbano", text: message, url });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setStatus("copied");
+      window.setTimeout(() => setStatus("idle"), 2000);
+    } catch {
+      setStatus("manual");
+    }
+  }
+
+  return (
+    <div className="mb-4 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={shareSearch}
+        className="inline-flex min-h-11 cursor-pointer items-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
+      >
+        {status === "copied" ? <Check className="h-4 w-4" aria-hidden="true" /> : <Share2 className="h-4 w-4" aria-hidden="true" />}
+        {status === "copied" ? "Enlace copiado" : "Compartir esta búsqueda"}
+      </button>
+      <a
+        href={`https://wa.me/?text=${encodeURIComponent(`${message} ${url}`)}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex min-h-11 items-center gap-2 border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-800 hover:border-neutral-950"
+      >
+        <WhatsAppIcon width={16} height={16} />
+        Enviar por WhatsApp
+      </a>
+      {status === "manual" ? (
+        <input
+          readOnly
+          value={url}
+          aria-label="Enlace de esta búsqueda"
+          onFocus={(event) => event.currentTarget.select()}
+          className="h-11 min-w-0 flex-1 border border-neutral-300 bg-white px-3 text-sm"
+        />
+      ) : null}
+      <span className="sr-only" aria-live="polite">{status === "copied" ? "Enlace copiado" : ""}</span>
     </div>
   );
 }
@@ -411,21 +592,10 @@ function ViewButton({
   );
 }
 
-function parseNumber(value: string) {
-  const normalized = value.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+function capitalize(value: string) {
+  return value.charAt(0).toLocaleUpperCase("es") + value.slice(1);
 }
 
-function isMonoambiente(property: Property) {
-  return (
-    property.type === "Departamento" &&
-    property.bedrooms === 1 &&
-    (property.title.toLocaleLowerCase("es").includes("monoambiente") ||
-      property.tags.some((tag) => tag.toLocaleLowerCase("es").includes("monoambiente")))
-  );
+function shorten(value: string, max: number) {
+  return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }

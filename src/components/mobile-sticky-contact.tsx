@@ -1,7 +1,7 @@
 import { ExternalLink, MessageCircle } from "lucide-react";
 import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
-import { getPropertyContactCopy, isExternalContactUrl } from "@/lib/property-contact";
+import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
 
 type MobileStickyContactProps = {
@@ -31,7 +31,7 @@ export function MobileStickyContact({ property }: MobileStickyContactProps) {
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-neutral-300 bg-white text-neutral-950"
         />
         <a
-          href={`/api/propiedades/${property.slug}/whatsapp`}
+          href={whatsappContactPath(property.slug, "barra")}
           target="_blank"
           rel="noreferrer"
           className="inline-flex h-11 shrink-0 items-center justify-center gap-2 bg-[#176b4d] px-4 text-sm font-semibold text-white"

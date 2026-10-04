@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ClipboardCheck } from "lucide-react";
+import { OwnerServicesNote } from "@/components/owner-services-note";
 import { PublishWizard } from "@/components/publish-wizard";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { getCurrentAccount } from "@/lib/mysql-auth";
@@ -26,12 +27,13 @@ export default async function PublishPage() {
           <p className="zu-eyebrow">PARA PROPIETARIOS</p>
           <h1 className="mt-3 text-3xl font-semibold">Dale un nuevo comienzo a tu vivienda.</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-neutral-600">
-            Contrato directo con el propietario, sin comisiones de intermediación. Revisamos la ficha antes de publicarla.
+            Publicar es gratis. Contrato directo con el propietario, sin comisiones de intermediación. Una persona del equipo revisa tu anuncio antes de publicarlo.
           </p>
         </div>
         <div className="publication-account-bar"><span>Publicando como <strong>{account.display_name}</strong></span><SupportWhatsAppButton /></div>
         <Link href="/requisitos" target="_blank" rel="noopener noreferrer" className="zu-button zu-button-secondary mb-5"><ClipboardCheck size={16} aria-hidden="true" />Qué necesito para publicar</Link>
         <PublishWizard key={account.id} account={{ id: account.id, name: account.display_name, phone: account.phone ?? "" }} />
+        <OwnerServicesNote className="mt-8 max-w-2xl rounded-[10px]" />
       </div>
     </main>
   );

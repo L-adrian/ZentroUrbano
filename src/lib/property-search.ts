@@ -1,4 +1,9 @@
-import { getPropertyPriceInCurrency } from "@/lib/currency";
+import {
+  convertPrice,
+  getPropertyPriceInCurrency,
+  parseCurrencyAmount,
+  type DisplayCurrency,
+} from "@/lib/currency";
 import type { Operation, Property, PropertyType } from "@/lib/properties";
 
 export type PropertySearchEvaluation = {
@@ -31,6 +36,11 @@ type ParsedSearchQuery = {
   maxPriceBob?: number;
 };
 
+type PropertySearchOptions = {
+  // Currency for amounts written without one ("hasta 3000").
+  currency?: DisplayCurrency;
+};
+
 const stopWords = new Set([
   "a",
   "al",
@@ -45,15 +55,21 @@ const stopWords = new Set([
   "el",
   "en",
   "entre",
+  "hasta",
   "la",
   "las",
   "lo",
   "los",
+  "max",
+  "maximo",
   "me",
+  "mensual",
+  "mes",
   "necesito",
   "o",
   "para",
   "por",
+  "presupuesto",
   "propiedad",
   "propiedades",
   "que",
@@ -181,6 +197,7 @@ const amenityAliases: Array<{ amenity: SearchAmenity; aliases: string[] }> = [
 
 const currencyUsdTerms = new Set(["dolar", "dolares", "usd", "us"]);
 const currencyBobTerms = new Set(["bob", "boliviano", "bolivianos", "bs"]);
+const priceLimitTerms = new Set(["hasta", "max", "maximo", "menos", "presupuesto", "tope"]);
 
 export function hasSearchQuery(value: string | null | undefined) {
   const parsed = parseSearchQuery(value ?? "");
@@ -190,9 +207,12 @@ export function hasSearchQuery(value: string | null | undefined) {
 export function evaluatePropertySearch(
   property: Property,
   query: string | null | undefined,
+  options: PropertySearchOptions = {},
 ): PropertySearchEvaluation {
-  const parsed = parseSearchQuery(query ?? "");
+  return evaluateParsedSearch(property, parseSearchQuery(query ?? "", options));
+}
 
+function evaluateParsedSearch(property: Property, parsed: ParsedSearchQuery): PropertySearchEvaluation {
   if (parsed.meaningfulTokens.length === 0) {
     return { matches: true, score: 0, hasIntent: false };
   }
@@ -245,8 +265,17 @@ export function normalizeSearchText(value: string) {
     .trim();
 }
 
-function parseSearchQuery(query: string): ParsedSearchQuery {
-  const normalized = normalizeSearchText(query);
+// "3.000" and "3 mil" are amounts, not two words.
+function normalizeQueryAmounts(query: string) {
+  return query
+    .replace(/(\d)[.,](?=\d{3}(?:\D|$))/g, "$1")
+    .replace(/(\d+(?:[.,]\d+)?)\s*(?:mil|k)\b/giu, (_, amount: string) =>
+      String(Math.round(Number(amount.replace(",", ".")) * 1000)),
+    );
+}
+
+function parseSearchQuery(query: string, options: PropertySearchOptions = {}): ParsedSearchQuery {
+  const normalized = normalizeSearchText(normalizeQueryAmounts(query));
   const tokens = normalized.split(" ").filter(Boolean);
   const meaningfulTokens = tokens.filter(isMeaningfulToken);
   const consumedIndexes = new Set<number>();
@@ -259,7 +288,11 @@ function parseSearchQuery(query: string): ParsedSearchQuery {
     tokens.some((token) => isSimilarToken(token, "estudio"));
   const bedroomCount = monoambiente ? 1 : detectBedroomCount(tokens, consumedIndexes);
   const amenities = detectAmenities(tokens, consumedIndexes);
-  const { maxPriceUsd, maxPriceBob } = detectPriceIntent(tokens, consumedIndexes);
+  const { maxPriceUsd, maxPriceBob } = detectPriceIntent(
+    tokens,
+    consumedIndexes,
+    options.currency ?? "BOB",
+  );
 
   return {
     normalized,
@@ -346,7 +379,11 @@ function detectAmenities(tokens: string[], consumedIndexes: Set<number>) {
   return amenities;
 }
 
-function detectPriceIntent(tokens: string[], consumedIndexes: Set<number>) {
+function detectPriceIntent(
+  tokens: string[],
+  consumedIndexes: Set<number>,
+  defaultCurrency: DisplayCurrency,
+) {
   let maxPriceUsd: number | undefined;
   let maxPriceBob: number | undefined;
 
@@ -357,7 +394,11 @@ function detectPriceIntent(tokens: string[], consumedIndexes: Set<number>) {
       continue;
     }
 
-    const nearbyCurrency = findNearbyCurrency(tokens, index);
+    const nearbyCurrency =
+      findNearbyCurrency(tokens, index) ??
+      (tokens.slice(Math.max(0, index - 2), index).some((token) => priceLimitTerms.has(token))
+        ? defaultCurrency
+        : null);
 
     if (nearbyCurrency === "USD") {
       maxPriceUsd = maxPriceUsd === undefined ? amount : Math.max(maxPriceUsd, amount);
@@ -720,4 +761,318 @@ function levenshteinDistance(source: string, target: string, maxDistance: number
   }
 
   return previous[target.length];
+}
+
+// Catalog filters: shared by the catalog, the home search and the links people share.
+
+export type RentalTypeFilter = "" | "Casa" | "Departamento" | "Monoambiente";
+export type PetsPolicy = "allowed" | "consult" | "not_allowed";
+export type PriceBound = { amount: number; currency: DisplayCurrency };
+
+export type RentalSearchFilters = {
+  query: string;
+  zone: string;
+  type: RentalTypeFilter;
+  minPrice: string;
+  maxPrice: string;
+  // Currency of a price that came in a link; otherwise prices follow the visitor's currency.
+  priceCurrency: DisplayCurrency | null;
+  bedrooms: string;
+  bathrooms: string;
+  pets: boolean;
+  garage: boolean;
+};
+
+export type RentalFilterKey = Exclude<keyof RentalSearchFilters, "priceCurrency">;
+
+export type RentalSearchMatch = { property: Property; petsPolicy: PetsPolicy };
+
+type SearchParamsReader = {
+  get(name: string): string | null;
+  getAll(name: string): string[];
+};
+
+export const emptyRentalSearchFilters: RentalSearchFilters = {
+  query: "",
+  zone: "",
+  type: "",
+  minPrice: "",
+  maxPrice: "",
+  priceCurrency: null,
+  bedrooms: "",
+  bathrooms: "",
+  pets: false,
+  garage: false,
+};
+
+export const rentalBedroomOptions = ["1", "2", "3", "4"];
+export const rentalBathroomOptions = ["1", "2", "3"];
+export const rentalSearchParamKeys = [
+  "q",
+  "zone",
+  "type",
+  "minPrice",
+  "maxPrice",
+  "currency",
+  "bedrooms",
+  "bathrooms",
+  "amenity",
+];
+
+const rentalFilterKeys: RentalFilterKey[] = [
+  "query",
+  "zone",
+  "type",
+  "minPrice",
+  "maxPrice",
+  "bedrooms",
+  "bathrooms",
+  "pets",
+  "garage",
+];
+
+// Reads "3.000", "3,000", "3 mil", "3k", "Bs 3000" or "$us 450". Null when it is not an amount.
+export function parsePriceInput(
+  value: string | null | undefined,
+  fallbackCurrency: DisplayCurrency,
+): PriceBound | null {
+  let text = (value ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/([a-z$])(\d)/g, "$1 $2")
+    .replace(/(\d)([a-z$])/g, "$1 $2")
+    .trim();
+  if (!text) return null;
+
+  let currency = fallbackCurrency;
+  if (/\$|\busd\b|\bdolar(es)?\b/.test(text)) currency = "USD";
+  else if (/\bbs\b|\bbob\b|\bbolivianos?\b/.test(text)) currency = "BOB";
+
+  text = text
+    .replace(/\$\s*us\b|\bus\s*\$|\bu\s*\$\s*s\b|\busd\b|\bdolar(es)?\b|\$|\bbs\b\.?|\bbob\b|\bbolivianos?\b/g, " ")
+    .replace(/\b(por|al)\s+mes\b|\/\s*mes\b|\bmensual(es)?\b|\bhasta\b|\bdesde\b|\bmax(imo)?\b\.?|\bmin(imo)?\b\.?/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const thousands = /^(\d[\d.,]*)\s*(?:mil|k)$/.exec(text);
+  const base = parseCurrencyAmount(thousands ? thousands[1] : text);
+  if (base === null) return null;
+  return { amount: thousands ? Math.round(base * 1000) : base, currency };
+}
+
+export function formatPriceBound(bound: PriceBound) {
+  const amount = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 2 }).format(bound.amount);
+  return `${bound.currency === "USD" ? "$us" : "Bs"} ${amount}`;
+}
+
+export function getPetsPolicy(property: Pick<Property, "pets" | "rentalDetails">): PetsPolicy {
+  if (property.pets) return "allowed";
+  return property.rentalDetails?.petsPolicy === "not_allowed" ? "not_allowed" : "consult";
+}
+
+export function isMonoambiente(property: Property) {
+  return (
+    property.rentalDetails?.type === "Monoambiente" ||
+    (property.type === "Departamento" &&
+      property.bedrooms === 1 &&
+      (property.title.toLocaleLowerCase("es").includes("monoambiente") ||
+        property.tags.some((tag) => tag.toLocaleLowerCase("es").includes("monoambiente"))))
+  );
+}
+
+// URL values win over the page defaults (for example the zone of a zone page).
+export function readRentalSearchParams(
+  params: SearchParamsReader,
+  defaults: Partial<RentalSearchFilters> = {},
+): RentalSearchFilters {
+  const base = { ...emptyRentalSearchFilters, ...defaults };
+  const text = (key: string, max: number) => {
+    const value = params.get(key);
+    return value === null ? null : value.trim().slice(0, max);
+  };
+  const typeParam = text("type", 20);
+  const bedroomsParam = text("bedrooms", 20);
+  const amenityParams = params.getAll("amenity");
+  const amenities = new Set(amenityParams.flatMap((value) => value.split(",").map((item) => item.trim())));
+  const currencyParam = params.get("currency");
+  const hasPriceParam = params.get("minPrice") !== null || params.get("maxPrice") !== null;
+
+  let type = base.type;
+  if (typeParam === "Monoambiente" || bedroomsParam === "Monoambiente") type = "Monoambiente";
+  else if (typeParam !== null) type = typeParam === "Casa" || typeParam === "Departamento" ? typeParam : "";
+
+  return {
+    query: text("q", 120) ?? base.query,
+    zone: text("zone", 80) ?? base.zone,
+    type,
+    minPrice: text("minPrice", 40) ?? base.minPrice,
+    maxPrice: text("maxPrice", 40) ?? base.maxPrice,
+    priceCurrency:
+      hasPriceParam && (currencyParam === "USD" || currencyParam === "BOB")
+        ? currencyParam
+        : base.priceCurrency,
+    bedrooms: optionParam(bedroomsParam === "Monoambiente" ? null : bedroomsParam, rentalBedroomOptions, base.bedrooms),
+    bathrooms: optionParam(text("bathrooms", 20), rentalBathroomOptions, base.bathrooms),
+    pets: amenityParams.length ? amenities.has("pets") : base.pets,
+    garage: amenityParams.length ? amenities.has("garage") : base.garage,
+  };
+}
+
+export function buildRentalSearchParams(
+  filters: RentalSearchFilters,
+  displayCurrency: DisplayCurrency,
+) {
+  const params = new URLSearchParams();
+  const query = filters.query.trim();
+  const { min, max } = getPriceBounds(filters, displayCurrency);
+  const currency = (max ?? min)?.currency;
+
+  if (query) params.set("q", query);
+  if (filters.zone) params.set("zone", filters.zone);
+  if (filters.type) params.set("type", filters.type);
+  if (min && currency) {
+    params.set("minPrice", formatAmountParam(convertPrice(min.amount, min.currency, currency)));
+  }
+  if (max) params.set("maxPrice", formatAmountParam(max.amount));
+  if (currency) params.set("currency", currency);
+  if (filters.bedrooms) params.set("bedrooms", filters.bedrooms);
+  if (filters.bathrooms) params.set("bathrooms", filters.bathrooms);
+  if (filters.pets) params.append("amenity", "pets");
+  if (filters.garage) params.append("amenity", "garage");
+  return params;
+}
+
+export function getPriceBounds(filters: RentalSearchFilters, displayCurrency: DisplayCurrency) {
+  const currency = filters.priceCurrency ?? displayCurrency;
+  return {
+    min: parsePriceInput(filters.minPrice, currency),
+    max: parsePriceInput(filters.maxPrice, currency),
+  };
+}
+
+export function getActiveRentalFilters(filters: RentalSearchFilters) {
+  return rentalFilterKeys.filter((key) => {
+    const value = filters[key];
+    return typeof value === "boolean" ? value : value.trim() !== "";
+  });
+}
+
+export function withoutRentalFilter(
+  filters: RentalSearchFilters,
+  key: RentalFilterKey,
+): RentalSearchFilters {
+  const next = { ...filters, [key]: emptyRentalSearchFilters[key] };
+  if (!next.minPrice.trim() && !next.maxPrice.trim()) next.priceCurrency = null;
+  return next;
+}
+
+// Featured listings first; with a text search, relevance first. With "Acepta mascotas",
+// listings where pets are "a consultar" come after the confirmed ones and "no" never shows.
+export function searchRentals(
+  properties: Property[],
+  filters: RentalSearchFilters,
+  displayCurrency: DisplayCurrency,
+): RentalSearchMatch[] {
+  const parsed = parseSearchQuery(filters.query, { currency: displayCurrency });
+  const hasQuery = parsed.meaningfulTokens.length > 0;
+  const { min, max } = getPriceBounds(filters, displayCurrency);
+  const bedrooms = Number(filters.bedrooms) || 0;
+  const bathrooms = Number(filters.bathrooms) || 0;
+
+  return properties
+    .map((property, index) => ({
+      property,
+      index,
+      evaluation: evaluateParsedSearch(property, parsed),
+      petsPolicy: getPetsPolicy(property),
+    }))
+    .filter(({ property, evaluation, petsPolicy }) => {
+      const matchesType =
+        !filters.type ||
+        (filters.type === "Monoambiente"
+          ? isMonoambiente(property)
+          : property.type === filters.type);
+
+      return (
+        (!hasQuery || evaluation.matches) &&
+        (!filters.zone || property.zone === filters.zone) &&
+        matchesType &&
+        (!min || getPropertyPriceInCurrency(property, min.currency) >= min.amount) &&
+        (!max || getPropertyPriceInCurrency(property, max.currency) <= max.amount) &&
+        property.bedrooms >= bedrooms &&
+        property.bathrooms >= bathrooms &&
+        (!filters.pets || petsPolicy !== "not_allowed") &&
+        (!filters.garage || property.garage > 0)
+      );
+    })
+    .sort(
+      (first, second) =>
+        (filters.pets ? petsRank(first.petsPolicy) - petsRank(second.petsPolicy) : 0) ||
+        (hasQuery ? second.evaluation.score - first.evaluation.score : 0) ||
+        featuredRank(first.property) - featuredRank(second.property) ||
+        first.index - second.index,
+    )
+    .map(({ property, petsPolicy }) => ({ property, petsPolicy }));
+}
+
+// Plain-language summary of the search, for the price hint and the WhatsApp messages.
+export function describeRentalSearch(filters: RentalSearchFilters, displayCurrency: DisplayCurrency) {
+  const { min, max } = getPriceBounds(filters, displayCurrency);
+  const query = filters.query.trim();
+  const bedrooms = Number(filters.bedrooms);
+  const bathrooms = Number(filters.bathrooms);
+  const kind = filters.type ? filters.type.toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
+  return [
+    kind ? `${kind}${filters.zone ? ` en ${filters.zone}` : ""}` : null,
+    describePriceBounds(min, max),
+    bedrooms ? `${bedrooms} ${bedrooms === 1 ? "dormitorio" : "dormitorios"} o más` : null,
+    bathrooms ? `${bathrooms} ${bathrooms === 1 ? "baño" : "baños"} o más` : null,
+    filters.pets ? "que acepte mascotas" : null,
+    filters.garage ? "con parqueo" : null,
+    query ? `búsqueda “${query}”` : null,
+  ].filter((part): part is string => Boolean(part));
+}
+
+export function describePriceBounds(min: PriceBound | null, max: PriceBound | null) {
+  if (min && max) return `entre ${formatPriceBound(min)} y ${formatPriceBound(max)} por mes`;
+  if (max) return `hasta ${formatPriceBound(max)} por mes`;
+  if (min) return `desde ${formatPriceBound(min)} por mes`;
+  return null;
+}
+
+// Zentro Urbano only publishes monthly rentals of whole homes ("Por ahora SOLO ALQUILER").
+export function getUnsupportedSearchIntent(query: string) {
+  const parsed = parseSearchQuery(query);
+  const tokens = parsed.tokens;
+  if (tokens.some((token) => isSimilarToken(token, "anticretico") || isSimilarToken(token, "anticresis"))) {
+    return "anticretico" as const;
+  }
+  if (tokens.some((token) => ["venta", "vendo", "vende", "vender", "compra", "comprar", "compro"].includes(token))) {
+    return "venta" as const;
+  }
+  const singleRoom = tokens.some((token) => ["habitacion", "cuarto", "pieza"].includes(token));
+  const anyRoom = singleRoom || tokens.some((token) => ["habitaciones", "cuartos", "piezas"].includes(token));
+  const shared = tokens.some((token) => token.startsWith("compart"));
+  if ((anyRoom && shared) || (singleRoom && parsed.bedroomCount === undefined && !parsed.propertyType)) {
+    return "habitacion" as const;
+  }
+  return null;
+}
+
+function optionParam(value: string | null, options: string[], fallback: string) {
+  if (value === null) return fallback;
+  return options.includes(value) ? value : "";
+}
+
+function formatAmountParam(amount: number) {
+  return String(Math.round(amount * 100) / 100);
+}
+
+function petsRank(policy: PetsPolicy) {
+  return policy === "allowed" ? 0 : 1;
+}
+
+function featuredRank(property: Property) {
+  return property.listingPlan === "featured" ? 0 : 1;
 }

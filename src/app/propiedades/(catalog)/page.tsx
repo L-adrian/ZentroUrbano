@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
-import type { PropertyType } from "@/lib/properties";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { getDirectRentals, withoutContactEmail } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
@@ -20,23 +19,9 @@ export const metadata: Metadata = buildSeoMetadata({
   ],
 });
 
-const validPropertyTypes: PropertyType[] = ["Casa", "Departamento"];
-
-export default async function PropertiesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
-}) {
-  const params = await searchParams;
-  const q = firstParam(params.q);
-  const zone = firstParam(params.zone);
-  const typeParam = firstParam(params.type);
-  const minPrice = firstParam(params.minPrice);
-  const maxPrice = firstParam(params.maxPrice);
-  const bedrooms = firstParam(params.bedrooms);
-  const bathrooms = firstParam(params.bathrooms);
-  const amenity = firstParam(params.amenity);
-  const propertyType = validPropertyTypes.find((type) => type === typeParam);
+// The explorer reads its filters from the URL itself (q, zone, type, minPrice, maxPrice, currency,
+// bedrooms, bathrooms, amenity), so they survive going back from a listing and can be shared.
+export default async function PropertiesPage() {
   const publishedProperties = await getPublishedPropertiesData();
   const directRentals = getDirectRentals(publishedProperties);
 
@@ -51,21 +36,7 @@ export default async function PropertiesPage({
         </p>
       </div>
 
-      <DirectRentalExplorer
-        properties={withoutContactEmail(directRentals)}
-        initialQuery={q}
-        initialZone={zone}
-        initialPropertyType={propertyType}
-        initialMinPrice={minPrice}
-        initialMaxPrice={maxPrice}
-        initialBedrooms={bedrooms}
-        initialBathrooms={bathrooms}
-        initialAmenity={amenity}
-      />
+      <DirectRentalExplorer properties={withoutContactEmail(directRentals)} />
     </main>
   );
-}
-
-function firstParam(value: string | string[] | undefined) {
-  return Array.isArray(value) ? value[0] : value;
 }

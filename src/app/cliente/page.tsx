@@ -8,8 +8,8 @@ import { buildSeoMetadata } from "@/lib/seo";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Panel cliente",
-  description: "Panel de reportes para propietarios con viviendas en alquiler en Zentro Urbano.",
+  title: "Mi cuenta",
+  description: "Tus anuncios de alquiler en Zentro Urbano: visitas, contactos, disponibilidad y solicitudes.",
   path: "/cliente",
   noIndex: true,
 });
@@ -37,7 +37,7 @@ function DashboardFallback() {
   return (
     <main className="min-h-[70svh] bg-neutral-50 px-4 py-16">
       <div className="mx-auto max-w-7xl rounded-[28px] border border-black/10 bg-white p-6">
-        <p className="text-sm font-semibold text-neutral-500">Cargando panel...</p>
+        <p className="text-sm font-semibold text-neutral-500">Cargando tu cuenta...</p>
       </div>
     </main>
   );

@@ -1,5 +1,104 @@
 import "server-only";
-import { hasDatabaseConfig, queryRows } from "@/lib/mysql";
+import { hasDatabaseConfig, queryRows, type DbQueryValue } from "@/lib/mysql";
+import { getCuratedRentalBySlug } from "@/lib/curated-rentals";
+import { availabilityPrompt, sortReportedListings } from "@/lib/listing-moderation";
+import { getListingAudience, getListingReportSummaries, type ListingAudience, type ListingReportSummary } from "@/lib/property-audience";
+import type { Property } from "@/lib/properties";
+
+export type AdminListingCheck = {
+  slug: string;
+  title: string;
+  zone: string;
+  ownerName: string;
+  ownerWhatsapp: string | null;
+  label: string;
+  detail: string;
+  fresh: boolean;
+  days: number | null;
+  reports: number;
+  canConfirm: boolean;
+  canHide: boolean;
+};
+
+export type AdminReportedListing = ListingReportSummary & {
+  title: string;
+  published: boolean;
+  ownerWhatsapp: string | null;
+  canConfirm: boolean;
+  canHide: boolean;
+};
+
+type ListingControlRow = { slug: string; title: string; published: number | boolean; whatsapp: string | null };
+
+// Published listings whose availability is stale or about to be, and listings tenants reported.
+// Actions only apply to listings stored in MySQL; listings written in code are shown without buttons.
+export async function getAdminListingHealth(published: Property[]) {
+  const stale = published.filter((property) => availabilityPrompt(property).ask);
+  let reports: ListingReportSummary[] = [];
+  try {
+    reports = await getListingReportSummaries();
+  } catch (error) {
+    console.error("admin report summaries failed", error);
+  }
+  const slugs = Array.from(new Set([...stale.map((property) => property.slug), ...reports.map((report) => report.slug)])).slice(0, 300);
+  const controls = new Map<string, ListingControlRow>();
+  if (hasDatabaseConfig() && slugs.length > 0) {
+    const values: Record<string, DbQueryValue> = {};
+    const placeholders = slugs.map((slug, index) => {
+      values[`s${index}`] = slug;
+      return `:s${index}`;
+    });
+    const rows = await queryRows<ListingControlRow>(
+      `select slug, title, published, whatsapp from properties where slug in (${placeholders.join(",")})`,
+      values,
+    ).catch((error) => {
+      console.error("admin listing controls failed", error);
+      return null;
+    });
+    for (const row of rows ?? []) controls.set(row.slug, row);
+  }
+  const permissions = (slug: string) => {
+    const row = controls.get(slug);
+    const live = Boolean(row?.published);
+    return { canConfirm: live, canHide: live && !getCuratedRentalBySlug(slug) };
+  };
+  const bySlug = new Map(published.map((property) => [property.slug, property]));
+
+  const checks: AdminListingCheck[] = stale
+    .map((property) => {
+      const { state } = availabilityPrompt(property);
+      return {
+        slug: property.slug,
+        title: property.title,
+        zone: property.zone,
+        ownerName: property.agent.name,
+        ownerWhatsapp: property.agent.whatsapp || null,
+        label: state.label,
+        detail: state.detail,
+        fresh: state.fresh,
+        days: state.days,
+        reports: property.availabilityReports ?? 0,
+        ...permissions(property.slug),
+      };
+    })
+    .sort((a, b) => Number(a.fresh) - Number(b.fresh) || (b.days ?? 999) - (a.days ?? 999));
+
+  const reported: AdminReportedListing[] = sortReportedListings(
+    reports.map((report) => {
+      const property = bySlug.get(report.slug);
+      const row = controls.get(report.slug);
+      return {
+        ...report,
+        title: property?.title ?? row?.title ?? report.slug,
+        published: Boolean(property) || Boolean(row?.published),
+        ownerWhatsapp: property?.agent.whatsapp ?? row?.whatsapp ?? null,
+        ...permissions(report.slug),
+      };
+    }),
+  );
+
+  return { checks, reported };
+}
 
 export type AdminAccountSummary = {
   id: string;
@@ -19,12 +118,9 @@ export type AdminAccountSummary = {
   updatedAt: Date | string | null;
   propertyCount: number;
   activePropertyCount: number;
-  premiumCount: number;
-  views: number;
-  propertyClicks: number;
-  mapViews: number;
-  whatsappClicks: number;
-  galleryOpens: number;
+  // Distinct people (one per phone or computer), from tracking_events.
+  views30: number;
+  whatsapp30: number;
   properties: AdminAccountProperty[];
 };
 
@@ -39,16 +135,14 @@ export type AdminAccountProperty = {
   zone: string;
   price: number;
   currency: string;
-  planSlug: string;
   status: string;
   published: boolean;
   featured: boolean;
   availableUntil: Date | string | null;
-  views: number;
-  propertyClicks: number;
-  mapViews: number;
-  whatsappClicks: number;
-  galleryOpens: number;
+  views30: number;
+  viewsTotal: number;
+  whatsapp30: number;
+  whatsappTotal: number;
 };
 
 type AccountRow = {
@@ -69,12 +163,6 @@ type AccountRow = {
   updated_at: Date | string | null;
   property_count: number | string | null;
   active_property_count: number | string | null;
-  premium_count: number | string | null;
-  views: number | string | null;
-  property_clicks: number | string | null;
-  map_views: number | string | null;
-  whatsapp_clicks: number | string | null;
-  gallery_opens: number | string | null;
 };
 
 type PropertyRow = {
@@ -88,16 +176,10 @@ type PropertyRow = {
   zone: string | null;
   price: number | string | null;
   currency: string | null;
-  plan_slug: string | null;
   status: string | null;
   published: number | boolean | null;
   featured: number | boolean | null;
   available_until: Date | string | null;
-  views: number | string | null;
-  property_clicks: number | string | null;
-  map_views: number | string | null;
-  whatsapp_clicks: number | string | null;
-  gallery_opens: number | string | null;
 };
 
 export async function getAdminAccountsOverview() {
@@ -127,13 +209,7 @@ export async function getAdminAccountsOverview() {
           ca.updated_at,
           coalesce(u.auth_providers, ca.provider) as auth_providers,
           coalesce(m.property_count, 0) as property_count,
-          coalesce(m.active_property_count, 0) as active_property_count,
-          coalesce(m.premium_count, 0) as premium_count,
-          coalesce(m.views, 0) as views,
-          coalesce(m.property_clicks, 0) as property_clicks,
-          coalesce(m.map_views, 0) as map_views,
-          coalesce(m.whatsapp_clicks, 0) as whatsapp_clicks,
-          coalesce(m.gallery_opens, 0) as gallery_opens
+          coalesce(m.active_property_count, 0) as active_property_count
         from client_accounts ca
         left join (
           select
@@ -146,26 +222,9 @@ export async function getAdminAccountsOverview() {
           select
             cap.account_id,
             count(*) as property_count,
-            sum(case when cap.status = 'active' then 1 else 0 end) as active_property_count,
-            sum(case when cap.plan_slug = 'premium' then 1 else 0 end) as premium_count,
-            sum(coalesce(perf.views, 0)) as views,
-            sum(coalesce(perf.property_clicks, 0)) as property_clicks,
-            sum(coalesce(perf.map_views, 0)) as map_views,
-            sum(coalesce(perf.whatsapp_clicks, 0)) as whatsapp_clicks,
-            sum(coalesce(perf.gallery_opens, 0)) as gallery_opens
+            sum(case when cap.status = 'active' then 1 else 0 end) as active_property_count
           from client_account_properties cap
           join properties p on p.slug = cap.property_slug
-          left join (
-            select
-              account_property_id,
-              sum(views) as views,
-              sum(property_clicks) as property_clicks,
-              sum(map_views) as map_views,
-              sum(whatsapp_clicks) as whatsapp_clicks,
-              sum(gallery_opens) as gallery_opens
-            from property_performance_snapshots
-            group by account_property_id
-          ) perf on perf.account_property_id = cap.id
           where cap.status <> 'closed'
             and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')
           group by cap.account_id
@@ -178,7 +237,6 @@ export async function getAdminAccountsOverview() {
           cap.account_id,
           cap.id,
           cap.property_slug,
-          cap.plan_slug,
           cap.status,
           cap.available_until,
           p.title,
@@ -189,36 +247,24 @@ export async function getAdminAccountsOverview() {
           p.price,
           p.currency,
           p.published,
-          p.featured,
-          coalesce(perf.views, 0) as views,
-          coalesce(perf.property_clicks, 0) as property_clicks,
-          coalesce(perf.map_views, 0) as map_views,
-          coalesce(perf.whatsapp_clicks, 0) as whatsapp_clicks,
-          coalesce(perf.gallery_opens, 0) as gallery_opens
+          p.featured
         from client_account_properties cap
         join client_accounts ca on ca.id = cap.account_id and ca.kind = 'owner'
         left join properties p on p.slug = cap.property_slug
-        left join (
-          select
-            account_property_id,
-            sum(views) as views,
-            sum(property_clicks) as property_clicks,
-            sum(map_views) as map_views,
-            sum(whatsapp_clicks) as whatsapp_clicks,
-            sum(gallery_opens) as gallery_opens
-          from property_performance_snapshots
-          group by account_property_id
-        ) perf on perf.account_property_id = cap.id
         where cap.status <> 'closed'
           and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')
         order by cap.created_at desc`,
     ),
   ]);
 
+  const audience = await getListingAudience((propertyRows ?? []).map((row) => row.property_slug)).catch((error) => {
+    console.error("admin audience query failed", error);
+    return new Map<string, ListingAudience>();
+  });
   const propertiesByAccount = new Map<string, AdminAccountProperty[]>();
 
   for (const row of propertyRows ?? []) {
-    const property = toProperty(row);
+    const property = toProperty(row, audience.get(row.property_slug));
     const current = propertiesByAccount.get(property.accountId) ?? [];
     current.push(property);
     propertiesByAccount.set(property.accountId, current);
@@ -226,36 +272,35 @@ export async function getAdminAccountsOverview() {
 
   return {
     databaseReady: true as const,
-    accounts: (accountRows ?? []).map((row) => ({
-      id: row.id,
-      kind: row.kind,
-      displayName: row.display_name,
-      companyName: row.company_name ?? undefined,
-      email: row.email,
-      phone: row.phone ?? undefined,
-      avatarInitials: row.avatar_initials,
-      avatarUrl: row.avatar_url ?? undefined,
-      roleLabel: row.role_label,
-      location: row.location ?? undefined,
-      provider: row.provider,
-      status: row.status,
-      authProviders: parseProviders(row.auth_providers),
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      propertyCount: toNumber(row.property_count),
-      activePropertyCount: toNumber(row.active_property_count),
-      premiumCount: toNumber(row.premium_count),
-      views: toNumber(row.views),
-      propertyClicks: toNumber(row.property_clicks),
-      mapViews: toNumber(row.map_views),
-      whatsappClicks: toNumber(row.whatsapp_clicks),
-      galleryOpens: toNumber(row.gallery_opens),
-      properties: propertiesByAccount.get(row.id) ?? [],
-    })),
+    accounts: (accountRows ?? []).map((row) => {
+      const properties = propertiesByAccount.get(row.id) ?? [];
+      return {
+        id: row.id,
+        kind: row.kind,
+        displayName: row.display_name,
+        companyName: row.company_name ?? undefined,
+        email: row.email,
+        phone: row.phone ?? undefined,
+        avatarInitials: row.avatar_initials,
+        avatarUrl: row.avatar_url ?? undefined,
+        roleLabel: row.role_label,
+        location: row.location ?? undefined,
+        provider: row.provider,
+        status: row.status,
+        authProviders: parseProviders(row.auth_providers),
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        propertyCount: toNumber(row.property_count),
+        activePropertyCount: toNumber(row.active_property_count),
+        views30: properties.reduce((total, property) => total + property.views30, 0),
+        whatsapp30: properties.reduce((total, property) => total + property.whatsapp30, 0),
+        properties,
+      };
+    }),
   };
 }
 
-function toProperty(row: PropertyRow): AdminAccountProperty {
+function toProperty(row: PropertyRow, audience?: ListingAudience): AdminAccountProperty {
   return {
     accountId: row.account_id,
     id: row.id,
@@ -267,16 +312,14 @@ function toProperty(row: PropertyRow): AdminAccountProperty {
     zone: row.zone ?? "Sin zona",
     price: toNumber(row.price),
     currency: row.currency ?? "USD",
-    planSlug: row.plan_slug ?? "basic",
     status: row.status ?? "active",
     published: Boolean(row.published),
     featured: Boolean(row.featured),
     availableUntil: row.available_until,
-    views: toNumber(row.views),
-    propertyClicks: toNumber(row.property_clicks),
-    mapViews: toNumber(row.map_views),
-    whatsappClicks: toNumber(row.whatsapp_clicks),
-    galleryOpens: toNumber(row.gallery_opens),
+    views30: audience?.views30 ?? 0,
+    viewsTotal: audience?.viewsTotal ?? 0,
+    whatsapp30: audience?.contacts30 ?? 0,
+    whatsappTotal: audience?.contactsTotal ?? 0,
   };
 }
 

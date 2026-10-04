@@ -2,7 +2,7 @@ import { BadgeCheck, ExternalLink, Mail, MessageCircle, Phone } from "lucide-rea
 import Image from "next/image";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { PublisherBadge } from "@/components/publisher-badge";
-import { getPropertyContactCopy, isExternalContactUrl } from "@/lib/property-contact";
+import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
 import { SafetyNotice } from "@/components/safety-notice";
 import type { Property } from "@/lib/properties";
 
@@ -106,7 +106,7 @@ export function AgentContactCard({ property }: AgentContactCardProps) {
 
       <div className="mt-5 space-y-3">
         <a
-          href={`/api/propiedades/${property.slug}/whatsapp`}
+          href={whatsappContactPath(property.slug, "ficha")}
           target="_blank"
           rel="noreferrer"
           className="inline-flex h-12 w-full items-center justify-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white transition-colors hover:bg-[#10533b]"
