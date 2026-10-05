@@ -17,7 +17,7 @@ import { databaseUrl, loadRuntimeEnvironment } from "./runtime-environment.mjs";
 
 type Ficha = {
   nombre: string; telefono: string; enlace: string; titulo: string; tipo: string; zona: string; direccion: string | null;
-  precio: number; moneda: string; tipoCambio: number | null; dormitorios: number | null; banos: number | null; garaje: number | null; superficie: number | null;
+  precio: number; moneda: string; tipoCambio: number | null; dormitorios: number | null; banos: number | null; garaje: number | boolean | null; superficie: number | null;
   mascotas: string; amoblado: boolean; seguridad: boolean; piscina: boolean; patio: boolean; parrillero: boolean; ascensor: boolean;
   expensas: string; montoExpensas: number | null; garantia: string | null; montoGarantia: number | null; descripcion: string; fotos: string[];
 };
@@ -70,7 +70,7 @@ export function fichaDetails(ficha: Ficha) {
   return validatePublicationDetails({
     title: ficha.titulo, type: ficha.tipo, zone: ficha.zona, address: ficha.direccion || `${ficha.zona} (dirección aproximada)`,
     description: ficha.descripcion, price: ficha.precio, currency: ficha.moneda, exchangeRate: ficha.tipoCambio,
-    bedrooms: ficha.dormitorios, bathrooms: ficha.banos, area: ficha.superficie, garage: ficha.garaje ?? 0,
+    bedrooms: ficha.dormitorios, bathrooms: ficha.banos, area: ficha.superficie, garage: typeof ficha.garaje === "boolean" ? Number(ficha.garaje) : ficha.garaje ?? 0,
     petsPolicy: pets === "si" ? "allowed" : pets === "no" ? "not_allowed" : "consult",
     ...(expenses === "incluidas" ? { expensesMode: "included" } : expenses === "ninguna" ? { expensesMode: "none" } : expenses === "aparte" && ficha.montoExpensas ? { expensesMode: "separate" } : {}),
     commonExpenses: expenses === "aparte" ? ficha.montoExpensas ?? 0 : 0,
