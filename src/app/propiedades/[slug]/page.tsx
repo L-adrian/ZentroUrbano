@@ -191,7 +191,8 @@ export default async function PropertyDetailPage({
           </div>
 
         <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 space-y-10">
+          {/* On phones the map comes right after the key facts, before the long text sections. */}
+          <div className="flex min-w-0 flex-col gap-7 lg:gap-10">
             <PropertyGallery property={property} tour={tour} />
             <div>
               <div className="flex flex-wrap gap-2">
@@ -285,11 +286,11 @@ export default async function PropertyDetailPage({
               ) : null}
             </div>
 
-            <ContentSection title="Descripción">
+            <ContentSection title="Descripción" className="max-lg:order-1">
               <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{property.longDescription}</p>
             </ContentSection>
 
-            <ContentSection title="Características">
+            <ContentSection title="Características" className="max-lg:order-1">
               <ul className="property-features" aria-label="Características de la vivienda">
                 {featureList(property).map((feature) => (
                   <li
@@ -306,7 +307,7 @@ export default async function PropertyDetailPage({
               {featureList(property).length === 0 && <p>Consulta las características con el propietario.</p>}
             </ContentSection>
 
-            <ContentSection title="Requisitos">
+            <ContentSection title="Requisitos" className="max-lg:order-1">
               <ul className="space-y-3">
                 {property.requirements.map((requirement) => (
                   <li key={requirement} className="flex gap-3 text-neutral-700">
@@ -479,10 +480,10 @@ function getBathroomReplacementFact(property: Property) {
   };
 }
 
-function ContentSection({ title, children }: { title: string; children: ReactNode }) {
+function ContentSection({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
   return (
-    <section className="border-t border-black/10 pt-8">
-      <h2 className="text-2xl font-semibold tracking-tight text-neutral-950">{title}</h2>
+    <section className={`border-t border-black/10 pt-6 lg:pt-8${className ? ` ${className}` : ""}`}>
+      <h2 className="text-xl font-semibold tracking-tight text-neutral-950 lg:text-2xl">{title}</h2>
       <div className="mt-4 text-base leading-8 text-neutral-700">{children}</div>
     </section>
   );

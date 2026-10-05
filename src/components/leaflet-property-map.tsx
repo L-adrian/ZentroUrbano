@@ -796,7 +796,8 @@ function shouldReduceMapAnimation() {
   );
 }
 
-function createPropertyIcon(
+// Shared with the listing-page map so both show the same marker.
+export function createPropertyIcon(
   property: Property,
   isSelected: boolean,
   mode: "compact" | "full",

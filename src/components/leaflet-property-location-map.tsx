@@ -3,7 +3,9 @@
 import L from "leaflet";
 import { LocateFixed, Minus, Plus } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Circle, MapContainer, Marker, Tooltip, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, useMap } from "react-leaflet";
+import { useCurrencyPreference } from "@/components/currency-preference";
+import { createPropertyIcon } from "@/components/leaflet-property-map";
 import { ResilientMapTiles } from "@/components/resilient-map-tiles";
 import {
   BOLIVIA_MAP_BOUNDS,
@@ -26,6 +28,7 @@ const approximateRadiusMeters = 300;
 export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocationMapProps) {
   const [map, setMap] = useState<L.Map | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number | null>(null);
+  const displayCurrency = useCurrencyPreference();
   const approximate = !property.locationConfirmedAt;
   // On phones one finger scrolls the page; the map moves with two fingers.
   const [touchHint, setTouchHint] = useState(false);
@@ -169,23 +172,16 @@ export function LeafletPropertyLocationMap({ property }: LeafletPropertyLocation
       >
         <ResilientMapTiles />
         <LocationMapBridge onReady={setMap} />
+        {/* Same marker as the catalog map; an approximate location also gets a soft zone circle
+            (the header above the map already says it is approximate). */}
         {approximate ? (
           <Circle
             center={position}
             radius={approximateRadiusMeters}
-            pathOptions={{ color: "#176b4d", weight: 2, fillColor: "#176b4d", fillOpacity: 0.14 }}
-          >
-            <Tooltip direction="center" opacity={1} permanent>
-              <span className="text-xs font-semibold">Zona aproximada</span>
-            </Tooltip>
-          </Circle>
-        ) : (
-          <Marker position={position} icon={createLocationIcon(property)} title={property.title} alt={property.title}>
-            <Tooltip direction="top" offset={[0, -46]} opacity={1} permanent>
-              <span className="text-xs font-semibold">{property.title}</span>
-            </Tooltip>
-          </Marker>
-        )}
+            pathOptions={{ color: "#087c65", weight: 1.5, dashArray: "4 6", fillColor: "#087c65", fillOpacity: 0.1 }}
+          />
+        ) : null}
+        <Marker position={position} icon={createPropertyIcon(property, true, "full", displayCurrency)} title={property.title} alt={property.title} />
       </MapContainer>
       {touchHint ? (
         <p className="location-map-touch-hint" role="status">Usa dos dedos para mover el mapa</p>
@@ -219,54 +215,6 @@ function LocationMapBridge({ onReady }: { onReady: (map: L.Map) => void }) {
   return null;
 }
 
-function createLocationIcon(property: Property) {
-  const publisherLogo = getPublisherLocationLogo(property.publisher);
-
-  return L.divIcon({
-    className: "morada-location-marker",
-    html: `
-      <span
-        class="morada-location-pin"
-        style="--morada-location-bg:${property.publisher.brandColor};--morada-location-fg:${property.publisher.brandTextColor};"
-        aria-hidden="true"
-      >
-        <span class="morada-location-logo">${publisherLogo}</span>
-      </span>
-    `,
-    iconAnchor: [18, 44],
-    iconSize: [36, 44],
-  });
-}
-
-function getPublisherLocationLogo(publisher: Property["publisher"]) {
-  if (!publisher.logo) {
-    return escapeHtml(publisher.shortName);
-  }
-
-  return `<img class="morada-location-logo-image" src="${escapeHtml(publisher.logo)}" alt="${escapeHtml(
-    publisher.name,
-  )}" />`;
-}
-
 function shouldReduceMapAnimation() {
   return typeof window !== "undefined" && window.innerWidth <= 640;
-}
-
-function escapeHtml(value: string) {
-  return value.replace(/[&<>"']/g, (character) => {
-    switch (character) {
-      case "&":
-        return "&amp;";
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case '"':
-        return "&quot;";
-      case "'":
-        return "&#39;";
-      default:
-        return character;
-    }
-  });
 }
