@@ -127,7 +127,7 @@ const initialForm: PropertyForm = {
 
 const petsOptions: Array<[PetsPolicy, string]> = [["allowed", "Sí"], ["not_allowed", "No"], ["consult", "A consultar"]];
 const petsLabels: Record<PetsPolicy, string> = { allowed: "Sí acepta", not_allowed: "No acepta", consult: "A consultar" };
-const expensesLabels: Record<PropertyForm["expensesMode"], string> = { "": "Sin indicar", included: "Incluidas en el alquiler", none: "No se cobran", separate: "Se pagan aparte" };
+const expensesLabels: Record<PropertyForm["expensesMode"], string> = { "": "Sin indicar", included: "Incluidas en el alquiler", none: "No se cobran", separate: "Se pagan aparte", consult: "Pendiente de consulta" };
 const serviceValues = new Set<string>([...includedServiceOptions.map(([key]) => key), noServicesValue]);
 
 // The server accepts older forms without the expenses question; this form always asks it.

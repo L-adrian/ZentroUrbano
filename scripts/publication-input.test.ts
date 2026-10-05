@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { getPublicationContactErrors, getPublicationStepErrors, normalizePublicationPhone, parsePublicationDetails, publicationFieldStep, validatePublicationDetails } from "../src/lib/publication-input";
+import { getPublicationContactErrors, getPublicationStepErrors, normalizePublicationPhone, parsePublicationDetails, publicationFieldStep, publicationRequirements, validatePublicationDetails } from "../src/lib/publication-input";
 import { getOwnerListingSuggestions } from "../src/lib/owner-listing-suggestions";
 import { directRentalDemoProperties } from "../src/lib/direct-rental-demo";
 
@@ -71,4 +71,12 @@ test("publication parses grouped amounts and preserves the owner's multiline tex
   assert.equal(result.commonExpenses,250.5);
   assert.equal(result.guaranteeAmount,1500);
   assert.equal(result.description,description);
+});
+
+test("expenses the ad did not state stay pending instead of reading as zero", () => {
+  const details = validatePublicationDetails({ ...valid, expensesMode: "consult", commonExpenses: "" }).details;
+  assert.ok(details);
+  assert.equal(details.expensesMode, "consult");
+  assert.equal(details.commonExpenses, 0);
+  assert.ok(publicationRequirements(details).includes("Expensas: pendiente de consulta"));
 });

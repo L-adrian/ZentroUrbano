@@ -109,6 +109,7 @@ export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" 
 export function getMonthlyCost(property: Pick<Property, "price" | "rentalDetails" | "requirements">): number | null {
   const expenses = property.rentalDetails?.commonExpenses;
   if (property.rentalDetails) {
+    if (property.rentalDetails.expensesMode === "consult") return null;
     return typeof expenses === "number" && Number.isFinite(expenses) && expenses >= 0 ? property.price + expenses : null;
   }
   const line = property.requirements.find((item) => /expensas/i.test(item));

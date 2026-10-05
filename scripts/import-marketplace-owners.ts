@@ -72,7 +72,7 @@ export function fichaDetails(ficha: Ficha) {
     description: ficha.descripcion, price: ficha.precio, currency: ficha.moneda, exchangeRate: ficha.tipoCambio,
     bedrooms: ficha.dormitorios, bathrooms: ficha.banos, area: ficha.superficie, garage: typeof ficha.garaje === "boolean" ? Number(ficha.garaje) : ficha.garaje ?? 0,
     petsPolicy: pets === "si" ? "allowed" : pets === "no" ? "not_allowed" : "consult",
-    ...(expenses === "incluidas" ? { expensesMode: "included" } : expenses === "ninguna" ? { expensesMode: "none" } : expenses === "aparte" && ficha.montoExpensas ? { expensesMode: "separate" } : {}),
+    ...(expenses === "incluidas" ? { expensesMode: "included" } : expenses === "ninguna" ? { expensesMode: "none" } : expenses === "aparte" && ficha.montoExpensas ? { expensesMode: "separate" } : { expensesMode: "consult" }),
     commonExpenses: expenses === "aparte" ? ficha.montoExpensas ?? 0 : 0,
     guarantee, guaranteeAmount: ficha.montoGarantia,
     pets: pets === "si", furnished: ficha.amoblado === true, security: ficha.seguridad === true, pool: ficha.piscina === true,

@@ -4,7 +4,8 @@ import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 export const petsPolicies = ["allowed", "not_allowed", "consult"] as const;
 export type PetsPolicy = (typeof petsPolicies)[number];
 // "none": no expenses at all; "included": already in the rent; "separate": paid on top (commonExpenses).
-export const expensesModes = ["included", "none", "separate"] as const;
+// "consult": the ad did not say (imported listings); shown as "pendiente de consulta", never as 0.
+export const expensesModes = ["included", "none", "separate", "consult"] as const;
 export type ExpensesMode = (typeof expensesModes)[number];
 
 export type PublicationDetails = {
@@ -57,7 +58,7 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   const expensesMode=input.expensesMode == null || input.expensesMode === "" ? undefined : String(input.expensesMode);
   const validExpensesMode=expensesMode === undefined || (expensesModes as readonly string[]).includes(expensesMode);
   // Included or not charged means nothing is paid on top of the rent, whatever the amount field says.
-  const noExtraExpenses=expensesMode === "included" || expensesMode === "none";
+  const noExtraExpenses=expensesMode === "included" || expensesMode === "none" || expensesMode === "consult";
   const price=number("price",100_000_000), commonExpenses=noExtraExpenses ? 0 : number("commonExpenses",1_000_000), garage=number("garage",100,true);
   const guarantee=text("guarantee",80);
   const guaranteeAmount=number("guaranteeAmount",100_000_000);
@@ -129,7 +130,7 @@ export function publicationRequirements(details: Pick<PublicationDetails, "curre
   const expenses = details.expensesMode === "included" ? "Expensas incluidas en el alquiler"
     : details.expensesMode === "none" ? "No se cobran expensas"
     : details.commonExpenses > 0 ? `Expensas: ${label} ${details.commonExpenses} por mes`
-    : details.expensesMode === "separate" ? "Expensas: pendiente de consulta"
+    : details.expensesMode === "separate" || details.expensesMode === "consult" ? "Expensas: pendiente de consulta"
     // Older form: 0 meant "included or not charged", so only "nothing extra" is certain.
     : "Sin expensas aparte";
   return [guarantee, expenses, "Sin comisión de intermediación"];
