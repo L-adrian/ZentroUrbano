@@ -436,7 +436,8 @@ button:disabled,
     scroll-behavior: auto !important;
   }
 
-  *,
+  /* The splash house and the push ad keep their (short, one-off) motion on phones. */
+  *:not(#zu-splash, #zu-splash *, .push-ad),
   *::before,
   *::after {
     animation: none !important;
