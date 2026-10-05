@@ -11,6 +11,7 @@ const correctable = new Set(["changes_requested", "rejected"]);
 function expensesLabel(details: PublicationDetails) {
   if (details.expensesMode === "included") return "Incluidas en el alquiler";
   if (details.expensesMode === "none") return "No se cobran";
+  if (details.expensesMode === "consult") return "Pendiente de consulta";
   return details.commonExpenses > 0 ? `${details.currency} ${details.commonExpenses} por mes` : "0 (formulario anterior: incluidas o no se cobran)";
 }
 

@@ -510,7 +510,7 @@ function CostsBlock({ property }: { property: Property }) {
   const guarantee = getGuaranteeLabel(property);
   const price = (amount: number) => <PriceDisplay property={{ ...property, price: amount }} showPeriod={false} showExchangeRate={false} />;
   const pending = <span className="entry-cost-pending">Pendiente de consulta</span>;
-  const expenses = details ? (details.commonExpenses > 0 ? price(details.commonExpenses) : "No se cobran aparte") : pending;
+  const expenses = details && details.expensesMode !== "consult" ? (details.commonExpenses > 0 ? price(details.commonExpenses) : "No se cobran aparte") : pending;
   const deposit = entry ? (entry.deposit > 0 ? price(entry.deposit) : "Sin garantía") : guarantee === "Consultar" ? pending : guarantee;
   return (
     <section className="entry-cost mt-4" aria-labelledby="entry-cost-title">
