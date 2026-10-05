@@ -24,7 +24,7 @@ export default async function MapPage() {
           Compara ubicaciones y contacta directamente al propietario.
         </p>
       </div>
-      <DirectRentalExplorer properties={withoutOwnerContact(properties)} initialView="map" layout="map" />
+      <DirectRentalExplorer properties={withoutOwnerContact(properties)} initialView="split" layout="map" />
     </main>
   );
 }

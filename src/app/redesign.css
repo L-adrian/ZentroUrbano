@@ -882,3 +882,21 @@ button, a { -webkit-tap-highlight-color: transparent; }
   body:has(.property-contact-dock) .push-ad { bottom: calc(150px + env(safe-area-inset-bottom)); }
 }
 @media (prefers-reduced-motion: reduce) { .push-ad, .push-ad.is-visible { transition: none; } }
+
+/* Catalog "Lista y mapa" (default): list beside the map on wide screens; /mapa gives the map more width.
+   Below 1024px the split view falls back to the list, and the "Lista" button shows as active. */
+.catalog-view-split { display: none; }
+@media (min-width: 1024px) {
+  .catalog-view-split { display: inline-flex; }
+  .catalog-view-button.is-split-fallback { background: var(--surface); color: var(--muted); }
+  .catalog-results-grid.is-split { display: grid; gap: 20px; grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr); align-items: start; }
+  .catalog-results-grid.is-split .catalog-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .catalog-results-grid.is-split .catalog-map-column { position: sticky; top: 92px; }
+  .catalog-results-grid.is-split .rental-results-map { min-height: 0; height: calc(100svh - 116px); }
+  .zu-explorer.is-map-layout .catalog-results-grid.is-split { grid-template-columns: minmax(340px, 0.62fr) minmax(0, 1.38fr); }
+  .zu-explorer.is-map-layout .catalog-results-grid.is-split .catalog-card-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 1023px) {
+  .catalog-view-button.is-split-fallback { background: var(--brand); color: #fff; }
+  .dark .catalog-view-button.is-split-fallback { color: #08291e; }
+}

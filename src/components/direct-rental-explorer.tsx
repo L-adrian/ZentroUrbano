@@ -5,6 +5,7 @@ import {
   Car,
   Check,
   Info,
+  Columns2,
   List,
   Map as MapIcon,
   PawPrint,
@@ -78,7 +79,8 @@ type DirectRentalExplorerProps = {
   layout?: "list" | "map";
 };
 
-type ResultsView = "list" | "map";
+// "split" shows the list beside the map on wide screens (on phones it behaves like "list").
+type ResultsView = "split" | "list" | "map";
 
 const unsupportedSearchCopy = {
   anticretico: "No hay anticréticos.",
@@ -98,7 +100,7 @@ const noDefaults: Partial<RentalSearchFilters> = {};
 export function DirectRentalExplorer({
   properties,
   initialFilters = noDefaults,
-  initialView = "list",
+  initialView = "split",
   layout = "list",
 }: DirectRentalExplorerProps) {
   const searchParams = useSearchParams();
@@ -531,8 +533,9 @@ export function DirectRentalExplorer({
                 {activeFilters.length > 0 ? <FilterCount count={activeFilters.length} /> : null}
               </button>
               <div className="catalog-view-toggle" role="group" aria-label="Ver resultados como">
-                <ViewButton active={view === "list"} label="Lista" icon={<List />} onClick={() => setView("list")} />
-                <ViewButton active={view === "map"} label="Mapa" icon={<MapIcon />} onClick={() => setView("map")} />
+                <ViewButton active={view === "split"} label="Lista y mapa" icon={<Columns2 />} onClick={() => setView("split")} className="catalog-view-split" />
+                <ViewButton active={view === "list"} label="Lista" icon={<List />} onClick={() => setView("list")} className={view === "split" && !mapLayout ? "is-split-fallback" : ""} />
+                <ViewButton active={view === "map"} label="Mapa" icon={<MapIcon />} onClick={() => setView("map")} className={view === "split" && mapLayout ? "is-split-fallback" : ""} />
               </div>
             </div>
           </div>
@@ -591,9 +594,9 @@ export function DirectRentalExplorer({
           <div
             data-results
             aria-busy={filters.query !== deferredQuery}
-            className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid`}
+            className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid${view === "split" ? " is-split" : ""}`}
           >
-            <div className={view === "map" ? "hidden" : "block"}>
+            <div className={view === "map" || (view === "split" && mapLayout) ? (view === "split" ? "hidden lg:block" : "hidden") : "block"}>
               {results.length > 0 ? (
                 <>
                   {mainMatches.length > 0 ? (
@@ -684,7 +687,7 @@ export function DirectRentalExplorer({
               )}
             </div>
 
-            <div className={`${view === "list" ? "hidden" : "block"} catalog-map-column`}>
+            <div className={`${view === "list" ? "hidden" : view === "split" && !mapLayout ? "hidden lg:block" : "block"} catalog-map-column`}>
               {results.length > 0 ? (
                 <PropertyMap
                   properties={results}
@@ -882,14 +885,16 @@ function ViewButton({
   label,
   icon,
   onClick,
+  className = "",
 }: {
   active: boolean;
   label: string;
   icon: React.ReactNode;
   onClick: () => void;
+  className?: string;
 }) {
   return (
-    <button type="button" onClick={onClick} aria-pressed={active} className={`catalog-view-button${active ? " is-active" : ""}`}>
+    <button type="button" onClick={onClick} aria-pressed={active} className={`catalog-view-button${active ? " is-active" : ""}${className ? ` ${className}` : ""}`}>
       <span aria-hidden="true" className="catalog-view-icon">{icon}</span>
       <span className="catalog-view-label">{label}</span>
     </button>
