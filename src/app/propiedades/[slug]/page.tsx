@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { BackToCatalogLink } from "@/components/back-to-catalog-link";
 import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { AgentContactCard } from "@/components/agent-contact-card";
@@ -174,12 +175,9 @@ export default async function PropertyDetailPage({
       <section className="listing-layout py-6 sm:py-8">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-            <Link
-              href="/propiedades"
-              className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950"
-            >
+            <BackToCatalogLink className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-neutral-700 transition hover:border-neutral-950">
               Volver al catálogo
-            </Link>
+            </BackToCatalogLink>
             <div className="flex items-center gap-2">
               <ListingSaveButton slug={property.slug} title={property.title} />
               <PropertyShareButton

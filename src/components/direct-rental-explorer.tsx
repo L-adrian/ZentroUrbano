@@ -27,6 +27,7 @@ import { SearchAlertButton } from "@/components/search-alert-button";
 import { RecentlyViewed, SavedListingsLink } from "@/components/recently-viewed";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { trackAnalyticsEvent } from "@/lib/analytics-events";
+import { rememberCatalogSearch, rememberListingOpened } from "@/lib/catalog-return";
 import {
   formatApproxDistance,
   getKnownPlace,
@@ -112,7 +113,8 @@ export function DirectRentalExplorer({
   const deferredQuery = useDeferredValue(filters.query);
   // Phones and tablets open the filter sidebar as a panel over the page.
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<ResultsView>(initialView);
+  // The view (lista, mapa o ambos) lives in the URL too, so going back keeps it.
+  const [view, setView] = useState<ResultsView>(() => readResultsView(searchParams.get("vista"), initialView));
   const filtersRef = useRef<HTMLElement>(null);
   const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const displayCurrency = useCurrencyPreference();
@@ -250,23 +252,41 @@ export function DirectRentalExplorer({
   ].find(Boolean);
 
   // Replace (not push) the URL so the back button still leaves the catalog in one step.
-  const writtenFilters = useRef<string | null>(null);
+  const urlState = useMemo(() => {
+    const params = new URLSearchParams(serializedFilters);
+    if (view !== initialView) params.set("vista", view);
+    return params.toString();
+  }, [serializedFilters, view, initialView]);
+  const writtenState = useRef<string | null>(null);
   useEffect(() => {
-    if (writtenFilters.current === null) {
-      writtenFilters.current = serializedFilters;
+    // This tab's last search, for "Volver al catálogo" when a listing was opened from a shared link.
+    rememberCatalogSearch(currentCatalogPath(urlState));
+    if (writtenState.current === null) {
+      writtenState.current = urlState;
       return;
     }
-    if (writtenFilters.current === serializedFilters) return;
+    if (writtenState.current === urlState) return;
     const timer = window.setTimeout(() => {
-      writtenFilters.current = serializedFilters;
-      const params = new URLSearchParams(window.location.search);
-      for (const key of rentalSearchParamKeys) params.delete(key);
-      new URLSearchParams(serializedFilters).forEach((value, key) => params.append(key, value));
-      const search = params.toString();
-      window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+      writtenState.current = urlState;
+      window.history.replaceState(window.history.state, "", `${currentCatalogPath(urlState)}${window.location.hash}`);
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [serializedFilters]);
+  }, [urlState]);
+
+  // A listing opened from here can go back to this exact page (filters and scroll) in one step.
+  function noteListingOpened(event: React.MouseEvent<HTMLElement>) {
+    const link = (event.target as Element).closest?.("a[href]");
+    if (!link) return;
+    const url = new URL((link as HTMLAnchorElement).href, window.location.href);
+    if (url.origin === window.location.origin && url.pathname.startsWith("/propiedades/")) {
+      // The filters may still be waiting for the 300 ms pause, so write them now.
+      if (writtenState.current !== urlState) {
+        writtenState.current = urlState;
+        window.history.replaceState(window.history.state, "", `${currentCatalogPath(urlState)}${window.location.hash}`);
+      }
+      rememberListingOpened(url.pathname);
+    }
+  }
 
   // One "search_empty" per search that stays without results, not per keystroke.
   const reportedEmpty = useRef<string | null>(null);
@@ -395,11 +415,11 @@ export function DirectRentalExplorer({
       ? onlyPetsPending
         ? `${mainMatches.length} ${mainMatches.length === 1 ? "acepta" : "aceptan"} mascotas · ${pendingMatches.length} a consultar`
         : `${mainMatches.length} con todo lo que pides · ${pendingMatches.length} ${pendingMatches.length === 1 ? "pendiente" : "pendientes"} de consulta`
-      : "Contacto directo con el propietario";
+      : "";
   const mapLayout = layout === "map";
 
   return (
-    <div className={`zu-explorer${mapLayout ? " is-map-layout" : ""}`}>
+    <div className={`zu-explorer${mapLayout ? " is-map-layout" : ""}`} onClickCapture={noteListingOpened}>
       {filtersOpen ? <button type="button" className="catalog-filters-backdrop" aria-label="Cerrar filtros" tabIndex={-1} onClick={() => setFiltersOpen(false)} /> : null}
       <div className="catalog-layout mx-auto max-w-[1500px] px-4 py-5 sm:px-6 lg:px-8">
         <aside
@@ -644,7 +664,7 @@ export function DirectRentalExplorer({
             onChange={(value) => updateFilter("sort", value)}
           />
 
-          <p className="mt-1 text-sm text-neutral-500">{subline}</p>
+          {subline ? <p className="mt-1 text-sm text-neutral-500">{subline}</p> : null}
           <p id="rental-price-hint" className="mt-1 text-sm" aria-live="polite">
             {unreadablePrice ? (
               <span className="text-[#a12d1c] dark:text-[#ff9c8a]">No entendimos “{shorten(unreadablePrice, 24)}”. Escribe solo el monto, por ejemplo 3.000.</span>
@@ -1101,6 +1121,19 @@ function ZonePicker({
       </div>
     </div>
   );
+}
+
+// This page's path with the filters and view in `urlState`, keeping any other query parameters.
+function currentCatalogPath(urlState: string) {
+  const params = new URLSearchParams(window.location.search);
+  for (const key of [...rentalSearchParamKeys, "vista"]) params.delete(key);
+  new URLSearchParams(urlState).forEach((value, key) => params.append(key, value));
+  const search = params.toString();
+  return `${window.location.pathname}${search ? `?${search}` : ""}`;
+}
+
+function readResultsView(value: string | null, fallback: ResultsView): ResultsView {
+  return value === "split" || value === "list" || value === "map" ? value : fallback;
 }
 
 function FilterGroup({ title, children }: { title: string; children: React.ReactNode }) {

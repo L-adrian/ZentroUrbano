@@ -3,8 +3,8 @@ import Link from "next/link";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Politica de privacidad",
-  description: "Como Zentro Urbano trata datos de contacto, consultas e informacion enviada.",
+  title: "Política de privacidad",
+  description: "Cómo Zentro Urbano trata datos de contacto, consultas e información enviada.",
   path: "/privacidad",
 });
 
@@ -31,7 +31,11 @@ const sections = [
   },
   {
     title: "Canales externos",
-    body: "Zentro Urbano usa enlaces de WhatsApp, mapas y servicios de imágenes o mapas. Al abrir esos servicios, aplican también sus propias políticas de privacidad.",
+    body: "Zentro Urbano usa enlaces de WhatsApp, mapas de OpenStreetMap y servicios de imágenes. Al abrir esos servicios, aplican también sus propias políticas de privacidad.",
+  },
+  {
+    title: "Estadísticas de visitas",
+    body: "Usamos Google Analytics para saber cuántas personas visitan el sitio y qué páginas y búsquedas les sirven. Guarda cookies en tu navegador y no recibe tu nombre, WhatsApp ni correo. Puedes bloquear esas cookies desde tu navegador sin que el sitio deje de funcionar.",
   },
   {
     title: "Conservación",

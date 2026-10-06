@@ -6,7 +6,7 @@ import { LoginPanel } from "@/components/login-panel";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Iniciar sesion",
+  title: "Iniciar sesión",
   description: "Acceso para propietarios con viviendas publicadas en Zentro Urbano.",
   path: "/login",
   noIndex: true,

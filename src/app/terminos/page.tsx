@@ -3,7 +3,7 @@ import Link from "next/link";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildSeoMetadata({
-  title: "Terminos y condiciones",
+  title: "Términos y condiciones",
   description: "Condiciones de uso de Zentro Urbano para explorar y publicar propiedades.",
   path: "/terminos",
 });
@@ -19,15 +19,15 @@ const sections = [
   },
   {
     title: "Información de propiedades",
-    body: "Los precios, disponibilidad, requisitos, características, superficies y documentación pueden cambiar. Antes de tomar una decisión, el usuario debe confirmar los datos directamente con el propietario, administrador o responsable de la publicación.",
+    body: "Los precios, disponibilidad, requisitos, características, superficies y documentación pueden cambiar. Antes de tomar una decisión, el usuario debe confirmar los datos directamente con el propietario.",
   },
   {
     title: "Curaduría y revisión",
-    body: "Zentro Urbano puede revisar visualmente una ficha antes de publicarla, pero esa revisión no sustituye una verificación legal, técnica, registral o financiera de la propiedad.",
+    body: "Una persona del equipo revisa cada ficha antes de publicarla, pero esa revisión no sustituye una verificación legal, técnica, registral o financiera de la propiedad.",
   },
   {
     title: "Contacto y operaciones",
-    body: "Zentro Urbano facilita el contacto inicial. El contrato de alquiler, la reserva y los pagos se acuerdan directamente entre propietario e inquilino, con asesoría profesional cuando sea necesario.",
+    body: "Zentro Urbano facilita el contacto inicial. El contrato de alquiler y los pagos se acuerdan directamente entre propietario e inquilino, con asesoría profesional cuando sea necesario. No pagues nada antes de visitar la vivienda.",
   },
   {
     title: "Uso permitido",
@@ -64,11 +64,11 @@ export default function TermsPage() {
             </article>
           ))}
 
-          <div className="rounded-[28px] bg-neutral-950 p-6 text-white">
+          <div className="rounded-[28px] p-6">
             <h2 className="text-xl font-semibold tracking-tight">Contacto</h2>
-            <p className="mt-3 text-sm leading-7 text-white/72">
+            <p className="mt-3 text-sm leading-7">
               Para consultas sobre estos términos, escribe desde la página de{" "}
-              <Link href="/contacto" className="font-semibold text-white">
+              <Link href="/contacto" className="font-semibold">
                 contacto
               </Link>
               .

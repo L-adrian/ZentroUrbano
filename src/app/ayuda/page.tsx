@@ -6,7 +6,7 @@ import { buildSeoMetadata } from "@/lib/seo";
 export const metadata = buildSeoMetadata({ title: "Centro de ayuda", description: "Ayuda para tu cuenta, publicación de alquileres, visitas y reportes de anuncios en Zentro Urbano.", path: "/ayuda" });
 const topics = [
   { icon: ClipboardCheck, title: "Qué necesito para publicar", text: "Lista de fotos, datos y condiciones para preparar tu alquiler.", href: "/requisitos" },
-  { icon: UserRound, title: "Mi cuenta", text: "Registro, inicio de sesión y acceso para propietarios.", href: "/login" },
+  { icon: UserRound, title: "Mi cuenta", text: "Registro, inicio de sesión y acceso para propietarios.", href: "/cliente" },
   { icon: HousePlus, title: "Publicar una vivienda", text: "Inicia sesión y envía fotos, precio y condiciones para revisión.", href: "/publicar" },
   { icon: MapPin, title: "Buscar y coordinar una visita", text: "Encuentra un alquiler y contacta directamente con su propietario.", href: "/propiedades" },
   { icon: ShieldCheck, title: "Seguridad y reportes", text: "Precauciones para las visitas y cómo reportar una ficha.", href: "/seguridad" },

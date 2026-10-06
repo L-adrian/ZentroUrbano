@@ -284,7 +284,7 @@ function AccountSummary({
           href="/publicar"
           className="inline-flex h-11 w-fit cursor-pointer items-center justify-center gap-2 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white transition hover:bg-[#21352b]"
         >
-          Publicar otra
+          {liveCount ? "Publicar otra" : "Publicar mi vivienda"}
           <ArrowRight className="h-4 w-4" aria-hidden="true" />
         </Link>
       </div>
