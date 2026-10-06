@@ -1206,7 +1206,7 @@ export function searchRentals(
       convertPrice(amount, property.currency, currency, getPropertyExchangeRate(property));
 
     if (hasQuery && !evaluation.matches) return [];
-    if (!zoneMatches(property.zone, zones)) return [];
+    if (!zoneMatches(property, zones)) return [];
     if (types.length && !types.some((type) => (type === "Monoambiente" ? isMonoambiente(property) : property.type === type))) return [];
 
     const monthly = filters.includeExpenses ? getMonthlyCost(property) : property.price;

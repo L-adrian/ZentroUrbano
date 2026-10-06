@@ -68,8 +68,7 @@ import {
   type RentalType,
 } from "@/lib/property-search";
 import type { Property } from "@/lib/properties";
-import { getRentalZones } from "@/lib/rentals";
-import { canonicalZone, getZoneSector, joinZones, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
+import { canonicalZone, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
 
@@ -129,15 +128,21 @@ export function DirectRentalExplorer({
   const optionCounts = useMemo(() => {
     const countWith = (changes: Partial<RentalSearchFilters>) =>
       searchRentals(properties, { ...appliedFilters, ...changes, sort: "" }, displayCurrency, { zoneAverages });
+    // Homes per neighborhood and per zone (a home counts once in its zone and once in its place).
     const byZone = new Map<string, number>();
+    const add = (name: string) => byZone.set(name, (byZone.get(name) ?? 0) + 1);
+    const unplaced = new Set<string>();
     for (const match of countWith({ zone: "" })) {
-      const zone = canonicalZone(match.property.zone);
-      byZone.set(zone, (byZone.get(zone) ?? 0) + 1);
+      const { place, sector } = locateHome(match.property);
+      add(sector ?? otherZonesLabel);
+      if (place) add(place);
+      if (place && !sector) unplaced.add(place);
     }
     const count = (key: "bedrooms" | "bathrooms", options: string[]) =>
       new Map(options.map((option) => [option, countWith({ [key]: option }).length]));
     return {
       byZone,
+      unplaced,
       bedrooms: count("bedrooms", rentalBedroomOptions),
       bathrooms: count("bathrooms", rentalBathroomOptions),
     };
@@ -148,20 +153,21 @@ export function DirectRentalExplorer({
     const groups: ZoneGroup[] = santaCruzSectors.map((sector) => ({
       name: sector.name,
       selectable: true,
-      count: countOf(sector.name) + sector.places.reduce((sum, place) => sum + countOf(place.name), 0),
+      count: countOf(sector.name),
       places: sector.places
         .map((place) => ({ name: place.name, count: countOf(place.name) }))
         .sort((first, second) => second.count - first.count || first.name.localeCompare(second.name, "es")),
     }));
-    const others = Array.from(new Set([...getRentalZones(properties).map(canonicalZone), ...selectedZones]))
-      .filter((name) => getZoneSector(name) === null)
+    // Homes without a map point and with a name outside the list.
+    const known = new Set(santaCruzSectors.flatMap((sector) => [sector.name, ...sector.places.map((place) => place.name)]));
+    const others = Array.from(new Set([...optionCounts.unplaced, ...selectedZones.filter((name) => !known.has(name))]))
       .map((name) => ({ name, count: countOf(name) }))
       .sort((first, second) => first.name.localeCompare(second.name, "es"));
     if (others.length) {
-      groups.push({ name: otherZonesLabel, selectable: false, count: others.reduce((sum, place) => sum + place.count, 0), places: others });
+      groups.push({ name: otherZonesLabel, selectable: false, count: countOf(otherZonesLabel), places: others });
     }
     return groups;
-  }, [optionCounts, properties, selectedZones]);
+  }, [optionCounts, selectedZones]);
   const matches = useMemo(
     () => searchRentals(properties, appliedFilters, displayCurrency, { zoneAverages }),
     [appliedFilters, displayCurrency, properties, zoneAverages],

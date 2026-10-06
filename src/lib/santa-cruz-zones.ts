@@ -1,3 +1,5 @@
+import { distanceKm, isValidCoordinates, type LatLng } from "@/lib/catalog-geo";
+
 // Zones of Santa Cruz de la Sierra, each with the neighborhoods and avenues people search for.
 // Picking a zone ("Zona Norte") picks every place inside it; a place can also be picked alone.
 // Owners type the zone by hand, so the aliases fold their spellings ("Norte", "Urbari") into one.
@@ -84,6 +86,33 @@ export const santaCruzSectors: CitySector[] = [
   },
 ];
 
+// Santa Cruz has no official line between Norte, Sur, Este and Oeste (its official units are the
+// municipal districts), so the zone of a home is the direction it lies in from the main square,
+// the way people use the words: Centro inside the 1st ring, Urubó and Porongo across the Piraí,
+// and otherwise the quarter of the compass (north is 315° to 45°). A known neighborhood the owner
+// typed wins over the point, so "Sirari" is always Zona Norte.
+const mainSquare: LatLng = { lat: -17.7834, lng: -63.1821 };
+const centroRadiusKm = 1.3;
+// The Piraí river runs north-south just west of Las Palmas; Urubó and Porongo are beyond it.
+const piraiRiverLng = -63.218;
+// Points farther than this are not in the city (a wrong pin); they keep the owner's text.
+const cityRadiusKm = 30;
+
+export function sectorFromCoordinates(point: LatLng | null | undefined) {
+  if (!isValidCoordinates(point)) return null;
+  const km = distanceKm(mainSquare, point);
+  if (km > cityRadiusKm) return null;
+  if (point.lng < piraiRiverLng) return "Urubó y Porongo";
+  if (km <= centroRadiusKm) return "Centro";
+  const north = point.lat - mainSquare.lat;
+  const east = (point.lng - mainSquare.lng) * Math.cos((mainSquare.lat * Math.PI) / 180);
+  const bearing = ((Math.atan2(east, north) * 180) / Math.PI + 360) % 360;
+  if (bearing >= 315 || bearing < 45) return "Zona Norte";
+  if (bearing < 135) return "Zona Este";
+  if (bearing < 225) return "Zona Sur";
+  return "Zona Oeste";
+}
+
 // Places the owner typed that are not in the list above fall in this group.
 export const otherZonesLabel = "Otras zonas";
 
@@ -126,6 +155,19 @@ export function getZoneSector(zone: string) {
   return sectorByZone.get(canonicalZone(zone)) ?? null;
 }
 
+function isPlaceName(zone: string) {
+  return sectorByZone.has(zone) && !isSectorName(zone);
+}
+
+// Where a home goes in the filter: a known neighborhood keeps its own name and zone; a bare zone
+// ("Norte") or a name outside the list goes by its map point, and keeps its text as the place.
+export function locateHome(home: { zone: string; coordinates?: LatLng | null }) {
+  const zone = canonicalZone(home.zone);
+  if (isPlaceName(zone)) return { place: zone, sector: sectorByZone.get(zone) ?? null };
+  const sector = sectorFromCoordinates(home.coordinates) ?? sectorByZone.get(zone) ?? null;
+  return { place: isSectorName(zone) ? null : zone || null, sector };
+}
+
 // The filter keeps several zones and places in one string ("Zona Norte|Urbarí").
 export function splitZones(value: string) {
   return Array.from(new Set(value.split(zoneSeparator).map(canonicalZone).filter(Boolean)));
@@ -135,12 +177,11 @@ export function joinZones(zones: string[]) {
   return splitZones(zones.join(zoneSeparator)).join(zoneSeparator);
 }
 
-// A chosen zone covers every place inside it; a chosen place covers only itself.
-export function zoneMatches(propertyZone: string, selected: string[]) {
+// A chosen zone covers every home located in it; a chosen place covers only homes with that name.
+export function zoneMatches(home: { zone: string; coordinates?: LatLng | null }, selected: string[]) {
   if (selected.length === 0) return true;
-  const zone = canonicalZone(propertyZone);
-  const sector = sectorByZone.get(zone);
-  return selected.includes(zone) || (sector !== undefined && selected.includes(sector));
+  const { place, sector } = locateHome(home);
+  return (place !== null && selected.includes(place)) || (sector !== null && selected.includes(sector));
 }
 
 export function formatZoneList(zones: string[]) {
