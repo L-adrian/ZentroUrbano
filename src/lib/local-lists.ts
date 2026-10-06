@@ -10,6 +10,8 @@ export const localListsEventName = "zu-local-lists";
 
 export const savedListingsLimit = 50;
 export const recentListingsLimit = 12;
+// "Vistos recientemente" forgets a home a week after it was last opened, so the list does not grow old.
+export const recentListingsMaxAgeMs = 7 * 24 * 60 * 60 * 1000;
 // A new visit starts after 30 minutes away; "Nuevo" marks homes published after the last moment
 // of the previous visit.
 export const visitGapMs = 30 * 60 * 1000;
@@ -47,12 +49,15 @@ export function parseSavedListings(raw: string | null | undefined): SavedListing
   }).slice(0, savedListingsLimit);
 }
 
-export function parseRecentListings(raw: string | null | undefined): RecentListing[] {
+// With "now", homes opened more than a week before it are left out.
+export function parseRecentListings(raw: string | null | undefined, now?: number): RecentListing[] {
   const seen = new Set<string>();
   return parseArray(raw).flatMap((item) => {
     if (!isRecord(item) || typeof item.slug !== "string" || !slugPattern.test(item.slug) || seen.has(item.slug)) return [];
     seen.add(item.slug);
-    return [{ slug: item.slug, viewedAt: typeof item.viewedAt === "number" && Number.isFinite(item.viewedAt) ? item.viewedAt : 0 }];
+    const viewedAt = typeof item.viewedAt === "number" && Number.isFinite(item.viewedAt) ? item.viewedAt : 0;
+    if (now !== undefined && viewedAt < now - recentListingsMaxAgeMs) return [];
+    return [{ slug: item.slug, viewedAt }];
   }).slice(0, recentListingsLimit);
 }
 
@@ -64,7 +69,8 @@ export function toggleSavedListing(list: SavedListing[], listing: { slug: string
 
 export function addRecentListing(list: RecentListing[], slug: string, now: number) {
   if (!slugPattern.test(slug)) return list;
-  return [{ slug, viewedAt: now }, ...list.filter((item) => item.slug !== slug)].slice(0, recentListingsLimit);
+  return [{ slug, viewedAt: now }, ...list.filter((item) => item.slug !== slug && item.viewedAt >= now - recentListingsMaxAgeMs)]
+    .slice(0, recentListingsLimit);
 }
 
 export function parseVisitState(raw: string | null | undefined): VisitState | null {

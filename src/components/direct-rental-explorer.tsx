@@ -68,7 +68,7 @@ import {
   type RentalType,
 } from "@/lib/property-search";
 import type { Property } from "@/lib/properties";
-import { canonicalZone, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
+import { canonicalZone, getZoneSector, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
 
@@ -132,17 +132,25 @@ export function DirectRentalExplorer({
     const byZone = new Map<string, number>();
     const add = (name: string) => byZone.set(name, (byZone.get(name) ?? 0) + 1);
     const unplaced = new Set<string>();
+    // Names the owner typed that are not in the list, shown inside the zone their map point is in,
+    // and homes that only say the zone ("Norte"), so a zone's number always adds up.
+    const extraPlaces = new Map<string, Set<string>>();
+    const unnamed = new Map<string, number>();
     for (const match of countWith({ zone: "" })) {
       const { place, sector } = locateHome(match.property);
       add(sector ?? otherZonesLabel);
       if (place) add(place);
       if (place && !sector) unplaced.add(place);
+      if (place && sector && getZoneSector(place) === null) extraPlaces.set(sector, (extraPlaces.get(sector) ?? new Set()).add(place));
+      if (!place && sector) unnamed.set(sector, (unnamed.get(sector) ?? 0) + 1);
     }
     const count = (key: "bedrooms" | "bathrooms", options: string[]) =>
       new Map(options.map((option) => [option, countWith({ [key]: option }).length]));
     return {
       byZone,
       unplaced,
+      extraPlaces,
+      unnamed,
       bedrooms: count("bedrooms", rentalBedroomOptions),
       bathrooms: count("bathrooms", rentalBathroomOptions),
     };
@@ -154,17 +162,18 @@ export function DirectRentalExplorer({
       name: sector.name,
       selectable: true,
       count: countOf(sector.name),
-      places: sector.places
-        .map((place) => ({ name: place.name, count: countOf(place.name) }))
+      unnamed: optionCounts.unnamed.get(sector.name) ?? 0,
+      places: [...sector.places.map((place) => place.name), ...(optionCounts.extraPlaces.get(sector.name) ?? [])]
+        .map((name) => ({ name, count: countOf(name) }))
         .sort((first, second) => second.count - first.count || first.name.localeCompare(second.name, "es")),
     }));
     // Homes without a map point and with a name outside the list.
-    const known = new Set(santaCruzSectors.flatMap((sector) => [sector.name, ...sector.places.map((place) => place.name)]));
+    const known = new Set(groups.flatMap((group) => [group.name, ...group.places.map((place) => place.name)]));
     const others = Array.from(new Set([...optionCounts.unplaced, ...selectedZones.filter((name) => !known.has(name))]))
       .map((name) => ({ name, count: countOf(name) }))
       .sort((first, second) => first.name.localeCompare(second.name, "es"));
     if (others.length) {
-      groups.push({ name: otherZonesLabel, selectable: false, count: countOf(otherZonesLabel), places: others });
+      groups.push({ name: otherZonesLabel, selectable: false, count: countOf(otherZonesLabel), unnamed: 0, places: others });
     }
     return groups;
   }, [optionCounts, selectedZones]);
@@ -173,6 +182,7 @@ export function DirectRentalExplorer({
     [appliedFilters, displayCurrency, properties, zoneAverages],
   );
   const results = useMemo(() => matches.map(({ property }) => property), [matches]);
+  const hasMap = results.length > 0;
   const mainMatches = matches.filter((match) => match.pending.length === 0);
   const pendingMatches = matches.filter((match) => match.pending.length > 0);
   const onlyPetsPending = pendingMatches.every((match) => match.pending.every((reason) => reason === "pets"));
@@ -317,13 +327,13 @@ export function DirectRentalExplorer({
   function toggleZone(zone: string, checked: boolean) {
     setFilters((current) => {
       const selected = splitZones(current.zone);
-      const sector = santaCruzSectors.find((item) => item.name === zone);
+      const sector = zoneGroups.find((item) => item.selectable && item.name === zone);
       if (sector) {
         const inside = new Set([sector.name, ...sector.places.map((place) => place.name)]);
         const rest = selected.filter((item) => !inside.has(item));
         return { ...current, zone: joinZones(checked ? [...rest, sector.name] : rest) };
       }
-      const parent = santaCruzSectors.find((item) => item.places.some((place) => place.name === zone));
+      const parent = zoneGroups.find((item) => item.selectable && item.places.some((place) => place.name === zone));
       if (!checked && parent && selected.includes(parent.name)) {
         const siblings = parent.places.map((place) => place.name).filter((name) => name !== zone);
         return { ...current, zone: joinZones([...selected.filter((item) => item !== parent.name), ...siblings]) };
@@ -681,9 +691,13 @@ export function DirectRentalExplorer({
           <div
             data-results
             aria-busy={filters.query !== deferredQuery}
-            className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid${view === "split" ? " is-split" : ""}`}
+            className={`${filters.query !== deferredQuery ? "results-pending" : ""} catalog-results-grid${view === "split" && hasMap ? " is-split" : ""}`}
           >
-            <div className={view === "map" || (view === "split" && mapLayout) ? (view === "split" ? "hidden lg:block" : "hidden") : "block"}>
+            {/* The key restarts a short fade each time the search changes, instead of a sudden swap. */}
+            <div
+              key={serializedFilters}
+              className={`zu-fade ${!hasMap ? "block" : view === "map" || (view === "split" && mapLayout) ? (view === "split" ? "hidden lg:block" : "hidden") : "block"}`}
+            >
               {results.length > 0 ? (
                 <>
                   {mainMatches.length > 0 ? (
@@ -774,8 +788,9 @@ export function DirectRentalExplorer({
               )}
             </div>
 
+            {/* With no results the map closes; the list column shows what to change. */}
+            {hasMap ? (
             <div className={`${view === "list" ? "hidden" : view === "split" && !mapLayout ? "hidden lg:block" : "block"} catalog-map-column`}>
-              {results.length > 0 ? (
                 <PropertyMap
                   properties={results}
                   sectionClassName="h-full bg-white"
@@ -786,12 +801,8 @@ export function DirectRentalExplorer({
                   loadOnView
                   preserveView={Boolean(filters.area)}
                 />
-              ) : (
-                <div className="flex min-h-[55svh] items-center justify-center border border-neutral-300 bg-neutral-50 p-6 text-center text-sm text-neutral-500">
-                  El mapa se actualizará cuando existan resultados.
-                </div>
-              )}
             </div>
+            ) : null}
           </div>
 
           {nearby.length > 0 ? (
@@ -977,7 +988,14 @@ function RoomPicker({
   );
 }
 
-type ZoneGroup = { name: string; selectable: boolean; count: number; places: Array<{ name: string; count: number }> };
+type ZoneGroup = {
+  name: string;
+  selectable: boolean;
+  count: number;
+  // Homes in the zone whose owner gave no neighborhood.
+  unnamed: number;
+  places: Array<{ name: string; count: number }>;
+};
 
 // Zona Norte, Sur, Este, Oeste…: ticking a zone picks all of it; opening it shows its places.
 function ZonePicker({
@@ -1069,6 +1087,11 @@ function ZonePicker({
                       <span className="catalog-check-count">{place.count}</span>
                     </label>
                   ))}
+                  {group.unnamed > 0 ? (
+                    <p className="catalog-zone-unnamed">
+                      {group.unnamed} {group.unnamed === 1 ? "alquiler" : "alquileres"} sin barrio indicado
+                    </p>
+                  ) : null}
                 </div>
               ) : null}
             </div>

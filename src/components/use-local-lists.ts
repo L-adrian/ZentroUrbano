@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import {
   addRecentListing,
   getPreviousVisit,
@@ -29,6 +29,12 @@ export function useSavedListings() {
 
 export function useRecentListings() {
   const raw = useStoredString(recentListingsKey);
+  // Homes opened more than a week ago are removed from the phone once the list is shown.
+  useEffect(() => {
+    if (!raw) return;
+    const fresh = JSON.stringify(parseRecentListings(raw, Date.now()));
+    if (fresh !== JSON.stringify(parseRecentListings(raw))) writeLocalList(recentListingsKey, fresh);
+  }, [raw]);
   return useMemo(() => parseRecentListings(raw), [raw]);
 }
 

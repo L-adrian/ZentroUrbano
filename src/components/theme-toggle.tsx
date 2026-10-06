@@ -28,6 +28,14 @@ function subscribe(callback: () => void) {
   };
 }
 
+// Light and dark cross-fade instead of switching at once, where the browser can (View Transitions).
+function switchTheme(dark: boolean) {
+  const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (doc.startViewTransition && !reduceMotion) doc.startViewTransition(() => applyTheme(dark));
+  else applyTheme(dark);
+}
+
 export function ThemeToggle() {
   const dark = useSyncExternalStore(subscribe, () => document.documentElement.dataset.theme === "dark", () => false);
   const label = dark ? "Activar modo claro" : "Activar modo nocturno";
@@ -35,7 +43,7 @@ export function ThemeToggle() {
     <button type="button" className="zu-icon-button" aria-label={label} title={label}
       onClick={() => {
         try { localStorage.setItem("zu-theme", dark ? "light" : "dark"); } catch { /* Keep the choice for this page. */ }
-        applyTheme(!dark);
+        switchTheme(!dark);
       }}>
       {dark ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
     </button>
