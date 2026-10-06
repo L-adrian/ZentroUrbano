@@ -64,11 +64,11 @@ export default function TermsPage() {
             </article>
           ))}
 
-          <div className="rounded-[28px] bg-neutral-950 p-6 text-white">
+          <div className="rounded-[28px] p-6">
             <h2 className="text-xl font-semibold tracking-tight">Contacto</h2>
-            <p className="mt-3 text-sm leading-7 text-white/72">
+            <p className="mt-3 text-sm leading-7">
               Para consultas sobre estos términos, escribe desde la página de{" "}
-              <Link href="/contacto" className="font-semibold text-white">
+              <Link href="/contacto" className="font-semibold">
                 contacto
               </Link>
               .
