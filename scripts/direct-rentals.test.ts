@@ -15,6 +15,7 @@ import {
   withoutRentalFilter,
   type RentalSearchFilters,
 } from "../src/lib/property-search";
+import { canonicalZone } from "../src/lib/santa-cruz-zones";
 import { getDirectRentals, isDirectRental, isRentalPropertyType } from "../src/lib/rentals";
 import { getOperationSeoRoutes, getDepartmentSeoRoutes } from "../src/lib/seo-routes";
 import { getActiveSponsoredAds, getSponsoredAdById } from "../src/lib/sponsored-ads";
@@ -147,7 +148,8 @@ test("an empty search can tell how many homes each removed filter would bring ba
   assert.deepEqual(counts, { type: 1, maxPrice: 0, garage: 1 });
   assert.equal(withoutRentalFilter(filters({ maxPrice: "300", priceCurrency: "USD" }), "maxPrice").priceCurrency, null);
   assert.equal(describeRentalSearch(search, "BOB").join(", "), "casa, hasta Bs 4.000 por mes, con parqueo");
-  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol", pets: true, bedrooms: "2" }), "BOB").join(", "), "vivienda en Equipetrol, 2 dormitorios o más, que acepte mascotas");
+  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol", pets: true, bedrooms: "2" }), "BOB").join(", "), "vivienda en Equipetrol, 2 dormitorios, que acepte mascotas");
+  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol|Sirari", bedrooms: "4" }), "BOB").join(", "), "vivienda en Equipetrol o Sirari, 4 o más dormitorios");
 });
 
 test("searches for anticrético, sales or shared rooms are recognized as outside the catalog", () => {
@@ -160,4 +162,30 @@ test("searches for anticrético, sales or shared rooms are recognized as outside
   for (const query of ["casa 3 habitaciones", "departamento con una habitación", "monoambiente", "casa con cuarto de servicio", "Equipetrol", ""]) {
     assert.equal(getUnsupportedSearchIntent(query), null, query);
   }
+});
+
+test("bedroom and bathroom filters are exact, and only the last option means 'or more'", () => {
+  const home = (slug: string, bedrooms: number, bathrooms: number) => ({ ...catalog[0], slug, bedrooms, bathrooms });
+  const homes = [home("uno", 1, 1), home("dos", 2, 1), home("tres", 3, 2), home("cuatro", 4, 3), home("cinco", 5, 4)];
+  assert.deepEqual(slugs(homes, { bedrooms: "1" }), ["uno"]);
+  assert.deepEqual(slugs(homes, { bedrooms: "2" }), ["dos"]);
+  assert.deepEqual(slugs(homes, { bedrooms: "4" }).sort(), ["cinco", "cuatro"]);
+  assert.deepEqual(slugs(homes, { bathrooms: "1" }).sort(), ["dos", "uno"]);
+  assert.deepEqual(slugs(homes, { bathrooms: "3" }).sort(), ["cinco", "cuatro"]);
+  assert.deepEqual(slugs(homes, { query: "1 dormitorio" }), ["uno"]);
+});
+
+test("zones fold owners' spellings and several can be chosen at once", () => {
+  assert.equal(canonicalZone("Norte"), "Zona Norte");
+  assert.equal(canonicalZone(" urbari "), "Urbarí");
+  assert.equal(canonicalZone("Barrio Inventado"), "Barrio Inventado");
+  const homes = [
+    { ...catalog[0], slug: "a", zone: "Norte" },
+    { ...catalog[0], slug: "b", zone: "Urbari" },
+    { ...catalog[0], slug: "c", zone: "Equipetrol" },
+  ];
+  assert.deepEqual(slugs(homes, { zone: "Zona Norte|Urbarí" }).sort(), ["a", "b"]);
+  const params = buildRentalSearchParams(filters({ zone: "Zona Norte|Urbarí" }), "BOB");
+  assert.deepEqual(params.getAll("zone"), ["Zona Norte", "Urbarí"]);
+  assert.equal(readRentalSearchParams(params).zone, "Zona Norte|Urbarí");
 });

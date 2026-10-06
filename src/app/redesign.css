@@ -673,6 +673,26 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .catalog-check input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--brand); cursor: pointer; }
 .catalog-check-icon { display: inline-flex; color: var(--muted); }
 .catalog-check-icon svg { width: 16px; height: 16px; }
+.catalog-check-count { margin-left: auto; min-width: 24px; padding: 1px 7px; border-radius: 999px; background: color-mix(in srgb, var(--foreground) 7%, transparent); color: var(--muted); font-size: 12px; font-weight: 600; text-align: center; }
+.catalog-check.is-empty { color: var(--muted); }
+.catalog-zones { display: grid; gap: 8px; }
+.catalog-zones-selected { display: flex; flex-wrap: wrap; gap: 6px; }
+.catalog-zones-selected .catalog-chip { min-height: 32px; font-size: 13px; }
+.catalog-zones-clear { min-height: 32px; padding: 0 4px; color: var(--brand); font-size: 13px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.catalog-zones-search { position: relative; display: block; }
+.catalog-zones-search svg { position: absolute; left: 10px; top: 50%; width: 15px; height: 15px; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.catalog-zones-search input { width: 100%; height: 40px; padding: 0 10px 0 32px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--foreground); font-size: 14px; outline: none; }
+.catalog-zones-search input:focus { border-color: var(--brand); }
+.catalog-zones-list { display: grid; max-height: 236px; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; }
+.catalog-zones-empty { padding: 8px 0; color: var(--muted); font-size: 13px; }
+.catalog-rooms { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.catalog-rooms button { min-height: 40px; padding: 0 4px; border-left: 1px solid var(--line); background: var(--surface); color: var(--foreground); font-size: 14px; font-weight: 600; cursor: pointer; }
+.catalog-rooms button:first-child { border-left: 0; }
+.catalog-rooms button.is-selected { background: var(--brand); color: #fff; }
+.catalog-rooms button:disabled { color: var(--muted); opacity: .45; cursor: not-allowed; }
+.catalog-price-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.catalog-price-presets button { min-height: 32px; padding: 0 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--foreground); font-size: 13px; font-weight: 600; cursor: pointer; }
+.catalog-price-presets button.is-selected { border-color: var(--brand); background: var(--brand-soft); }
 .catalog-sidebar .catalog-advanced-note { margin-top: 14px; font-size: 12px; }
 .catalog-sidebar-foot, .catalog-filters-backdrop { display: none; }
 @media (min-width: 1024px) {
