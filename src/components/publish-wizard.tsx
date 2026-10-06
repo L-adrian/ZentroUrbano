@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import NextImage from "next/image";
 import Link from "next/link";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type { ChangeEvent, ReactNode } from "react";
 import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
 import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
@@ -181,6 +181,8 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
   // A form opened from Mi cuenta has its own draft, so it never overwrites the regular one.
   const draftKey = `zu-publication-draft-v2:${account.id}${prefill ? `:${prefill.id}` : ""}`;
   const [step, setStep] = useState(0);
+  // The furthest step the owner has opened, so they can jump back to it after fixing an earlier one.
+  const [furthestStep, setFurthestStep] = useState(0);
   const [form, setForm] = useState<PropertyForm>(() => ({ ...initialForm, ownerName: account.name, phone: account.phone }));
   const [sessionExpired, setSessionExpired] = useState(false);
   const [photos, setPhotos] = useState<UploadPhoto[]>([]);
@@ -304,6 +306,15 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
 
   const quality = useMemo(() => calculateQuality(form, photos), [form, photos]);
   const canContinue = canAdvanceStep(step, form, photos);
+  // A step can be opened when every step before it is complete; nothing typed is lost on the way.
+  const firstIncompleteStep = [0, 1, 2].find((index) => !canAdvanceStep(index, form, photos)) ?? steps.length - 1;
+  const canOpenStep = (index: number) => index <= firstIncompleteStep;
+
+  function goToStep(index: number) {
+    if (index === step || status === "sending" || !canOpenStep(index)) return;
+    setStep(index);
+    setFurthestStep((current) => Math.max(current, index));
+  }
   const stepErrors = step === 1 || step === 2 ? wizardStepErrors(step, form) : {};
 
   function updateField<TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) {
@@ -424,13 +435,15 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
     setPhotos([]);
     setForm({ ...initialForm, ownerName: account.name, phone: account.phone });
     setDraftSaved(false);
+    setAcceptedTerms(false);
     setStep(0);
+    setFurthestStep(0);
   }
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!acceptedTerms || status === "sending") {
+  // Sent only by the "Enviar" button on the last step. The form never submits on its own (Enter
+  // in a field, or a button that changes under the pointer), so nothing is sent by accident.
+  async function sendRequest() {
+    if (step !== steps.length - 1 || !acceptedTerms || status === "sending") {
       return;
     }
     const invalidStep = [0, 1, 2].find(index => !canAdvanceStep(index, form, photos));
@@ -527,26 +540,25 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
   }
 
   return (
-    <form ref={wizardRef} tabIndex={-1} onSubmit={submit} className="publish-wizard grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
+    <form ref={wizardRef} tabIndex={-1} onSubmit={(event) => event.preventDefault()} noValidate className="publish-wizard grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-start">
       <div className="border border-neutral-300 bg-white">
         <div className="border-b border-neutral-200 px-4 py-4 sm:px-6">
-          <ol className="grid grid-cols-4 gap-2" aria-label="Progreso de publicación">
+          <ol className="publish-steps" aria-label="Pasos de la publicación">
             {steps.map((label, index) => {
-              const Icon = stepIcons[index];
+              const Icon = index < step || (index < steps.length - 1 && index < furthestStep && canAdvanceStep(index, form, photos)) ? Check : stepIcons[index];
+              const open = canOpenStep(index);
               return (
               <li key={label}>
                 <button
                   type="button"
-                  onClick={() => index <= step && setStep(index)}
-                  disabled={index > step}
+                  onClick={() => goToStep(index)}
+                  disabled={!open || status === "sending"}
                   aria-current={index === step ? "step" : undefined}
-                  className={`w-full border-t-2 pt-2 text-left text-xs font-semibold ${
-                    index <= step
-                      ? "cursor-pointer border-[#176b4d] text-neutral-950"
-                      : "cursor-default border-neutral-200 text-neutral-400"
-                  }`}
+                  data-state={index === step ? "current" : open ? "open" : "locked"}
+                  title={open ? undefined : "Completa los pasos anteriores"}
                 >
-                  <Icon size={17} aria-hidden="true" />{label}
+                  <Icon size={16} aria-hidden="true" />
+                  <span>{label}</span>
                 </button>
               </li>
             ); })}
@@ -569,12 +581,14 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
             />
           ) : null}
 
+
           {step === 1 ? <InformationStep form={form} updateField={updateField} /> : null}
           {step === 2 ? <PriceStep form={form} updateField={updateField} errors={stepErrors} /> : null}
           {step === 3 ? (
             <ConfirmationStep
               form={form}
-              photosCount={photos.length}
+              photos={photos}
+              onEdit={goToStep}
               acceptedTerms={acceptedTerms}
               onAcceptedTermsChange={setAcceptedTerms}
             />
@@ -601,10 +615,11 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
             </div>
           ) : null}
 
-          <div className="mt-8 flex items-center justify-between border-t border-neutral-200 pt-5">
+          <div className="publish-nav">
             <button
+              key="back"
               type="button"
-              onClick={() => setStep((current) => Math.max(0, current - 1))}
+              onClick={() => goToStep(step - 1)}
               disabled={step === 0 || status === "sending"}
               className="inline-flex h-11 cursor-pointer items-center gap-2 px-2 text-sm font-semibold text-neutral-700 disabled:cursor-default disabled:opacity-0"
             >
@@ -612,10 +627,23 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
               Volver
             </button>
 
+            {step < steps.length - 1 && furthestStep === steps.length - 1 && step < steps.length - 2 ? (
+              <button
+                key="review"
+                type="button"
+                onClick={() => goToStep(steps.length - 1)}
+                disabled={!canOpenStep(steps.length - 1)}
+                className="publish-nav-review"
+              >
+                Ir a la revisión
+              </button>
+            ) : null}
+
             {step < steps.length - 1 ? (
               <button
+                key="next"
                 type="button"
-                onClick={() => setStep((current) => Math.min(steps.length - 1, current + 1))}
+                onClick={() => goToStep(step + 1)}
                 disabled={!canContinue}
                 className="inline-flex h-11 cursor-pointer items-center gap-2 bg-neutral-950 px-5 text-sm font-semibold text-white hover:bg-[#176b4d] disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
@@ -624,7 +652,9 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
               </button>
             ) : (
               <button
-                type="submit"
+                key="send"
+                type="button"
+                onClick={() => void sendRequest()}
                 disabled={!acceptedTerms || status === "sending"}
                 className="inline-flex h-11 cursor-pointer items-center gap-2 bg-[#176b4d] px-5 text-sm font-semibold text-white hover:bg-[#10533b] disabled:cursor-not-allowed disabled:bg-neutral-300"
               >
@@ -943,41 +973,89 @@ function PriceStep({
 
 function ConfirmationStep({
   form,
-  photosCount,
+  photos,
+  onEdit,
   acceptedTerms,
   onAcceptedTermsChange,
 }: {
   form: PropertyForm;
-  photosCount: number;
+  photos: UploadPhoto[];
+  onEdit: (step: number) => void;
   acceptedTerms: boolean;
   onAcceptedTermsChange: (value: boolean) => void;
 }) {
   const symbol = form.currency === "BOB" ? "Bs" : "$us";
   const beforeVisit = beforeVisitRows(parseBeforeVisitInput(form).values) ?? [];
+  const extras = ([["furnished", "Amoblado"], ["security", "Seguridad"], ["pool", "Piscina"], ["patio", "Patio o balcón"], ["grill", "Churrasquera"], ["elevator", "Ascensor"]] as const)
+    .filter(([key]) => form[key]).map(([, label]) => label);
   return (
     <section>
-      <StepHeading title="Revisa antes de enviar" copy="Una persona del equipo revisa fotos, precio y datos antes de publicar. Por ahora no verificamos identidad." />
-      <dl className="mt-6 divide-y divide-neutral-200 border-y border-neutral-200">
-        <SummaryRow label="Contrato" value="Alquiler directo con el propietario" />
-        <SummaryRow label="Propiedad" value={form.title || "Sin título"} />
-        <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
-        <SummaryRow label="Alquiler" value={form.price ? `${symbol} ${form.price}/mes` : "Sin precio"} />
-        {form.currency === "USD" && <SummaryRow label="Tipo de cambio" value={`1 USD = ${form.exchangeRate} Bs`} />}
-        <SummaryRow label="Expensas" value={form.expensesMode === "separate" ? `${symbol} ${form.commonExpenses}/mes` : expensesLabels[form.expensesMode]} />
-        <SummaryRow label="Garantía" value={form.guarantee === "Otro monto" ? `${symbol} ${form.guaranteeAmount}` : form.guarantee || "No indicada"} />
-        {beforeVisit.map((row) => <SummaryRow key={row.label} label={row.label} value={row.value ?? "Sin indicar"} />)}
-        <SummaryRow label="Mascotas" value={petsLabels[form.petsPolicy]} />
-        <SummaryRow label="Fotos" value={`${photosCount} cargadas`} />
-        <SummaryRow label="Contacto" value={form.phone || "Sin WhatsApp"} />
-      </dl>
-      <CostSummary form={form} />
+      <StepHeading title="Revisa antes de enviar" copy="Así llega tu anuncio al equipo. Una persona revisa fotos, precio y datos antes de publicarlo. Por ahora no verificamos identidad." />
+
+      <ReviewSection title={`Fotos (${photos.length})`} onEdit={() => onEdit(0)}>
+        <ul className="review-photos">
+          {photos.map((photo, index) => (
+            <li key={photo.id}>
+              <div className="review-photo-frame">
+                <NextImage src={photo.url} alt={`Foto ${index + 1}: ${photoCategoryLabel(photo.category)}`} fill unoptimized sizes="160px" className="object-cover" />
+                {index === 0 ? <span>Portada</span> : null}
+              </div>
+              <p>{photoCategoryLabel(photo.category)}</p>
+            </li>
+          ))}
+        </ul>
+      </ReviewSection>
+
+      <ReviewSection title="La vivienda" onEdit={() => onEdit(1)}>
+        <dl className="review-summary">
+          <SummaryRow label="Título" value={form.title || "Sin título"} />
+          <SummaryRow label="Tipo" value={form.type} />
+          <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
+          <SummaryRow label="Ambientes" value={`${form.bedrooms || 0} dorm. · ${form.bathrooms || "?"} baños · ${form.garage || 0} parqueos`} />
+          <SummaryRow label="Superficie" value={form.area ? `${form.area} m²` : "Sin indicar"} />
+          <SummaryRow label="Mascotas" value={petsLabels[form.petsPolicy]} />
+          <SummaryRow label="Comodidades" value={extras.join(", ") || "Ninguna marcada"} />
+          {form.description.trim() ? <SummaryRow label="Descripción" value={form.description.trim()} /> : null}
+        </dl>
+      </ReviewSection>
+
+      <ReviewSection title="Precio y contacto" onEdit={() => onEdit(2)}>
+        <dl className="review-summary">
+          <SummaryRow label="Contrato" value="Alquiler directo con el propietario" />
+          <SummaryRow label="Alquiler" value={form.price ? `${symbol} ${form.price}/mes` : "Sin precio"} />
+          {form.currency === "USD" && <SummaryRow label="Tipo de cambio" value={`1 USD = ${form.exchangeRate} Bs`} />}
+          <SummaryRow label="Expensas" value={form.expensesMode === "separate" ? `${symbol} ${form.commonExpenses}/mes` : expensesLabels[form.expensesMode]} />
+          <SummaryRow label="Garantía" value={form.guarantee === "Otro monto" ? `${symbol} ${form.guaranteeAmount}` : form.guarantee || "No indicada"} />
+          {beforeVisit.map((row) => <SummaryRow key={row.label} label={row.label} value={row.value ?? "Sin indicar"} />)}
+          <SummaryRow label="Propietario" value={form.ownerName || "Sin nombre"} />
+          <SummaryRow label="WhatsApp" value={form.phone || "Sin WhatsApp"} />
+        </dl>
+        <CostSummary form={form} />
+      </ReviewSection>
+
       <label className="mt-6 flex cursor-pointer items-start gap-3 border border-neutral-300 p-4">
-        <input type="checkbox" checked={acceptedTerms} onChange={(event) => onAcceptedTermsChange(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[#176b4d]" />
+        <input type="checkbox" checked={acceptedTerms} onChange={(event) => onAcceptedTermsChange(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#176b4d]" />
         <span className="text-sm leading-6 text-neutral-700">
           Confirmo que soy propietario, que el contrato de alquiler será directo conmigo y que no cobro comisión de intermediación. La información es correcta.
         </span>
       </label>
     </section>
+  );
+}
+
+function photoCategoryLabel(category: PhotoCategory) {
+  return photoCategories.find((item) => item.value === category)?.label ?? "Sin clasificar";
+}
+
+function ReviewSection({ title, onEdit, children }: { title: string; onEdit: () => void; children: ReactNode }) {
+  return (
+    <div className="review-section">
+      <div className="review-section-heading">
+        <h3>{title}</h3>
+        <button type="button" onClick={onEdit}>Editar</button>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -1022,8 +1100,8 @@ function StepHeading({ title, copy }: { title: string; copy: string }) {
 
 function Field({ label, icon, children, className = "" }: { label: string; icon?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <label className={`grid gap-1.5 ${className}`}>
-      <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-800">
+    <label className={`grid min-w-0 content-start gap-1.5 ${className}`}>
+      <span className="inline-flex min-h-5 items-center gap-1.5 text-sm font-semibold leading-5 text-neutral-800">
         {icon ? <span className="text-neutral-400" aria-hidden="true">{icon}</span> : null}
         {label}
       </span>
@@ -1043,9 +1121,9 @@ function SimpleCheckbox({ checked, onChange, label }: { checked: boolean; onChan
 
 function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="grid grid-cols-[110px_1fr] gap-4 py-3 text-sm">
-      <dt className="font-medium text-neutral-500">{label}</dt>
-      <dd className="font-semibold text-neutral-900">{value}</dd>
+    <div className="review-summary-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
