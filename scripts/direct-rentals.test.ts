@@ -184,7 +184,10 @@ test("zones fold owners' spellings and several can be chosen at once", () => {
     { ...catalog[0], slug: "b", zone: "Urbari" },
     { ...catalog[0], slug: "c", zone: "Equipetrol" },
   ];
-  assert.deepEqual(slugs(homes, { zone: "Zona Norte|Urbarí" }).sort(), ["a", "b"]);
+  // Equipetrol is inside Zona Norte, so picking the zone brings it too; a place alone does not.
+  assert.deepEqual(slugs(homes, { zone: "Zona Norte|Urbarí" }).sort(), ["a", "b", "c"]);
+  assert.deepEqual(slugs(homes, { zone: "Equipetrol" }), ["c"]);
+  assert.deepEqual(slugs(homes, { zone: "Zona Oeste" }), ["b"]);
   const params = buildRentalSearchParams(filters({ zone: "Zona Norte|Urbarí" }), "BOB");
   assert.deepEqual(params.getAll("zone"), ["Zona Norte", "Urbarí"]);
   assert.equal(readRentalSearchParams(params).zone, "Zona Norte|Urbarí");
