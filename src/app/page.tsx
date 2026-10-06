@@ -52,7 +52,7 @@ export default async function HomePage() {
     <section className="zu-container rental-catalog">
       <nav className="rental-categories" aria-label="Tipos de alquiler">{categories.map(({label,href,icon: Icon},index) => <Link href={href} key={label} className={index === 0 ? "is-active" : ""}><Icon size={22} strokeWidth={1.6} /><span>{label}</span></Link>)}</nav>
       <RecentlyViewed properties={toRentalSummaries(rentals)} />
-      <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length === 1 ? "1 vivienda publicada" : `${rentals.length} viviendas publicadas`} · Contacto directo con el propietario</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
+      <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length === 1 ? "1 vivienda publicada" : `${rentals.length} viviendas publicadas`}</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
       {rentals.length ? <div className="rental-grid">{rentals.slice(0, homeListingLimit).map((property, index) => <PropertyCard key={property.slug} property={property} compact eagerImage={index < 2} />)}</div> : <div className="zu-empty"><Home size={32} /><h2>Pronto, nuevos alquileres</h2><p>Las nuevas viviendas aparecerán aquí.</p><Link href="/publicar" className="zu-button zu-button-primary">Publicar mi vivienda</Link></div>}
       {rentals.length > 0 && <div className="catalog-more"><Link href="/propiedades" className="zu-button zu-button-secondary">{rentals.length > homeListingLimit ? `Ver los ${rentals.length} alquileres` : "Buscar con filtros"} <ArrowRight size={17} /></Link></div>}
     </section>

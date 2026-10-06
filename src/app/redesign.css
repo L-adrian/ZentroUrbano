@@ -11,6 +11,7 @@
   --brand: #087c65;
   --brand-hover: #05624f;
   --brand-surface: #f0f7f4;
+  --footer-bg: #f3f6f4;
   --brand-soft: #e5f4ec;
   --brand-deep: #174a3d;
   --brand-ink: #102f27;
@@ -30,6 +31,7 @@
   --brand-hover: #69d4b1;
   --brand-soft: #213d32;
   --brand-surface: #1a2721;
+  --footer-bg: #0f1312;
   --brand-positive: #43c49b;
   --color-neutral-50: #191f1c;
   --color-neutral-100: #242d28;
@@ -172,7 +174,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .owner-band { border-block: 1px solid var(--line); background: var(--brand-surface); }
 .owner-band > div { display: flex; align-items: center; gap: 20px; padding-block: 30px; }
 .owner-band h2 { font-size: 21px; font-weight: 650; }.owner-band p { margin-top: 5px; font-size: 13px; color: var(--muted); }.owner-band .zu-button { margin-left: auto; }.owner-band-icon { color: var(--brand); }
-.zu-footer { background: var(--surface); }
+/* The footer sits at the bottom of short pages and has its own tone, so it never blends with the page. */
+.zu-footer { margin-top: auto; background: var(--footer-bg); border-top: 1px solid var(--line); }
 .footer-top { padding-block: 36px; display: flex; justify-content: space-between; gap: 24px; }
 .footer-top p { font-size: 12px; color: var(--muted); margin-top: 13px; }
 .footer-location { display: flex; gap: 5px; align-items: center; font-size: 11px; color: var(--muted); margin-top: 10px; }
@@ -981,3 +984,12 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .admin-carousel-thumbs button { position: relative; flex: none; width: 88px; aspect-ratio: 4 / 3; overflow: hidden; border-radius: 4px; border: 2px solid transparent; opacity: .7; cursor: pointer; }
 .admin-carousel-thumbs button[aria-current="true"] { border-color: var(--brand); opacity: 1; }
 .admin-carousel-thumbs button:hover { opacity: 1; }
+
+/* Phones: less on screen at once. The "Publicita aquí" box no longer floats over the listings,
+   photos are shorter so more of each card fits, and repeated lines are left out. */
+@media (max-width: 768px) {
+  .push-ad { display: none; }
+  .rental-card-image { aspect-ratio: 16/10; }
+  .rental-owner-label:not(:has(.rental-views)) { display: none; }
+  .welcome-rentals { display: none; }
+}

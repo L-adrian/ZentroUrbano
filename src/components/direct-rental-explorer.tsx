@@ -415,7 +415,7 @@ export function DirectRentalExplorer({
       ? onlyPetsPending
         ? `${mainMatches.length} ${mainMatches.length === 1 ? "acepta" : "aceptan"} mascotas · ${pendingMatches.length} a consultar`
         : `${mainMatches.length} con todo lo que pides · ${pendingMatches.length} ${pendingMatches.length === 1 ? "pendiente" : "pendientes"} de consulta`
-      : "Contacto directo con el propietario";
+      : "";
   const mapLayout = layout === "map";
 
   return (
@@ -664,7 +664,7 @@ export function DirectRentalExplorer({
             onChange={(value) => updateFilter("sort", value)}
           />
 
-          <p className="mt-1 text-sm text-neutral-500">{subline}</p>
+          {subline ? <p className="mt-1 text-sm text-neutral-500">{subline}</p> : null}
           <p id="rental-price-hint" className="mt-1 text-sm" aria-live="polite">
             {unreadablePrice ? (
               <span className="text-[#a12d1c] dark:text-[#ff9c8a]">No entendimos “{shorten(unreadablePrice, 24)}”. Escribe solo el monto, por ejemplo 3.000.</span>
