@@ -4,6 +4,7 @@ import {
   ArrowDownUp,
   Car,
   Check,
+  ChevronDown,
   Info,
   Columns2,
   List,
@@ -50,6 +51,7 @@ import {
   readRentalSearchParams,
   rentalBathroomOptions,
   rentalBedroomOptions,
+  roomOptionLabel,
   rentalSearchParamKeys,
   rentalSortOptions,
   rentalTypeOptions,
@@ -66,7 +68,7 @@ import {
   type RentalType,
 } from "@/lib/property-search";
 import type { Property } from "@/lib/properties";
-import { getRentalZones } from "@/lib/rentals";
+import { canonicalZone, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
 
@@ -114,14 +116,58 @@ export function DirectRentalExplorer({
   const filtersRef = useRef<HTMLElement>(null);
   const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const displayCurrency = useCurrencyPreference();
-  const zones = useMemo(() => {
-    const available = getRentalZones(properties);
-    return filters.zone && !available.includes(filters.zone) ? [...available, filters.zone] : available;
-  }, [filters.zone, properties]);
+  const selectedZones = useMemo(() => splitZones(filters.zone), [filters.zone]);
   const zoneAverages = useMemo(() => getZoneAverages(properties), [properties]);
   const zoneCenters = useMemo(() => getZoneCenters(properties), [properties]);
 
   const appliedFilters = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
+  const appliedZones = useMemo(() => splitZones(appliedFilters.zone), [appliedFilters.zone]);
+  // "Cerca de" and the zone average talk about one zone, so they only show when one is chosen.
+  const singleZone = appliedZones.length === 1 ? appliedZones[0] : "";
+  // How many homes each choice would show with the other filters as they are.
+  const optionCounts = useMemo(() => {
+    const countWith = (changes: Partial<RentalSearchFilters>) =>
+      searchRentals(properties, { ...appliedFilters, ...changes, sort: "" }, displayCurrency, { zoneAverages });
+    // Homes per neighborhood and per zone (a home counts once in its zone and once in its place).
+    const byZone = new Map<string, number>();
+    const add = (name: string) => byZone.set(name, (byZone.get(name) ?? 0) + 1);
+    const unplaced = new Set<string>();
+    for (const match of countWith({ zone: "" })) {
+      const { place, sector } = locateHome(match.property);
+      add(sector ?? otherZonesLabel);
+      if (place) add(place);
+      if (place && !sector) unplaced.add(place);
+    }
+    const count = (key: "bedrooms" | "bathrooms", options: string[]) =>
+      new Map(options.map((option) => [option, countWith({ [key]: option }).length]));
+    return {
+      byZone,
+      unplaced,
+      bedrooms: count("bedrooms", rentalBedroomOptions),
+      bathrooms: count("bathrooms", rentalBathroomOptions),
+    };
+  }, [appliedFilters, displayCurrency, properties, zoneAverages]);
+  // Zona Norte, Sur, Este… each with its neighborhoods and avenues; places outside the list last.
+  const zoneGroups = useMemo<ZoneGroup[]>(() => {
+    const countOf = (name: string) => optionCounts.byZone.get(name) ?? 0;
+    const groups: ZoneGroup[] = santaCruzSectors.map((sector) => ({
+      name: sector.name,
+      selectable: true,
+      count: countOf(sector.name),
+      places: sector.places
+        .map((place) => ({ name: place.name, count: countOf(place.name) }))
+        .sort((first, second) => second.count - first.count || first.name.localeCompare(second.name, "es")),
+    }));
+    // Homes without a map point and with a name outside the list.
+    const known = new Set(santaCruzSectors.flatMap((sector) => [sector.name, ...sector.places.map((place) => place.name)]));
+    const others = Array.from(new Set([...optionCounts.unplaced, ...selectedZones.filter((name) => !known.has(name))]))
+      .map((name) => ({ name, count: countOf(name) }))
+      .sort((first, second) => first.name.localeCompare(second.name, "es"));
+    if (others.length) {
+      groups.push({ name: otherZonesLabel, selectable: false, count: countOf(otherZonesLabel), places: others });
+    }
+    return groups;
+  }, [optionCounts, selectedZones]);
   const matches = useMemo(
     () => searchRentals(properties, appliedFilters, displayCurrency, { zoneAverages }),
     [appliedFilters, displayCurrency, properties, zoneAverages],
@@ -152,7 +198,7 @@ export function DirectRentalExplorer({
 
   // D10: under a zone's results, 3 to 6 homes from neighboring zones that fit the other filters.
   const nearby = useMemo(() => {
-    if (!appliedFilters.zone) return [];
+    if (!singleZone) return [];
     const candidates = searchRentals(
       properties,
       { ...appliedFilters, zone: "", area: null, near: "", sort: "" },
@@ -161,8 +207,8 @@ export function DirectRentalExplorer({
     )
       .filter((match) => match.pending.length === 0)
       .map((match) => match.property);
-    return getNearbyListings(candidates, appliedFilters.zone, zoneCenters.get(appliedFilters.zone));
-  }, [appliedFilters, displayCurrency, properties, zoneAverages, zoneCenters]);
+    return getNearbyListings(candidates, singleZone, zoneCenters.get(singleZone));
+  }, [appliedFilters, displayCurrency, properties, singleZone, zoneAverages, zoneCenters]);
 
   const serializedFilters = useMemo(
     () => buildRentalSearchParams(appliedFilters, displayCurrency, initialFilters).toString(),
@@ -266,6 +312,27 @@ export function DirectRentalExplorer({
     setFilters((current) => ({ ...emptyRentalSearchFilters, sort: current.sort === "cercania" ? "" : current.sort }));
   }
 
+  // A zone ("Zona Norte") covers its places, so picking it replaces any of its places already picked;
+  // unticking one place of a picked zone keeps the zone's other places.
+  function toggleZone(zone: string, checked: boolean) {
+    setFilters((current) => {
+      const selected = splitZones(current.zone);
+      const sector = santaCruzSectors.find((item) => item.name === zone);
+      if (sector) {
+        const inside = new Set([sector.name, ...sector.places.map((place) => place.name)]);
+        const rest = selected.filter((item) => !inside.has(item));
+        return { ...current, zone: joinZones(checked ? [...rest, sector.name] : rest) };
+      }
+      const parent = santaCruzSectors.find((item) => item.places.some((place) => place.name === zone));
+      if (!checked && parent && selected.includes(parent.name)) {
+        const siblings = parent.places.map((place) => place.name).filter((name) => name !== zone);
+        return { ...current, zone: joinZones([...selected.filter((item) => item !== parent.name), ...siblings]) };
+      }
+      const rest = selected.filter((item) => item !== zone);
+      return { ...current, zone: joinZones(checked ? [...rest, zone] : rest) };
+    });
+  }
+
   function toggleType(type: RentalType, checked: boolean) {
     setFilters((current) => {
       const types = new Set<string>(getRentalTypes(current.type));
@@ -296,11 +363,11 @@ export function DirectRentalExplorer({
   const zoneAverageNote = (() => {
     if (!appliedFilters.belowZoneAverage) return null;
     const averages = Array.from(zoneAverages.values())
-      .filter((average) => !appliedFilters.zone || average.zone === appliedFilters.zone)
+      .filter((average) => appliedZones.length === 0 || appliedZones.includes(canonicalZone(average.zone)))
       .sort((first, second) => first.zone.localeCompare(second.zone, "es"));
     if (averages.length === 0) {
-      return appliedFilters.zone
-        ? `${appliedFilters.zone} todavía no tiene ${zoneAverageMinListings} anuncios publicados para calcular su promedio.`
+      return singleZone
+        ? `${singleZone} todavía no tiene ${zoneAverageMinListings} anuncios publicados para calcular su promedio.`
         : `Todavía ninguna zona tiene ${zoneAverageMinListings} anuncios publicados para calcular su promedio.`;
     }
     return `Promedio del alquiler mensual por zona, con los anuncios publicados: ${averages
@@ -355,13 +422,28 @@ export function DirectRentalExplorer({
               ))}
             </FilterGroup>
 
-            <FilterGroup title="Zona">
-              <FilterSelect label="Zona" value={filters.zone} onChange={(value) => updateFilter("zone", value)}>
-                <option value="">Todas las zonas</option>
-                {zones.map((item) => (
-                  <option key={item} value={item}>{item}</option>
-                ))}
-              </FilterSelect>
+            <FilterGroup title="Zonas">
+              <ZonePicker groups={zoneGroups} selected={selectedZones} onToggle={toggleZone} onClear={() => updateFilter("zone", "")} />
+            </FilterGroup>
+
+            <FilterGroup title="Dormitorios">
+              <RoomPicker
+                label="Dormitorios"
+                options={rentalBedroomOptions}
+                value={filters.bedrooms}
+                counts={optionCounts.bedrooms}
+                onChange={(value) => updateFilter("bedrooms", value)}
+              />
+            </FilterGroup>
+
+            <FilterGroup title="Baños">
+              <RoomPicker
+                label="Baños"
+                options={rentalBathroomOptions}
+                value={filters.bathrooms}
+                counts={optionCounts.bathrooms}
+                onChange={(value) => updateFilter("bathrooms", value)}
+              />
             </FilterGroup>
 
             <FilterGroup title="Precio por mes">
@@ -393,6 +475,24 @@ export function DirectRentalExplorer({
                   />
                 </label>
               </div>
+              <div className="catalog-price-presets" aria-label="Presupuestos rápidos">
+                {(priceCurrency === "USD" ? [200, 350, 600, 900] : [1500, 2500, 4000, 6000]).map((amount) => {
+                  const selected = !filters.minPrice.trim() && priceBounds.max?.amount === amount && priceBounds.max.currency === priceCurrency;
+                  return (
+                    <button
+                      key={amount}
+                      type="button"
+                      aria-pressed={selected}
+                      className={selected ? "is-selected" : undefined}
+                      onClick={() => {
+                        setFilters((current) => ({ ...current, minPrice: "", maxPrice: selected ? "" : String(amount), priceCurrency: selected ? null : priceCurrency }));
+                      }}
+                    >
+                      Hasta {formatPriceBound({ amount, currency: priceCurrency })}
+                    </button>
+                  );
+                })}
+              </div>
               <FilterCheckbox
                 label="Incluir expensas en el presupuesto"
                 icon={<Receipt />}
@@ -411,19 +511,6 @@ export function DirectRentalExplorer({
               <FilterCheckbox label="Acepta mascotas" icon={<PawPrint />} checked={filters.pets} onChange={(checked) => updateFilter("pets", checked)} />
               <FilterCheckbox label="Con parqueo" icon={<Car />} checked={filters.garage} onChange={(checked) => updateFilter("garage", checked)} />
               <FilterCheckbox label="Amoblado" icon={<Sofa />} checked={filters.furnished} onChange={(checked) => updateFilter("furnished", checked)} />
-            </FilterGroup>
-
-            <FilterGroup title="Dormitorios y baños">
-              <div className="catalog-filter-pair">
-                <FilterSelect label="Dormitorios" value={filters.bedrooms} onChange={(value) => updateFilter("bedrooms", value)}>
-                  <option value="">Dormitorios</option>
-                  {rentalBedroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
-                </FilterSelect>
-                <FilterSelect label="Baños" value={filters.bathrooms} onChange={(value) => updateFilter("bathrooms", value)}>
-                  <option value="">Baños</option>
-                  {rentalBathroomOptions.map((option) => <option key={option} value={option}>{option}+</option>)}
-                </FilterSelect>
-              </div>
             </FilterGroup>
 
             <FilterGroup title="Para entrar">
@@ -709,14 +796,14 @@ export function DirectRentalExplorer({
 
           {nearby.length > 0 ? (
             <section className="catalog-nearby" aria-labelledby="nearby-heading">
-              <h2 id="nearby-heading">Cerca de {appliedFilters.zone}</h2>
+              <h2 id="nearby-heading">Cerca de {singleZone}</h2>
               <p>Viviendas de zonas vecinas que también cumplen tu búsqueda. Distancias aproximadas, en línea recta.</p>
               <div className="catalog-card-grid mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {nearby.map(({ property, distanceKm }) => (
                   <PropertyCard
                     key={property.slug}
                     property={property}
-                    notes={[capitalize(formatApproxDistance(distanceKm, appliedFilters.zone) ?? "")].filter(Boolean)}
+                    notes={[capitalize(formatApproxDistance(distanceKm, singleZone) ?? "")].filter(Boolean)}
                     contactSource="cercanos"
                   />
                 ))}
@@ -848,6 +935,148 @@ function FilterSelect({
         {children}
       </select>
     </label>
+  );
+}
+
+// Exact counts: "1" shows only one-bedroom homes; the last option ("4+") also covers more.
+function RoomPicker({
+  label,
+  options,
+  value,
+  counts,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  counts: Map<string, number>;
+  onChange: (value: string) => void;
+}) {
+  const choices = [{ value: "", text: "Todos" }, ...options.map((option) => ({ value: option, text: roomOptionLabel(option, options) }))];
+  return (
+    <div className="catalog-rooms" role="radiogroup" aria-label={label}>
+      {choices.map((choice) => {
+        const count = choice.value ? counts.get(choice.value) ?? 0 : null;
+        const selected = value === choice.value;
+        return (
+          <button
+            key={choice.value || "all"}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            aria-label={choice.value ? `${choice.text} ${label.toLocaleLowerCase("es")}, ${count} ${count === 1 ? "alquiler" : "alquileres"}` : `${label}: todos`}
+            className={selected ? "is-selected" : undefined}
+            disabled={!selected && count === 0}
+            onClick={() => onChange(choice.value)}
+          >
+            {choice.text}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+type ZoneGroup = { name: string; selectable: boolean; count: number; places: Array<{ name: string; count: number }> };
+
+// Zona Norte, Sur, Este, Oeste…: ticking a zone picks all of it; opening it shows its places.
+function ZonePicker({
+  groups,
+  selected,
+  onToggle,
+  onClear,
+}: {
+  groups: ZoneGroup[];
+  selected: string[];
+  onToggle: (zone: string, checked: boolean) => void;
+  onClear: () => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState<string[]>([]);
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const term = normalize(search.trim());
+  const visible = groups
+    .map((group) => ({
+      ...group,
+      places: term && !normalize(group.name).includes(term) ? group.places.filter((place) => normalize(place.name).includes(term)) : group.places,
+    }))
+    .filter((group) => !term || normalize(group.name).includes(term) || group.places.length > 0);
+  return (
+    <div className="catalog-zones">
+      {selected.length > 0 ? (
+        <div className="catalog-zones-selected">
+          {selected.map((zone) => (
+            <button key={zone} type="button" className="catalog-chip" onClick={() => onToggle(zone, false)} aria-label={`Quitar ${zone}`}>
+              {zone}
+              <X aria-hidden="true" />
+            </button>
+          ))}
+          <button type="button" className="catalog-zones-clear" onClick={onClear}>Todas las zonas</button>
+        </div>
+      ) : null}
+      <label className="catalog-zones-search">
+        <span className="sr-only">Buscar zona, barrio o avenida</span>
+        <Search aria-hidden="true" />
+        <input value={search} onChange={(event) => setSearch(event.target.value)} type="search" placeholder="Buscar barrio o avenida" autoComplete="off" />
+      </label>
+      <div className="catalog-zones-list">
+        {visible.map((group) => {
+          const whole = group.selectable && selected.includes(group.name);
+          const some = !whole && group.places.some((place) => selected.includes(place.name));
+          const expanded = Boolean(term) || open.includes(group.name);
+          const panelId = `zona-${normalize(group.name).replace(/[^a-z0-9]+/g, "-")}`;
+          return (
+            <div key={group.name} className="catalog-zone-group">
+              <div className="catalog-zone-row">
+                {group.selectable ? (
+                  <label className={`catalog-check${group.count === 0 ? " is-empty" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={whole}
+                      ref={(input) => { if (input) input.indeterminate = some; }}
+                      onChange={(event) => onToggle(group.name, event.target.checked)}
+                    />
+                    <span className="catalog-zone-name">{group.name}</span>
+                    <span className="catalog-check-count">{group.count}</span>
+                  </label>
+                ) : (
+                  <span className="catalog-check catalog-zone-other">
+                    <span className="catalog-zone-name">{group.name}</span>
+                    <span className="catalog-check-count">{group.count}</span>
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="catalog-zone-toggle"
+                  aria-expanded={expanded}
+                  aria-controls={panelId}
+                  aria-label={`${expanded ? "Ocultar" : "Ver"} barrios de ${group.name}`}
+                  onClick={() => setOpen((current) => (current.includes(group.name) ? current.filter((name) => name !== group.name) : [...current, group.name]))}
+                >
+                  <ChevronDown aria-hidden="true" />
+                </button>
+              </div>
+              {expanded ? (
+                <div id={panelId} className="catalog-zone-places">
+                  {group.places.map((place) => (
+                    <label key={place.name} className={`catalog-check${place.count === 0 ? " is-empty" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={whole || selected.includes(place.name)}
+                        onChange={(event) => onToggle(place.name, event.target.checked)}
+                      />
+                      <span>{place.name}</span>
+                      <span className="catalog-check-count">{place.count}</span>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+        {visible.length === 0 ? <p className="catalog-zones-empty">No encontramos ese barrio. Prueba con la zona (Norte, Sur, Este u Oeste).</p> : null}
+      </div>
+    </div>
   );
 }
 

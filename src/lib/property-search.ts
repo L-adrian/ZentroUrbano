@@ -24,6 +24,7 @@ import {
   type ZoneAverage,
   type ZoneAverageComparison,
 } from "@/lib/zone-prices";
+import { formatZoneList, joinZones, splitZones, zoneMatches } from "@/lib/santa-cruz-zones";
 
 export type PropertySearchEvaluation = {
   matches: boolean;
@@ -496,11 +497,11 @@ function getConstraintScore(property: Property, parsed: ParsedSearchQuery) {
   }
 
   if (parsed.bedroomCount !== undefined) {
-    if (property.bedrooms < parsed.bedroomCount) {
+    // "1 dormitorio" means exactly one; only the top option ("4 dormitorios") reads as "4 or more".
+    if (!matchesRoomCount(property.bedrooms, parsed.bedroomCount, maxBedroomOption)) {
       return null;
-    } else {
-      score += property.bedrooms === parsed.bedroomCount ? 32 : 24;
     }
+    score += 32;
   }
 
   for (const amenity of parsed.amenities) {
@@ -925,8 +926,23 @@ export const emptyRentalSearchFilters: RentalSearchFilters = {
   sort: "",
 };
 
+// Exact counts: "1" means one bedroom, not "1 or more". Only the last option also covers more.
 export const rentalBedroomOptions = ["1", "2", "3", "4"];
 export const rentalBathroomOptions = ["1", "2", "3"];
+const maxBedroomOption = Number(rentalBedroomOptions[rentalBedroomOptions.length - 1]);
+const maxBathroomOption = Number(rentalBathroomOptions[rentalBathroomOptions.length - 1]);
+
+export function roomOptionLabel(option: string, options: string[]) {
+  return option === options[options.length - 1] ? `${option}+` : option;
+}
+
+function matchesRoomCount(count: number, wanted: number, max: number) {
+  return wanted >= max ? count >= wanted : count === wanted;
+}
+
+function describeRoomCount(count: number, max: number, singular: string, plural: string) {
+  return `${count}${count >= max ? " o más" : ""} ${count === 1 ? singular : plural}`;
+}
 export const rentalSortOptions: Array<{ value: RentalSort; label: string }> = [
   { value: "", label: "Normal (destacados primero)" },
   { value: "recientes", label: "Confirmados hace poco" },
@@ -1058,7 +1074,7 @@ export function readRentalSearchParams(
 
   return {
     query: text("q", 120) ?? base.query,
-    zone: text("zone", 80) ?? base.zone,
+    zone: params.get("zone") === null ? base.zone : joinZones(params.getAll("zone").slice(0, 20).map((zone) => zone.slice(0, 80))),
     type,
     minPrice: text("minPrice", 40) ?? base.minPrice,
     maxPrice: text("maxPrice", 40) ?? base.maxPrice,
@@ -1101,7 +1117,7 @@ export function buildRentalSearchParams(
   const inCurrency = (bound: PriceBound) => formatAmountParam(convertPrice(bound.amount, bound.currency, currency ?? bound.currency));
 
   if (query) params.set("q", query);
-  if (filters.zone) params.set("zone", filters.zone);
+  if (filters.zone) for (const zone of splitZones(filters.zone)) params.append("zone", zone);
   else if (defaults.zone) params.set("zone", "");
   if (filters.type) for (const type of getRentalTypes(filters.type)) params.append("type", type);
   else if (defaults.type) params.set("type", "");
@@ -1176,6 +1192,7 @@ export function searchRentals(
   const entryBound = getEntryBound(filters, displayCurrency);
   const bedrooms = Number(filters.bedrooms) || 0;
   const bathrooms = Number(filters.bathrooms) || 0;
+  const zones = splitZones(filters.zone);
   const textPlace = parsed.intents.find((intent) => intent.kind === "place");
   const place = getKnownPlace(filters.near, places) ?? (textPlace?.kind === "place" ? textPlace.place : undefined);
   const zoneAverages = filters.belowZoneAverage ? (options.zoneAverages ?? getZoneAverages(properties)) : null;
@@ -1189,7 +1206,7 @@ export function searchRentals(
       convertPrice(amount, property.currency, currency, getPropertyExchangeRate(property));
 
     if (hasQuery && !evaluation.matches) return [];
-    if (filters.zone && property.zone !== filters.zone) return [];
+    if (!zoneMatches(property, zones)) return [];
     if (types.length && !types.some((type) => (type === "Monoambiente" ? isMonoambiente(property) : property.type === type))) return [];
 
     const monthly = filters.includeExpenses ? getMonthlyCost(property) : property.price;
@@ -1204,7 +1221,8 @@ export function searchRentals(
       }
     }
 
-    if (property.bedrooms < bedrooms || property.bathrooms < bathrooms) return [];
+    if (bedrooms && !matchesRoomCount(property.bedrooms, bedrooms, maxBedroomOption)) return [];
+    if (bathrooms && !matchesRoomCount(property.bathrooms, bathrooms, maxBathroomOption)) return [];
     if (filters.pets && petsPolicy === "not_allowed") return [];
     if (filters.pets && petsPolicy === "consult") pending.unshift("pets");
     if (filters.garage && property.garage <= 0) return [];
@@ -1285,7 +1303,7 @@ export function describeRentalFilter(
     case "query":
       return `Búsqueda: “${shortenText(filters.query.trim(), 28)}”`;
     case "zone":
-      return `Zona: ${filters.zone}`;
+      return `Zona: ${formatZoneList(splitZones(filters.zone))}`;
     case "type":
       return getRentalTypes(filters.type).join(" o ");
     case "minPrice":
@@ -1297,9 +1315,9 @@ export function describeRentalFilter(
     case "maxEntry":
       return entry ? `Para entrar hasta ${formatPriceBound(entry)}` : `Para entrar: “${shortenText(filters.maxEntry.trim(), 16)}”`;
     case "bedrooms":
-      return `${bedrooms}+ ${bedrooms === 1 ? "dormitorio" : "dormitorios"}`;
+      return describeRoomCount(bedrooms, maxBedroomOption, "dormitorio", "dormitorios");
     case "bathrooms":
-      return `${bathrooms}+ ${bathrooms === 1 ? "baño" : "baños"}`;
+      return describeRoomCount(bathrooms, maxBathroomOption, "baño", "baños");
     case "pets":
       return "Acepta mascotas";
     case "garage":
@@ -1331,12 +1349,12 @@ export function describeRentalSearch(
   const kind = filters.type ? getRentalTypes(filters.type).join(" o ").toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
   const place = getKnownPlace(filters.near, places);
   return [
-    kind ? `${kind}${filters.zone ? ` en ${filters.zone}` : ""}` : null,
+    kind ? `${kind}${filters.zone ? ` en ${formatZoneList(splitZones(filters.zone))}` : ""}` : null,
     describePriceBounds(min, max),
     filters.includeExpenses && (min || max) ? "con expensas incluidas en el presupuesto" : null,
     entry ? `para entrar hasta ${formatPriceBound(entry)}` : null,
-    bedrooms ? `${bedrooms} ${bedrooms === 1 ? "dormitorio" : "dormitorios"} o más` : null,
-    bathrooms ? `${bathrooms} ${bathrooms === 1 ? "baño" : "baños"} o más` : null,
+    bedrooms ? describeRoomCount(bedrooms, maxBedroomOption, "dormitorio", "dormitorios") : null,
+    bathrooms ? describeRoomCount(bathrooms, maxBathroomOption, "baño", "baños") : null,
     filters.pets ? "que acepte mascotas" : null,
     filters.garage ? "con parqueo" : null,
     filters.furnished ? "amoblada" : null,
@@ -1413,7 +1431,7 @@ function describeSearchIntent(intent: SearchIntent) {
     case "operation":
       return intent.operation === "Compra" ? "Venta" : intent.operation;
     case "bedrooms":
-      return `${intent.count}+ ${intent.count === 1 ? "dormitorio" : "dormitorios"}`;
+      return describeRoomCount(intent.count, maxBedroomOption, "dormitorio", "dormitorios");
     case "amenity":
       return amenityLabels[intent.amenity];
     case "price":

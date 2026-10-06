@@ -15,6 +15,7 @@ import {
   withoutRentalFilter,
   type RentalSearchFilters,
 } from "../src/lib/property-search";
+import { canonicalZone, locateHome, sectorFromCoordinates } from "../src/lib/santa-cruz-zones";
 import { getDirectRentals, isDirectRental, isRentalPropertyType } from "../src/lib/rentals";
 import { getOperationSeoRoutes, getDepartmentSeoRoutes } from "../src/lib/seo-routes";
 import { getActiveSponsoredAds, getSponsoredAdById } from "../src/lib/sponsored-ads";
@@ -147,7 +148,8 @@ test("an empty search can tell how many homes each removed filter would bring ba
   assert.deepEqual(counts, { type: 1, maxPrice: 0, garage: 1 });
   assert.equal(withoutRentalFilter(filters({ maxPrice: "300", priceCurrency: "USD" }), "maxPrice").priceCurrency, null);
   assert.equal(describeRentalSearch(search, "BOB").join(", "), "casa, hasta Bs 4.000 por mes, con parqueo");
-  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol", pets: true, bedrooms: "2" }), "BOB").join(", "), "vivienda en Equipetrol, 2 dormitorios o más, que acepte mascotas");
+  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol", pets: true, bedrooms: "2" }), "BOB").join(", "), "vivienda en Equipetrol, 2 dormitorios, que acepte mascotas");
+  assert.equal(describeRentalSearch(filters({ zone: "Equipetrol|Sirari", bedrooms: "4" }), "BOB").join(", "), "vivienda en Equipetrol o Sirari, 4 o más dormitorios");
 });
 
 test("searches for anticrético, sales or shared rooms are recognized as outside the catalog", () => {
@@ -160,4 +162,49 @@ test("searches for anticrético, sales or shared rooms are recognized as outside
   for (const query of ["casa 3 habitaciones", "departamento con una habitación", "monoambiente", "casa con cuarto de servicio", "Equipetrol", ""]) {
     assert.equal(getUnsupportedSearchIntent(query), null, query);
   }
+});
+
+test("bedroom and bathroom filters are exact, and only the last option means 'or more'", () => {
+  const home = (slug: string, bedrooms: number, bathrooms: number) => ({ ...catalog[0], slug, bedrooms, bathrooms });
+  const homes = [home("uno", 1, 1), home("dos", 2, 1), home("tres", 3, 2), home("cuatro", 4, 3), home("cinco", 5, 4)];
+  assert.deepEqual(slugs(homes, { bedrooms: "1" }), ["uno"]);
+  assert.deepEqual(slugs(homes, { bedrooms: "2" }), ["dos"]);
+  assert.deepEqual(slugs(homes, { bedrooms: "4" }).sort(), ["cinco", "cuatro"]);
+  assert.deepEqual(slugs(homes, { bathrooms: "1" }).sort(), ["dos", "uno"]);
+  assert.deepEqual(slugs(homes, { bathrooms: "3" }).sort(), ["cinco", "cuatro"]);
+  assert.deepEqual(slugs(homes, { query: "1 dormitorio" }), ["uno"]);
+});
+
+test("zones fold owners' spellings and several can be chosen at once", () => {
+  assert.equal(canonicalZone("Norte"), "Zona Norte");
+  assert.equal(canonicalZone(" urbari "), "Urbarí");
+  assert.equal(canonicalZone("Barrio Inventado"), "Barrio Inventado");
+  const north = { lat: -17.74, lng: -63.18 };
+  const homes = [
+    { ...catalog[0], slug: "a", zone: "Norte", coordinates: north },
+    { ...catalog[0], slug: "b", zone: "Urbari", coordinates: north },
+    { ...catalog[0], slug: "c", zone: "Equipetrol", coordinates: north },
+  ];
+  // Equipetrol is inside Zona Norte, so picking the zone brings it too; a place alone does not.
+  assert.deepEqual(slugs(homes, { zone: "Zona Norte|Urbarí" }).sort(), ["a", "b", "c"]);
+  assert.deepEqual(slugs(homes, { zone: "Equipetrol" }), ["c"]);
+  assert.deepEqual(slugs(homes, { zone: "Zona Oeste" }), ["b"]);
+  const params = buildRentalSearchParams(filters({ zone: "Zona Norte|Urbarí" }), "BOB");
+  assert.deepEqual(params.getAll("zone"), ["Zona Norte", "Urbarí"]);
+  assert.equal(readRentalSearchParams(params).zone, "Zona Norte|Urbarí");
+});
+
+test("a home's zone comes from its map point unless the owner named a known neighborhood", () => {
+  assert.equal(sectorFromCoordinates({ lat: -17.7834, lng: -63.1821 }), "Centro");
+  assert.equal(sectorFromCoordinates({ lat: -17.74, lng: -63.18 }), "Zona Norte");
+  assert.equal(sectorFromCoordinates({ lat: -17.83, lng: -63.18 }), "Zona Sur");
+  assert.equal(sectorFromCoordinates({ lat: -17.80, lng: -63.12 }), "Zona Este");
+  assert.equal(sectorFromCoordinates({ lat: -17.79, lng: -63.21 }), "Zona Oeste");
+  assert.equal(sectorFromCoordinates({ lat: -17.76, lng: -63.26 }), "Urubó y Porongo");
+  assert.equal(sectorFromCoordinates({ lat: -16.5, lng: -68.1 }), null);
+  // A bare "Norte" or an unknown name goes by the point; a known neighborhood keeps its zone.
+  assert.deepEqual(locateHome({ zone: "Norte", coordinates: { lat: -17.83, lng: -63.18 } }), { place: null, sector: "Zona Sur" });
+  assert.deepEqual(locateHome({ zone: "Barrio Inventado", coordinates: { lat: -17.80, lng: -63.12 } }), { place: "Barrio Inventado", sector: "Zona Este" });
+  assert.deepEqual(locateHome({ zone: "Sirari", coordinates: { lat: -17.83, lng: -63.18 } }), { place: "Sirari", sector: "Zona Norte" });
+  assert.deepEqual(locateHome({ zone: "Barrio Inventado", coordinates: null }), { place: "Barrio Inventado", sector: null });
 });
