@@ -46,7 +46,7 @@ export default async function WelcomePage() {
           <Link className="zu-button zu-button-primary" href="/propiedades"><Search size={18} />Buscar alquiler<ArrowRight size={17} /></Link>
           <Link className="zu-button zu-button-secondary" href="/publicar"><Home size={18} />Publicar mi vivienda</Link>
         </div>
-        <p className="welcome-login">¿Ya tienes una cuenta? <Link href="/login">Iniciar sesión <ArrowRight size={13} /></Link></p>
+        <p className="welcome-login">¿Ya tienes una cuenta? <Link href="/cliente">Iniciar sesión <ArrowRight size={13} /></Link></p>
         <PixelNeighborhood hero />
       </div>
     </section>

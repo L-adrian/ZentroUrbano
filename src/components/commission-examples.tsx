@@ -4,7 +4,7 @@ import Link from "next/link";
 const examples = [
   { label: "Un departamento", amount: "3.000", icon: Building2 },
   { label: "Una casa", amount: "4.000", icon: House },
-  { label: "Tu próximo hogar", amount: "3.000", icon: KeyRound },
+  { label: "Un monoambiente", amount: "1.500", icon: KeyRound },
 ];
 
 export function CommissionExamples() {
