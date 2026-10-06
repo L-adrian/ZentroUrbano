@@ -39,7 +39,7 @@ export function BeforeVisitFields({
       <p className="-mt-2 text-xs leading-5 text-neutral-600 sm:col-span-3">
         Lo que no indiques se verá como «Pendiente de consulta».
       </p>
-      <label className="grid min-w-0 gap-1.5">
+      <label className="grid min-w-0 content-start gap-1.5">
         <span className={labelClassName}>Disponible desde</span>
         <input
           id={`${idPrefix}-available-from`}
@@ -51,7 +51,7 @@ export function BeforeVisitFields({
           className={inputClassName}
         />
       </label>
-      <label className="grid min-w-0 gap-1.5">
+      <label className="grid min-w-0 content-start gap-1.5">
         <span className={labelClassName}>Contrato mínimo</span>
         <select value={value.minContractMonths} onChange={(event) => onChange("minContractMonths", event.target.value)} className={inputClassName}>
           <option value="">Sin indicar</option>
@@ -60,7 +60,7 @@ export function BeforeVisitFields({
           ))}
         </select>
       </label>
-      <label className="grid min-w-0 gap-1.5">
+      <label className="grid min-w-0 content-start gap-1.5">
         <span className={labelClassName}>Adelanto</span>
         <select value={value.advanceMonths} onChange={(event) => onChange("advanceMonths", event.target.value)} aria-describedby={`${idPrefix}-advance-help`} className={inputClassName}>
           <option value="">Sin indicar</option>
