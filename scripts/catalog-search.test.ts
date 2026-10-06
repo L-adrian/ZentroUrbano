@@ -23,6 +23,7 @@ import {
   parseSavedListings,
   parseVisitState,
   recentListingsLimit,
+  recentListingsMaxAgeMs,
   rollVisit,
   toggleSavedListing,
   visitGapMs,
@@ -328,6 +329,13 @@ test("saved and recently viewed lists stay small, unique and safe to read", () =
   assert.equal(recent.length, recentListingsLimit);
   assert.equal(recent[0].slug, "casa-5");
   assert.equal(recent.filter((item) => item.slug === "casa-5").length, 1);
+
+  // A week after a home was opened it leaves the list, both when reading and when adding another.
+  const week = recentListingsMaxAgeMs;
+  const stored = JSON.stringify([{ slug: "nueva", viewedAt: week + 10 }, { slug: "vieja", viewedAt: 5 }]);
+  assert.deepEqual(parseRecentListings(stored, week + 20).map((item) => item.slug), ["nueva"]);
+  assert.deepEqual(parseRecentListings(stored).map((item) => item.slug), ["nueva", "vieja"]);
+  assert.deepEqual(addRecentListing(parseRecentListings(stored), "otra", week + 20).map((item) => item.slug), ["otra", "nueva"]);
 });
 
 test("Nuevo marks only homes published after the previous visit", () => {
