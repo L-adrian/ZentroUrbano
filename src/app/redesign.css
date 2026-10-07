@@ -465,8 +465,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .dark .owner-card-availability.is-unconfirmed { color: #f3d39b; }
 .owner-card-no-reply { font-size: 13px; color: var(--muted); }
 .owner-card-no-reply .report-listing-trigger { color: var(--foreground); }
-.listing-featured-chip { background: #fff2d6; color: #8b4b31; }
-.dark .listing-featured-chip { background: #3a2d16; color: #f3d39b; }
+.listing-featured-chip { background: #ee7f1f; color: #fff; }
+.dark .listing-featured-chip { background: #ee7f1f; color: #fff; }
 .listing-nearby { margin-bottom: 12px; font-size: 15px; line-height: 1.6; }
 .entry-cost-note { font-size: 12px; color: var(--muted); }
 .entry-cost-pending { color: var(--muted); font-weight: 500; }
@@ -643,7 +643,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .saved-listings-link svg { width: 16px; height: 16px; color: #c2334d; fill: currentColor; }
 .saved-listings-link:hover { border-color: var(--brand); }
 
-/* Listing cards: heart to save, "Destacada" and "Nuevo" labels, search notes. */
+/* Listing cards: heart to save, "Nuevo" label, search notes. */
 .rental-card-media { position: relative; }
 .rental-save-button { position: absolute; top: 4px; right: 4px; z-index: 2; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 999px; color: #202726; cursor: pointer; }
 .rental-save-button::before { content: ""; position: absolute; inset: 5px; border-radius: 999px; background: rgb(255 255 255 / 0.95); box-shadow: 0 1px 4px rgb(0 0 0 / 0.2); }
@@ -653,7 +653,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-badges { position: absolute; left: 10px; bottom: 9px; display: flex; flex-wrap: wrap; gap: 5px; }
 .rental-card-badges:empty { display: none; }
 .rental-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; }
-.rental-badge.is-featured { background: #fff2d6; color: #8b4b31; }
 .rental-badge.is-new { background: #087c65; color: #fff; }
 .rental-card-notes { display: grid; gap: 2px; margin: 2px 0 4px; padding: 0; list-style: none; color: var(--brand); font-size: 13px; font-weight: 600; line-height: 1.4; }
 .rental-entry-label.is-pending > * { color: var(--muted); font-weight: 500; }
@@ -993,3 +992,58 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .rental-owner-label:not(:has(.rental-views)) { display: none; }
   .welcome-rentals { display: none; }
 }
+
+/* Featured (paid) listings: orange ribbon "Destacado · Anuncio promocionado", orange frame and price,
+   three extra photos, and a short entrance the first time the card appears. The WhatsApp button stays green
+   like every other card. Only the first featured card of the "Lista" view takes the whole row. */
+.rental-card.is-featured { --feature: #ee7f1f; --feature-deep: #b4520c; --feature-soft: #ffe7cc; position: relative; padding: 0 12px 12px; border: 2px solid var(--feature); border-radius: 14px; background: linear-gradient(180deg, #fff4e6 0%, #fffaf3 40%, var(--surface) 100%); box-shadow: 0 14px 34px -16px rgb(238 127 31 / 0.6); }
+.dark .rental-card.is-featured { --feature-deep: #ffb36b; --feature-soft: #4a2d12; background: linear-gradient(180deg, #2d1f12 0%, var(--surface) 55%); }
+.zu-explorer .rental-card.is-featured { padding: 0 12px 12px; }
+.rental-feature-ribbon { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 -12px 12px; padding: 8px 12px; border-radius: 11px 11px 0 0; background: var(--feature); color: #fff; font-size: 13px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; white-space: nowrap; }
+.rental-feature-ribbon > span:not(.rental-feature-shine) { display: inline-flex; align-items: center; gap: 6px; }
+.rental-feature-ribbon small { overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; font-weight: 550; letter-spacing: 0; text-transform: none; }
+.rental-feature-shine { position: absolute; top: 0; bottom: 0; left: -50%; width: 40%; background: linear-gradient(100deg, transparent, rgb(255 255 255 / 0.6), transparent); pointer-events: none; }
+.rental-feature-thumbs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.rental-feature-thumbs span { position: relative; aspect-ratio: 4/3; overflow: hidden; border-radius: 6px; background: var(--subtle); }
+.rental-feature-thumbs img { object-fit: cover; }
+.rental-feature-thumbs span[data-more]::after { content: attr(data-more); position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / 0.5); color: #fff; font-size: 13px; font-weight: 700; }
+.rental-card.is-featured .rental-card-title { font-weight: 700; }
+.rental-card.is-featured .rental-card-price { color: var(--feature-deep); }
+.rental-card.is-featured .rental-card-tags li:not(.is-unknown) { color: var(--feature-deep); background: var(--feature-soft); }
+@container (max-width: 299px) { .rental-feature-ribbon { gap: 6px; font-size: 12px; } .rental-feature-ribbon small { font-size: 10.5px; } }
+@container (max-width: 229px) { .rental-feature-ribbon small { display: none; } }
+@media (min-width: 1024px) {
+  .catalog-results-grid:not(.is-split) .rental-card.is-wide { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); column-gap: 22px; }
+  .rental-card.is-wide .rental-feature-ribbon { grid-column: 1 / -1; }
+  .rental-card.is-wide .rental-card-content { padding-top: 2px; }
+  .rental-card.is-wide .rental-card-title { font-size: 22px; line-height: 1.3; min-height: 0; -webkit-line-clamp: 3; }
+  .rental-card.is-wide .rental-card-price { font-size: 26px; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .rental-card.is-featured { animation: zu-feature-in .9s cubic-bezier(.2, .9, .25, 1.15) both, zu-feature-glow 1.6s .7s ease-out both; }
+  .rental-feature-shine { animation: zu-feature-shine 1.1s .55s ease-in-out both; }
+  .rental-feature-ribbon svg { animation: zu-feature-star .8s .45s cubic-bezier(.3, 1.6, .5, 1) both; }
+  .rental-feature-thumbs span { animation: zu-feature-in .5s both; }
+  .rental-feature-thumbs span:nth-child(1) { animation-delay: .5s; }
+  .rental-feature-thumbs span:nth-child(2) { animation-delay: .6s; }
+  .rental-feature-thumbs span:nth-child(3) { animation-delay: .7s; }
+  /* On the first visit of a session the splash covers the page: wait for it to leave. */
+  .zu-splash-on .rental-card.is-featured, .zu-splash-on .rental-card.is-featured .zu-feature-anim { animation-play-state: paused; }
+}
+@keyframes zu-feature-in { from { opacity: 0; transform: translateY(28px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes zu-feature-glow { 0% { box-shadow: 0 0 0 0 rgb(238 127 31 / 0); } 35% { box-shadow: 0 0 0 10px rgb(238 127 31 / 0.35), 0 14px 34px -16px rgb(238 127 31 / 0.6); } 100% { box-shadow: 0 0 0 0 rgb(238 127 31 / 0), 0 14px 34px -16px rgb(238 127 31 / 0.6); } }
+@keyframes zu-feature-shine { to { left: 120%; } }
+@keyframes zu-feature-star { from { transform: scale(0) rotate(-120deg); } to { transform: none; } }
+
+/* Featured listings on the map: orange pin, a soft pulse, and the price label always visible (also on phones,
+   where other pins show only the logo). */
+.morada-marker-root.is-featured { --morada-marker-bg: #ee7f1f; --morada-marker-fg: #fff; }
+.morada-marker-root.is-featured .morada-marker-pin.is-featured { transform: scale(1.25); }
+.morada-marker-root.is-featured::before { content: ""; position: absolute; left: -4px; top: -2px; width: 44px; height: 44px; border-radius: 999px; background: rgb(238 127 31 / 0.4); pointer-events: none; }
+.morada-marker-root.is-featured .morada-marker-label.is-featured { display: inline-flex; }
+.morada-marker-root.is-compact.is-featured .morada-marker-label { opacity: 1; pointer-events: auto; transform: none; }
+.morada-marker-label.is-featured, .morada-marker-label.is-featured.is-selected { background: #ee7f1f; color: #fff; border: 2px solid #fff; }
+.morada-marker-label.is-featured .morada-marker-boost, .morada-marker-label.is-featured.is-selected .morada-marker-boost { background: #fff; color: #b4520c; }
+.morada-cluster-root.is-featured { background: #ee7f1f; box-shadow: 0 20px 52px rgb(20 20 20 / 0.3), 0 0 0 9px rgb(238 127 31 / 0.25); }
+@media (prefers-reduced-motion: no-preference) { .morada-marker-root.is-featured::before { animation: zu-feature-pulse 1.8s ease-out infinite; } }
+@keyframes zu-feature-pulse { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.9); opacity: 0; } }
