@@ -202,7 +202,7 @@ export default async function PropertyDetailPage({
                 </span>
                 {property.listingPlan === "featured" ? (
                   <span className="listing-featured-chip rounded-full px-3 py-1 text-sm font-semibold">
-                    Destacada · servicio pagado
+                    ★ Destacado · anuncio promocionado
                   </span>
                 ) : null}
               </div>

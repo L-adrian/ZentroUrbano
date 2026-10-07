@@ -723,7 +723,7 @@ export function DirectRentalExplorer({
                   {mainMatches.length > 0 ? (
                     <div className="catalog-card-grid grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       {mainMatches.map((match, index) => (
-                        <PropertyCard key={match.property.slug} property={match.property} eagerImage={index < 4} notes={cardNotes(match)} />
+                        <PropertyCard key={match.property.slug} property={match.property} eagerImage={index < 4} notes={cardNotes(match)} wide={index === 0 && view === "list"} />
                       ))}
                     </div>
                   ) : (

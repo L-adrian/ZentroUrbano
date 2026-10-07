@@ -1,4 +1,4 @@
-import { Bath, BedDouble, Car, Check, Clock3, ExternalLink, Eye, Images, MapPin, Ruler, UserRound } from "lucide-react";
+import { Bath, BedDouble, Car, Check, Clock3, ExternalLink, Eye, Images, MapPin, Ruler, Star, UserRound } from "lucide-react";
 import Link from "next/link";
 import { PriceDisplay } from "@/components/currency-preference";
 import { ListingPhoto } from "@/components/listing-photo";
@@ -18,9 +18,11 @@ type PropertyCardProps = {
   // Extra lines asked for by the search ("a ~1,2 km de …", "Bs 400 bajo el promedio de …").
   notes?: string[];
   contactSource?: WhatsappContactSource;
+  // The first featured listing of the catalog list gets the whole row on wide screens.
+  wide?: boolean;
 };
 
-export function PropertyCard({ property, compact = false, eagerImage = false, pending = [], notes = [], contactSource = "tarjeta" }: PropertyCardProps) {
+export function PropertyCard({ property, compact = false, eagerImage = false, pending = [], notes = [], contactSource = "tarjeta", wide = false }: PropertyCardProps) {
   const contact = getPropertyContactCopy(property);
   const external = isExternalContactUrl(property.whatsapp);
   const facts = [
@@ -33,17 +35,22 @@ export function PropertyCard({ property, compact = false, eagerImage = false, pe
   const highlights = getListingHighlights(property, compact ? 2 : 3);
   const entry = getEntryCost(property);
   const featured = property.listingPlan === "featured";
+  // Featured cards show three more photos under the cover; the last one says how many remain.
+  const thumbs = featured && !compact ? property.images.slice(1, 4) : [];
+  const moreImages = property.images.length - 1 - thumbs.length;
   // Only what the price needs reaches the browser: the card is also drawn on server pages.
   const price = { price: property.price, currency: property.currency, operation: property.operation, exchangeRate: property.exchangeRate };
-  return <article className="rental-card">
+  return <article className={`rental-card${featured ? " is-featured zu-feature-anim" : ""}${featured && wide ? " is-wide" : ""}`}>
+    {featured ? <p className="rental-feature-ribbon"><span className="rental-feature-shine zu-feature-anim" aria-hidden="true" /><span><Star className="zu-feature-anim" size={15} fill="currentColor" aria-hidden="true" />Destacado</span><small>Anuncio promocionado</small></p> : null}
     <div className="rental-card-media">
       <Link href={`/propiedades/${property.slug}`} className="rental-card-image">
         {property.images[0] ? <ListingPhoto src={property.images[0]} alt={property.title} fill loading={eagerImage ? "eager" : "lazy"} quality={72} sizes="(max-width: 540px) calc(100vw - 40px), (max-width: 768px) 45vw, (max-width: 1100px) 30vw, 285px" /> : <span className="absolute inset-0 flex items-center justify-center gap-2 text-sm text-neutral-500"><Images size={20} />Fotos pendientes</span>}
         <span className={`rental-status${availability.fresh ? "" : " is-unconfirmed"}`} suppressHydrationWarning>{availability.fresh ? <Check /> : <Clock3 />}{availability.shortLabel}</span>
-        <span className="rental-card-badges">{featured ? <span className="rental-badge is-featured">Destacada · servicio pagado</span> : null}<NewListingBadge publishedAt={property.publishedAt} /></span>
+        <span className="rental-card-badges"><NewListingBadge publishedAt={property.publishedAt} /></span>
         <span className="rental-image-count"><Images size={13} />{property.images.length}</span>
       </Link>
       <SaveHeartButton slug={property.slug} title={property.title} />
+      {thumbs.length > 0 ? <Link href={`/propiedades/${property.slug}`} className="rental-feature-thumbs" tabIndex={-1} aria-hidden="true">{thumbs.map((src, index) => <span key={src} className="zu-feature-anim" data-more={index === thumbs.length - 1 && moreImages > 0 ? `+${moreImages} fotos` : undefined}><ListingPhoto src={src} alt="" fill loading="lazy" quality={60} sizes="(max-width: 540px) 30vw, 180px" /></span>)}</Link> : null}
     </div>
     <div className="rental-card-content">
       <p className="rental-card-location"><MapPin size={14} />{property.zone} · {property.city}</p>
