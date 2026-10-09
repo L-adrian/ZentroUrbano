@@ -25,6 +25,22 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      // Duplicate listings removed on 2026-10-09: keep shared links pointing at the original listing.
+      {
+        source: "/propiedades/monoambiente-tipo-casita-de-58-m-con-dos-patios-condominio-vista-sol-doble-via-la-guardia-km-8-5-42b68f8f6131",
+        destination: "/propiedades/monoambiente-dos-patios-vista-sol-la-guardia-1690",
+        permanent: true,
+      },
+      {
+        source: "/propiedades/casa-en-alquiler-con-garaje-dueno-directo-41c49847b78c",
+        destination: "/propiedades/casa-4-habitaciones-garaje-la-guardia-km9-3000",
+        permanent: true,
+      },
+      {
+        source: "/propiedades/departamento-en-alquiler-trato-directo-con-el-propietario-4cc2b869861f",
+        destination: "/propiedades/departamento-de-1-dormitorio-en-alquiler-trato-directo-con-propietario-4620b9138fe5",
+        permanent: true,
+      },
       {
         source: "/inmobiliarias/:path*",
         destination: "/propiedades",
