@@ -9,6 +9,7 @@ import {
 import { absoluteUrl } from "@/lib/site";
 import { getDirectRentals } from "@/lib/rentals";
 import { guides } from "@/lib/guides";
+import { servicePackages, services } from "@/lib/services";
 
 export const dynamic = "force-dynamic";
 
@@ -24,6 +25,11 @@ const staticRoutes = [
   "/guias",
   ...guides.map((guide) => `/guias/${guide.slug}`),
   "/publicidad",
+  "/servicios",
+  "/servicios/individuales",
+  "/servicios/inquilinos",
+  ...services.filter((service) => !service.comingSoon).map((service) => `/servicios/${service.slug}`),
+  ...servicePackages.map((pkg) => `/servicios/paquetes/${pkg.slug}`),
   "/contacto",
   "/terminos",
   "/privacidad",

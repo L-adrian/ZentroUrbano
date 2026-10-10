@@ -14,7 +14,7 @@ import { trackAnalyticsEvent } from "@/lib/analytics-events";
 const storageKey = "morada.sponsoredAd.nextAt";
 const initialDelayMs = 15_000;
 const rotationDelayMs = sponsoredAdFrequencyMinutes * 60 * 1000;
-const hiddenPathPrefixes = ["/admin", "/cliente", "/login", "/publicidad", "/privacidad", "/terminos"];
+const hiddenPathPrefixes = ["/admin", "/cliente", "/login", "/publicidad", "/servicios", "/privacidad", "/terminos"];
 const mobileScrollThresholdPx = 420;
 const compactViewportQuery = "(max-width: 900px), (hover: none), (pointer: coarse)";
 

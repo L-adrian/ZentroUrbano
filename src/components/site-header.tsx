@@ -1,6 +1,6 @@
 "use client";
 
-import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight, BookOpen } from "lucide-react";
+import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight, BookOpen, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -55,6 +55,7 @@ export function SiteHeader() {
         <nav className="header-nav" aria-label="Navegación principal">
           {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}><Icon size={17} />{label}</Link>)}
           <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={17} />Cómo funciona</Link>
+          <Link href="/servicios" aria-current={pathname.startsWith("/servicios") ? "page" : undefined}><Sparkles size={17} />Servicios</Link>
         </nav>
         <div className="header-actions">
           <Link href="/contacto" className="header-contact" aria-current={pathname === "/contacto" ? "page" : undefined}><MessageCircle size={17} aria-hidden="true" /><span>Contáctanos</span></Link>
@@ -70,6 +71,7 @@ export function SiteHeader() {
               <Link href="/propiedades"><Search size={18} />Explorar alquileres</Link>
               <Link href="/mapa"><MapPin size={18} />Buscar en el mapa</Link>
               <Link href="/publicar"><Plus size={18} />Publicar mi vivienda</Link>
+              <Link href="/servicios"><Sparkles size={18} />Servicios</Link>
               <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={18} />Cómo funciona</Link>
               <Link href="/ayuda"><MessageCircle size={18} />Centro de ayuda</Link>
               <SupportWhatsAppButton />
