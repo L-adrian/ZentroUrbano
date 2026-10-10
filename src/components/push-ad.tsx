@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 // Small house ad that slides in from the right edge; closing it hides it for the rest of the visit.
 const dismissedKey = "zu-push-ad-closed";
 const showDelayMs = 4000;
-const hiddenPathPrefixes = ["/admin", "/cliente", "/login", "/auth", "/publicar", "/publicidad", "/servicios", "/lista", "/privacidad", "/terminos"];
+const hiddenPathPrefixes = ["/admin", "/cliente", "/login", "/auth", "/publicar", "/publicidad", "/servicios", "/lista", "/equipo", "/privacidad", "/terminos"];
 
 export function PushAd() {
   const pathname = usePathname();
