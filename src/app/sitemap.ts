@@ -23,6 +23,7 @@ const staticRoutes = [
   "/requisitos",
   "/seguridad",
   "/guias",
+  "/lista",
   ...guides.map((guide) => `/guias/${guide.slug}`),
   "/publicidad",
   "/servicios",
