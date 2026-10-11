@@ -59,7 +59,7 @@ export function SiteHeader() {
           <Link href="/nuestro-equipo" aria-current={pathname === "/nuestro-equipo" ? "page" : undefined}><UsersRound size={17} />Equipo</Link>
         </nav>
         <div className="header-actions">
-          <Link href="/contacto" className="header-contact" aria-current={pathname === "/contacto" ? "page" : undefined}><MessageCircle size={17} aria-hidden="true" /><span>Contáctanos</span></Link>
+          <Link href="/contacto" className="header-contact" aria-label="Contáctanos" title="Contáctanos" aria-current={pathname === "/contacto" ? "page" : undefined}><MessageCircle size={17} aria-hidden="true" /><span>Contáctanos</span></Link>
           <CurrencySelector className="header-currency" />
           <div className="header-theme"><ThemeToggle /></div>
           <Link href="/publicar" className="zu-button zu-button-primary header-publish"><Plus size={17} />Publicar alquiler</Link>
