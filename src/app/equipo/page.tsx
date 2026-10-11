@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import {
-  Ban, Camera, ChevronDown, Gift, Handshake, MessageCircle, Search, ShieldCheck, Star, Wallet,
+  Ban, Building2, Camera, ChevronDown, Crown, Gift, Handshake, MessageCircle, Search, ShieldCheck, Star, Users, Wallet,
 } from "lucide-react";
 import { buildSeoMetadata } from "@/lib/seo";
 import { whatsappUrl } from "@/lib/site";
@@ -25,9 +25,9 @@ const pct = (rate: number) => `${Math.round(rate * 100)}%`;
 const joinWords = (items: string[], last: string) => items.length > 1 ? `${items.slice(0, -1).join(", ")} ${last} ${items.at(-1)}` : items.join("");
 
 const steps = [
-  { icon: Search, title: "Encuentra a un dueño", text: "Alguien que tenga una casa, un departamento o un cuarto para alquilar en Santa Cruz." },
-  { icon: Handshake, title: "Ayúdalo a publicar", text: "Publicar es gratis para él. Antes de que publique, mándanos tu código por WhatsApp para saber que vino contigo." },
-  { icon: Wallet, title: "Cobra", text: "Cuando revisamos el anuncio y queda publicado, ese anuncio ya es tuyo. Te pagamos por QR." },
+  { icon: Search, title: "Encuentra dueños", text: "Gente que tiene una casa, un departamento o un cuarto vacío en Santa Cruz y quiere alquilarlo." },
+  { icon: Handshake, title: "Ayúdalos a publicar", text: "Para el dueño es gratis y no paga comisión, así que es fácil decir que sí. Antes de que publique, nos mandas tu código por WhatsApp." },
+  { icon: Wallet, title: "Cobra por cada uno", text: "Cuando revisamos el anuncio y queda publicado, ya ganaste. Te pagamos por QR, sin tope: mientras más traigas, más cobras." },
 ];
 
 // What a normal month (not the first) pays for a few listing counts, bonus included.
@@ -45,6 +45,19 @@ export default function EquipoPage() {
   const topGoal = goalBonuses.at(-1)!;
   const pkg = getPackage("hasta-que-se-alquile");
   const photos = getService("fotos-profesionales");
+  const photoSold = (photos?.price ?? 0) * rates.service;
+  const photoDone = (photos?.price ?? 0) * rates.serviceDone;
+  const packageGain = (pkg?.price ?? 0) * rates.package;
+  const featuredGain = featuredPrice * rates.featured;
+  const month = (approved: number, extra = 0) => listingAmount(approved, false) + goalBonus(approved) + extra;
+  const scenarios = [
+    { title: "Peor caso", worst: true, total: 0, text: "No consigues ningún anuncio. No ganas, pero tampoco pierdes: entrar no cuesta nada y no compras material." },
+    { title: "Unas horas por semana", total: month(5), text: "5 anuncios de tus conocidos." },
+    { title: "Constante", total: month(15, photoSold), text: `15 anuncios y vendes 1 sesión de fotos. Ya cobras el bono de ${formatBs(goalBonus(15))}.` },
+    { title: "Activo", total: month(30, 2 * packageGain + 3 * featuredGain), text: `30 anuncios, 2 paquetes "${pkg?.title ?? ""}" y 3 destacados.` },
+    { title: "A lo grande", best: true, total: month(50, 3 * packageGain + 4 * photoDone + 10 * featuredGain), text: "50 anuncios, 3 paquetes, 4 sesiones de fotos hechas por ti y 10 destacados." },
+  ];
+  const bestTotal = Math.max(...scenarios.map(item => item.total));
   const firstMonthExtra = listingPay.firstMonthFirst * (listingPay.firstMonthAmount - listingPay.regular);
 
   const faq: { q: string; a: string[] }[] = [
@@ -112,8 +125,8 @@ export default function EquipoPage() {
     <section className="eqp-hero">
       <div className="zu-container eqp-hero-in">
         <p className="eqp-tag"><ShieldCheck size={16} aria-hidden="true" />Invitación privada · Programa de aliados</p>
-        <h1>Te pagamos por cada dueño que publica su casa <em>con tu ayuda.</em></h1>
-        <p className="eqp-lead">Zentro Urbano es una página de alquileres en Santa Cruz donde el dueño publica gratis y alquila sin pagar comisión. Tu trabajo es traer dueños. Así de simple.</p>
+        <h1>¿Conoces gente que alquila casas o departamentos? <em>Te pagamos por cada uno.</em></h1>
+        <p className="eqp-lead">Zentro Urbano es la página de alquileres de Santa Cruz donde el dueño publica gratis y alquila sin pagar comisión. Buscamos personas que consigan muchas viviendas. Tú traes al dueño, nosotros revisamos y publicamos, y tú cobras por cada anuncio. No hay límite.</p>
         <div className="eqp-stats three">
           <div><strong>{formatBs(listingPay.regular)}</strong><span>por cada anuncio aprobado</span></div>
           <div><strong>{formatBs(listingPay.firstMonthAmount)}</strong><span>por cada uno de tus primeros {listingPay.firstMonthFirst}, para que arranques</span></div>
@@ -138,7 +151,7 @@ export default function EquipoPage() {
 
       <section className="eqp-block">
         <p className="eqp-kicker">Cuánto ganas</p>
-        <h2>Mientras más anuncios, más ganas.</h2>
+        <h2>Mientras más anuncios traes, más ganas.</h2>
         <p className="eqp-sub">Cada anuncio aprobado te da {formatBs(listingPay.regular)}. Al llegar a {joinWords(goalBonuses.map(goal => String(goal.listings)), "y")} anuncios en el mes se suma un bono. Esto es lo que cobras en un mes normal:</p>
         <ul className="eqp-steps">
           {ladder.map(row => <li key={row.count} className={row.bonus ? "bonus" : ""}>
@@ -149,6 +162,30 @@ export default function EquipoPage() {
         </ul>
         <p className="eqp-note">Tu primer mes ganas {formatBs(firstMonthExtra)} más, porque tus primeros {listingPay.firstMonthFirst} anuncios se pagan a {formatBs(listingPay.firstMonthAmount)}.</p>
         <Calculator />
+      </section>
+
+      <section className="eqp-block">
+        <p className="eqp-kicker">Del peor al mejor caso</p>
+        <h2>Cuánto puedes ganar, siendo honestos.</h2>
+        <p className="eqp-sub">No te prometemos un sueldo: ganas por lo que logras. Esto es lo que pasa en un mes según cuánto te muevas.</p>
+        <ol className="eqp-scen">{scenarios.map(item => <li key={item.title} className={item.best ? "best" : item.worst ? "worst" : ""} style={{ ["--h" as string]: `${Math.max(4, (item.total / bestTotal) * 100)}%` }}>
+          <i aria-hidden="true" />
+          <small>{item.title}</small>
+          <strong>{formatBs(item.total)}</strong>
+          <p>{item.text}</p>
+        </li>)}</ol>
+        <p className="eqp-note">Cálculo con los montos de esta página, en un mes normal. Las ventas se pagan cuando el dueño ya pagó.</p>
+      </section>
+
+      <section className="eqp-block">
+        <p className="eqp-kicker">Cómo crecer</p>
+        <h2>Empiezas con tus conocidos. Creces cuando sales a buscar.</h2>
+        <p className="eqp-sub">Lo que ganas depende de cuántos dueños alcanzas. Así pasan los aliados de unos pocos anuncios a decenas por mes.</p>
+        <ol className="eqp-grow">
+          <li><span className="eqp-ico"><Users size={22} aria-hidden="true" /></span><small>Nivel 1 · Tu círculo</small><h3>Familia, vecinos y conocidos</h3><p>Todos conocen a alguien con un cuarto, una casa o un depa vacío. Es la forma más rápida de lograr tus primeros {listingPay.firstMonthFirst} anuncios a {formatBs(listingPay.firstMonthAmount)}.</p><b>De 5 a 10 por mes</b></li>
+          <li><span className="eqp-ico"><Building2 size={22} aria-hidden="true" /></span><small>Nivel 2 · Sales a buscar</small><h3>Donde hay muchas viviendas juntas</h3><p>Llama a los números de los carteles &quot;Se alquila&quot; de tu barrio. Habla con porteros y administradores de edificios y condominios, que conocen a todos los dueños. Escríbeles a los dueños que publican en grupos de Facebook y Marketplace.</p><b>De 25 a 50 o más por mes</b></li>
+          <li><span className="eqp-ico"><Crown size={22} aria-hidden="true" /></span><small>Nivel 3 · Embajador</small><h3>Vendes servicios y armas tu equipo</h3><p>Con {ambassador.listings} anuncios y {ambassador.sales} ventas subes a Embajador: tus comisiones suben 5 puntos y ganas {formatBs(ambassador.referralBonus)} por cada aliado nuevo que traigas.</p><b>Anuncios + ventas + equipo</b></li>
+        </ol>
       </section>
 
       <section className="eqp-block">
