@@ -231,7 +231,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .family-motion.is-welcome { width: min(100%, 480px); margin: 20px auto 0; }
 .family-motion.is-compact { width: 260px; margin-inline: auto; }
 .pixel-neighborhood { width: 300px; max-width: 100%; flex: none; }
-.pixel-neighborhood img { display: block; width: 100%; height: auto; border-radius: 10px; }
+.pixel-neighborhood img { display: block; width: 100%; height: auto; border-radius: 10px; image-rendering: pixelated; }
 .pixel-neighborhood.is-hero { width: min(100%, 680px); margin: 24px auto 0; }
 .pixel-neighborhood.is-hero img { border-radius: 14px; }
 .pixel-neighborhood.is-scene { width: 100%; }
@@ -316,7 +316,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .footer-bottom nav { column-gap: 16px; }
   .mobile-navigation { display: grid; grid-template-columns: repeat(5,1fr); position: fixed; bottom: 0; left: 0; right: 0; z-index: 1200; background: var(--surface); border-top: 1px solid var(--line); padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); }
   .mobile-navigation a { display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); padding: 5px 0; font-size: 10px; }.mobile-navigation a[aria-current] { color: var(--brand); font-weight: 700; }
-  .rental-heading { padding: 26px 0 22px; }.rental-heading h1 { font-size: 30px; }.home-hero { padding: 0 0 22px; }.home-hero-top { grid-template-columns: 1fr; gap: 0; }.home-hero-scene { order: -1; margin-inline: -20px; }.home-hero-scene::after { background: linear-gradient(0deg, var(--brand-surface) 0%, transparent 40%); }.dark .home-hero-scene::after { background: linear-gradient(0deg, var(--brand-surface) 0%, transparent 40%), rgba(16, 32, 26, .38); }.home-hero-lead { padding: 4px 0 20px; }.home-hero-bottom { margin-top: 0; }.home-trust { gap: 6px 14px; }.home-trust li:last-child { margin-left: 0; }.heading-subtitle { max-width: 230px; font-size: 12px; line-height: 1.6; }
+  .rental-heading { padding: 26px 0 22px; }.rental-heading h1 { font-size: 30px; }.home-hero { padding: 0 0 22px; }.home-hero-top { grid-template-columns: 1fr; gap: 0; }.home-hero-scene { order: -1; margin-inline: -20px; }.home-hero-scene::after { background: linear-gradient(0deg, var(--brand-surface) 0%, transparent 8%); }.dark .home-hero-scene::after { background: linear-gradient(0deg, var(--brand-surface) 0%, transparent 8%), rgba(16, 32, 26, .38); }.home-hero-lead { padding: 4px 0 20px; }.home-hero-bottom { margin-top: 0; }.home-trust { gap: 6px 14px; }.home-trust li:last-child { margin-left: 0; }.heading-subtitle { max-width: 230px; font-size: 12px; line-height: 1.6; }
   .home-search { grid-template-columns: 1fr 1fr; gap: 0; padding: 0; background: var(--surface); }.home-search label { padding: 12px; border: 0; }.home-search label > span { font-size: 10px; }.home-search .search-query { grid-column: 1/-1; border-bottom: 1px solid var(--line); }.home-search label:nth-of-type(2) { border-right: 1px solid var(--line); }.home-search input, .home-search select { font-size: 16px; }.home-search .zu-button { grid-column: 1/-1; height: 44px; min-height: 44px; margin: 0 10px 10px; }
   .rental-categories { gap: 24px; margin-bottom: 22px; }.rental-categories a { flex-direction: column; gap: 7px; padding-block: 18px 14px; font-size: 10px; }.catalog-heading h2 { font-size: 21px; }.catalog-heading p { font-size: 11px; max-width: 220px; line-height: 1.6; }.catalog-heading .zu-button { padding: 9px 11px; font-size: 12px; flex-shrink: 0; }
   .rental-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px 16px; }.owner-band > div { flex-wrap: wrap; gap: 13px; padding-block: 25px; }.owner-band .zu-button { margin-left: 0; }.owner-band h2 { font-size: 19px; }.owner-band p { font-size: 12px; }.owner-band-icon { display: none; }
@@ -1049,3 +1049,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .morada-cluster-root.is-featured { background: #ee7f1f; box-shadow: 0 20px 52px rgb(20 20 20 / 0.3), 0 0 0 9px rgb(238 127 31 / 0.25); }
 @media (prefers-reduced-motion: no-preference) { .morada-marker-root.is-featured::before { animation: zu-feature-pulse 1.8s ease-out infinite; } }
 @keyframes zu-feature-pulse { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.9); opacity: 0; } }
+
+/* Anti-bot field on public forms: off screen, never focused (src/lib/form-guard.ts). */
+.form-trap { position: absolute; left: -10000px; top: auto; width: 1px; height: 1px; overflow: hidden; }
+.form-turnstile { min-height: 65px; }
