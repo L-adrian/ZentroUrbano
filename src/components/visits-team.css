@@ -68,10 +68,9 @@
 .visit-times-days { display: grid; gap: 18px; margin: 26px 0 0; padding: 0; list-style: none; }
 .visit-times-days h2 { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
 .visit-times-days ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
-.visit-times-days ul li { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.visit-times-days ul li { display: grid; grid-template-columns: 64px auto; align-items: center; gap: 12px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .visit-times-days ul strong { font-size: 16px; font-variant-numeric: tabular-nums; color: var(--foreground); }
-.visit-times-days ul span { color: var(--foreground); font-size: 14px; min-width: 0; overflow-wrap: anywhere; }
-.visit-times-days ul em { font-style: normal; font-size: 12px; font-weight: 650; color: var(--brand); background: var(--brand-soft); border-radius: 999px; padding: 2px 9px; }
+.visit-times-days ul em { justify-self: start; font-style: normal; font-size: 12px; font-weight: 650; color: var(--brand); background: var(--brand-soft); border-radius: 999px; padding: 2px 9px; }
 .visit-times-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
 .visit-times-note { margin-top: 16px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 
