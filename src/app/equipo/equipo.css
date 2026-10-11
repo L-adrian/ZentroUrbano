@@ -1,6 +1,7 @@
 /* /equipo: private recruiting page for aliados, shared by link only. */
 .eqp{--k-anuncios:#176b4d;--k-bono:#d9a21b;--k-paquetes:#1d5f7a;--k-servicios:#5fbf93;--k-destacados:#ee7f1f;color:var(--foreground);padding-bottom:64px}
 .eqp *{box-sizing:border-box;margin:0}
+.eqp .zu-container{margin-inline:auto}
 .eqp a{text-decoration:none}
 .eqp svg{flex-shrink:0}
 .eqp h2{font-size:30px;line-height:1.15;letter-spacing:-.02em;font-weight:650;max-width:720px;margin-top:8px}
