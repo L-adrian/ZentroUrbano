@@ -38,13 +38,20 @@ test("money inputs preserve thousands and distinguish decimal cents", () => {
   assert.equal(formatPriceInCurrency({price:3400,currency:"BOB",operation:"Alquiler"},"BOB"),"Bs 3.400/mes");
 });
 
-test("pixel neighborhood scene is light, accessible and respects reduced motion", async () => {
-  const svg = await readFile(new URL("../public/images/pixel/barrio-zentro.svg", import.meta.url), "utf8");
-  assert.ok(svg.length < 60_000);
-  assert.match(svg, /^<svg[^>]+viewBox="0 0 124 60"/);
-  assert.match(svg, /role="img" aria-label="[^"]+"/);
-  assert.match(svg, /@media \(prefers-reduced-motion:reduce\)/);
-  assert.doesNotMatch(svg, /<script|href=|url\(/i);
+test("pixel neighborhood scene is light, pixel-sized and has a still frame for reduced motion", async () => {
+  const gif = await readFile(new URL("../public/images/pixel/barrio-chibi.gif", import.meta.url));
+  const animated = await sharp(gif, { animated: true }).metadata();
+  assert.equal(animated.format, "gif");
+  assert.equal(animated.width, 200);
+  assert.equal(animated.pageHeight, 96);
+  assert.ok((animated.pages ?? 1) > 1);
+  assert.ok(gif.length < 120_000);
+  const still = await sharp(await readFile(new URL("../public/images/pixel/barrio-chibi.png", import.meta.url))).metadata();
+  assert.equal(still.width, 200);
+  assert.equal(still.height, 96);
+  const component = await readFile(new URL("../src/components/pixel-neighborhood.tsx", import.meta.url), "utf8");
+  assert.match(component, /prefers-reduced-motion: reduce\)" srcSet="\/images\/pixel\/barrio-chibi\.png"/);
+  assert.match(component, /alt="[^"]+"/);
 });
 
 test("family illustration is static, transparent and sharp at 3x its largest display size", async () => {

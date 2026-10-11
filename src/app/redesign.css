@@ -231,7 +231,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .family-motion.is-welcome { width: min(100%, 480px); margin: 20px auto 0; }
 .family-motion.is-compact { width: 260px; margin-inline: auto; }
 .pixel-neighborhood { width: 300px; max-width: 100%; flex: none; }
-.pixel-neighborhood img { display: block; width: 100%; height: auto; border-radius: 10px; }
+.pixel-neighborhood img { display: block; width: 100%; height: auto; border-radius: 10px; image-rendering: pixelated; }
 .pixel-neighborhood.is-hero { width: min(100%, 680px); margin: 24px auto 0; }
 .pixel-neighborhood.is-hero img { border-radius: 14px; }
 .pixel-neighborhood.is-scene { width: 100%; }
