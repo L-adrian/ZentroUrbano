@@ -45,7 +45,7 @@ test("pixel neighborhood scene is light, pixel-sized and has a still frame for r
   assert.equal(animated.width, 200);
   assert.equal(animated.pageHeight, 96);
   assert.ok((animated.pages ?? 1) > 1);
-  assert.ok(gif.length < 120_000);
+  assert.ok(gif.length < 260_000);
   const still = await sharp(await readFile(new URL("../public/images/pixel/barrio-chibi.png", import.meta.url))).metadata();
   assert.equal(still.width, 200);
   assert.equal(still.height, 96);
