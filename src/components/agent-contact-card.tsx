@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
+import { CalendarDays, CheckCircle2, Clock3, ExternalLink, Mail, MessageCircle, Phone } from "lucide-react";
 import Image from "next/image";
 import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
@@ -14,10 +14,12 @@ import { suggestedQuestions } from "@/lib/whatsapp-questions";
 type AgentContactCardProps = {
   property: Property;
   availability: AvailabilityState;
+  // "#agendar-visita" when the listing takes visit bookings.
+  visitHref?: string | null;
 };
 
 // Desktop keeps price, cost to move in and WhatsApp next to the gallery, once.
-export function AgentContactCard({ property, availability }: AgentContactCardProps) {
+export function AgentContactCard({ property, availability, visitHref = null }: AgentContactCardProps) {
   const agent = property.agent;
   const contactCopy = getPropertyContactCopy(property);
   const contactUsesReference = isExternalContactUrl(property.whatsapp);
@@ -64,6 +66,12 @@ export function AgentContactCard({ property, availability }: AgentContactCardPro
           )}
           {contactCopy.label}
         </a>
+        {visitHref ? (
+          <a href={visitHref} className="zu-button zu-button-secondary visit-jump mt-2 w-full">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" />
+            Agendar una visita
+          </a>
+        ) : null}
         {questions}
       </div>
 

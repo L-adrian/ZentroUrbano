@@ -2,7 +2,8 @@ import type { Property } from "@/lib/properties";
 
 export type DisplayCurrency = Property["currency"];
 
-export const currencyExchangeRateBobPerUsd = 7;
+// Reference rate (Bs per US dollar), used whenever the owner gives no rate of their own.
+export const currencyExchangeRateBobPerUsd = 12;
 export const maxPropertyExchangeRate = 1000;
 
 export function parseCurrencyAmount(value: unknown): number | null {

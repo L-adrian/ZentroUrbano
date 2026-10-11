@@ -1,3 +1,4 @@
+import { currencyExchangeRateBobPerUsd } from "@/lib/currency";
 // Optional paid services. Publishing and contacting owners stay free; nothing here is a % of the rent.
 // Prices are fixed amounts in bolivianos. Every service is coordinated by WhatsApp.
 
@@ -47,8 +48,8 @@ export type ServicePackage = {
   conditions: string[];
 };
 
-// Fixed rate for showing the dollar reference on this page only.
-export const servicesUsdRate = 12;
+// Same reference rate as the listings, for showing the dollar price next to each service.
+export const servicesUsdRate = currencyExchangeRateBobPerUsd;
 
 export const ownerCategories = ["Preparar el anuncio", "Promocionar", "Alquilar seguro", "Contrato y entrega"];
 export const packageGoals = ["Para empezar", "Alquilar rápido", "Cerrar seguro", "Varias viviendas"];

@@ -28,6 +28,7 @@ import { PriceDisplay } from "@/components/currency-preference";
 import { OwnerLocationDialog } from "@/components/owner-location-dialog";
 import { OwnerServicesNote } from "@/components/owner-services-note";
 import { OwnerShareKit } from "@/components/owner-share-kit";
+import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
 import "./listing-tones.css";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
 import {
@@ -63,8 +64,10 @@ type EditedProperty = Property & { petsPolicy?: PetsPolicy; beforeVisit?: Before
 
 export function ClientDashboard({
   account,
+  visits = null,
 }: {
   account: DemoAccount;
+  visits?: OwnerVisits | null;
 }) {
   const router = useRouter();
   const baseProperties = useMemo(() => getDirectRentals(getDemoAccountProperties(account)), [account]);
@@ -200,6 +203,9 @@ export function ClientDashboard({
       <main className="mx-auto grid max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[1fr_360px] lg:px-8">
         <div className="grid min-w-0 gap-6">
           <RequestsSection requests={requests} liveSlugs={new Set(properties.filter((property) => listingFor(property).status === "live").map((property) => property.slug))} />
+          {visits && properties.length > 0 ? (
+            <OwnerVisitsSection visits={visits} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} />
+          ) : null}
           <AccountSummary account={account} liveCount={liveCount} />
           <section className="rounded-[28px] border border-black/10 bg-white p-5 sm:p-6">
             <p className="text-sm font-semibold uppercase tracking-[0.16em] text-[#8b4b31]">

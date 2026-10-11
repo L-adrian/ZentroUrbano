@@ -62,7 +62,7 @@ test("welcome has real entry points, metadata and the pixel neighborhood scene",
   assert.match(html, /href="\/publicar"/);
   assert.match(html, /property="og:url" content="[^"]*\/bienvenida"/);
   assert.match(html, /pixel-neighborhood is-hero/);
-  assert.match(html, /\/images\/pixel\/barrio-zentro\.svg/);
+  assert.match(html, /\/images\/pixel\/barrio-chibi\.gif/);
   assert.doesNotMatch(html, /family-key|family-replay/);
   assert.match(html, /support-whatsapp-floating/);
   assert.match(html, /rental-faq-item/);
@@ -76,7 +76,7 @@ test("welcome has real entry points, metadata and the pixel neighborhood scene",
 
 test("home links to the welcome explanation and serves the branded house icon", options, async () => {
   const html = await (await request("/")).text();
-  assert.match(html, /\/images\/pixel\/barrio-zentro\.svg/);
+  assert.match(html, /\/images\/pixel\/barrio-chibi\.gif/);
   assert.match(html, /href="\/bienvenida#sin-comisiones"/);
   assert.match(html, /href="\/icon.svg\?/);
   const icon = await request("/icon.svg");

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ClientDashboard } from "@/components/client-dashboard";
 import { getCurrentAccount, getCurrentDashboardAccount } from "@/lib/mysql-auth";
+import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -26,9 +27,17 @@ export default async function ClientPage() {
     redirect("/login?next=/cliente");
   }
 
+  // Visits booked on the owner's listings; null while the visit tables are missing.
+  const slugs = (dashboard.properties ?? []).map((property) => property.slug);
+  const [bookings, settings] = await Promise.all([
+    listBookingsFor(slugs).catch(() => null),
+    getVisitSettingsFor(slugs).catch(() => null),
+  ]);
+  const visits = bookings && settings ? { bookings, settings } : null;
+
   return (
     <Suspense fallback={<DashboardFallback />}>
-      <ClientDashboard account={dashboard} />
+      <ClientDashboard account={dashboard} visits={visits} />
     </Suspense>
   );
 }

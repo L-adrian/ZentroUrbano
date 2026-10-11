@@ -3,6 +3,7 @@ import { ArrowRight, Eye, EyeOff, KeyRound, LoaderCircle, LockKeyhole, Mail, Use
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { HoneypotField, TurnstileBox, useFormGuard } from "@/components/form-guard-fields";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { googleAuthMessages, safeAuthNext } from "@/lib/auth-navigation";
 
@@ -19,17 +20,27 @@ export function LoginPanel({ authEnabled }: { authEnabled: boolean }) {
   const next = params.get("next");
   const nextPath = safeAuthNext(next);
   const publishing = nextPath === "/publicar";
+  const guard = useFormGuard("registro", mode === "signup");
+  const waitingForCheck = mode === "signup" && Boolean(guard.siteKey) && !guard.turnstileToken;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!authEnabled || busy) return;
+    if (mode === "signup" && waitingForCheck) { setError("Marca la casilla de verificación antes de crear tu cuenta."); return; }
     setBusy(true); setError("");
     try {
       const response = await fetch(mode === "signup" ? "/api/auth/register" : "/api/auth/login", {
         method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ displayName: displayName.trim(), email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({
+          displayName: displayName.trim(), email: email.trim().toLowerCase(), password,
+          ...(mode === "signup" ? guard.fields(event.currentTarget) : {}),
+        }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.message || "No pudimos completar el acceso.");
+      if (!response.ok) {
+        // A refused sign-up needs a fresh ticket, except when it was only sent too fast.
+        if (mode === "signup" && response.status !== 429) guard.renew();
+        throw new Error(data.message || "No pudimos completar el acceso.");
+      }
       window.dispatchEvent(new Event("morada-session"));
       router.push(nextPath); router.refresh();
     } catch (err) { setError(err instanceof Error ? err.message : "Revisa tu conexión e intenta nuevamente."); }
@@ -49,6 +60,7 @@ export function LoginPanel({ authEnabled }: { authEnabled: boolean }) {
       {mode === "signup" && <label><span><UserRound size={15} />Tu nombre</span><input value={displayName} onChange={event => setDisplayName(event.target.value)} autoComplete="name" required placeholder="Nombre y apellido" /></label>}
       <label><span><Mail size={15} />{mode === "signup" ? "Correo electrónico" : "Correo o usuario"}</span><input type={mode === "signup" ? "email" : "text"} value={email} onChange={event => setEmail(event.target.value)} autoComplete={mode === "signup" ? "email" : "username"} autoCapitalize="none" spellCheck={false} required placeholder={mode === "signup" ? "tu@correo.com" : "Correo o nombre de usuario"} /></label>
       <label><span><LockKeyhole size={15} />Contraseña</span><div className="password-field"><input type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} autoComplete={mode === "signup" ? "new-password" : "current-password"} minLength={mode === "signup" ? 8 : undefined} required placeholder={mode === "signup" ? "Al menos 8 caracteres" : "Tu contraseña"} /><button type="button" onClick={() => setShowPassword(current => !current)} aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} title={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>{showPassword ? <EyeOff size={17} /> : <Eye size={17} />}</button></div></label>
+      {mode === "signup" && <><HoneypotField /><TurnstileBox guard={guard} /></>}
       {(error || params.get("google_error")) && <p role="alert" className="auth-error">{error || googleAuthMessages[params.get("google_error") || ""] || "No se pudo completar el acceso con Google. Intenta con tu correo."}</p>}
       <button type="submit" className="zu-button zu-button-primary" disabled={busy || !authEnabled}>{busy ? <LoaderCircle size={18} className="zu-spin" /> : <ArrowRight size={18} />}{busy ? "Un momento..." : mode === "signup" ? "Crear mi cuenta" : "Ingresar"}</button>
     </form>
