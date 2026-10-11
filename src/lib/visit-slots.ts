@@ -18,6 +18,9 @@ export type VisitSettings = {
 };
 
 export const defaultVisitSettings: VisitSettings = { enabled: true, weekdays: [1, 2, 3, 4, 5, 6], startMinute: 9 * 60, endMinute: 18 * 60 };
+// A home whose host never chose visit hours: bookings stay off so nobody books a time the owner never offered.
+// The default hours are only the suggestion shown when they turn bookings on.
+export const unsetVisitSettings: VisitSettings = { ...defaultVisitSettings, enabled: false };
 
 export const weekdayNames = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 export const weekdayShortNames = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -135,11 +138,3 @@ export function visitSettingsSummary(settings: VisitSettings) {
 }
 
 export const visitLimits = { name: 80, note: 240 } as const;
-
-// "Ana María Rojas" -> "Ana María R." for the public list of booked times.
-export function visitorPublicName(name: string) {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  if (words.length <= 1) return words[0] ?? "Reservado";
-  const last = words.at(-1) ?? "";
-  return `${words.slice(0, -1).slice(0, 2).join(" ")} ${last[0]?.toLocaleUpperCase("es") ?? ""}.`;
-}

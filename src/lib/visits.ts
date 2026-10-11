@@ -5,7 +5,7 @@ import type { Property } from "@/lib/properties";
 import { isExternalContactUrl } from "@/lib/property-contact";
 import { getPropertyTeam, isMissingTable } from "@/lib/team";
 import type { PropertyTeamEntry, PublicTeamMember } from "@/lib/team-roles";
-import { defaultVisitSettings, visitBookingDays, type VisitSettings } from "@/lib/visit-slots";
+import { unsetVisitSettings, visitBookingDays, type VisitSettings } from "@/lib/visit-slots";
 
 // Visits booked from the listing page. Until 008_team_and_visits runs, booking is "unavailable"
 // and the page keeps only the WhatsApp button.
@@ -61,7 +61,7 @@ function toBooking(row: BookingRow): VisitBooking {
 const bookingColumns = "id, property_slug, starts_at, visitor_name, visitor_whatsapp, note, host_kind, host_member_id, status, created_at";
 
 function parseSettings(row: SettingsRow | null): VisitSettings {
-  if (!row) return defaultVisitSettings;
+  if (!row) return unsetVisitSettings;
   const weekdays = row.weekdays.split(",").map(Number).filter((day) => Number.isInteger(day) && day >= 0 && day <= 6);
   return { enabled: Boolean(row.enabled), weekdays, startMinute: Number(row.start_minute), endMinute: Number(row.end_minute) };
 }
@@ -90,7 +90,7 @@ export async function getVisitSettingsFor(slugs: string[]): Promise<Record<strin
       Object.fromEntries(slugs.map((slug, index) => [`slug${index}`, slug])),
     )) ?? [];
     const found = new Map(rows.map((row) => [row.property_slug, parseSettings(row)]));
-    return Object.fromEntries(slugs.map((slug) => [slug, found.get(slug) ?? defaultVisitSettings]));
+    return Object.fromEntries(slugs.map((slug) => [slug, found.get(slug) ?? unsetVisitSettings]));
   } catch (error) {
     if (isMissingTable(error)) return null;
     throw error;
