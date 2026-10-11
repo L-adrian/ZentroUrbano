@@ -2,7 +2,7 @@
 // Prices come from services.ts so the commissions follow the Servicios page.
 import { getPackage, getService, servicePackages } from "@/lib/services";
 
-export const listingPay = { firstMonthFirst: 5, firstMonthAmount: 25, regular: 15, photoBonus: 5, photoBonusMin: 8 };
+export const listingPay = { firstMonthFirst: 5, firstMonthAmount: 25, firstMonthDays: 30, regular: 15, photoBonus: 5, photoBonusMin: 8, clawbackDays: 30 };
 export const goalBonuses = [
   { listings: 10, bonus: 100 },
   { listings: 25, bonus: 300 },
