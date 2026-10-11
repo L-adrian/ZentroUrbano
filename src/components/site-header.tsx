@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { CurrencySelector } from "@/components/currency-preference";
+import { RegionPicker } from "@/components/region-picker";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 
@@ -52,6 +53,7 @@ export function SiteHeader() {
     <header className="zu-header">
       <div className="zu-container header-inner">
         <Link href="/" className="zu-logo" aria-label="Zentro Urbano, inicio"><span className="logo-mark"><House size={22} strokeWidth={1.8} /></span><span>Zentro<span className="logo-accent">Urbano</span></span></Link>
+        <RegionPicker />
         <nav className="header-nav" aria-label="Navegación principal">
           {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}><Icon size={17} />{label}</Link>)}
           <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={17} />Cómo funciona</Link>
