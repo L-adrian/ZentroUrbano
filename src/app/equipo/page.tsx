@@ -38,6 +38,14 @@ const rules = [
   "Decir que eres de una inmobiliaria. Dices: \"trabajo con Zentro Urbano\".",
   "Publicar una vivienda sin permiso del dueño, inventar datos o usar fotos de otros anuncios.",
   "Prometer que se alquila en un plazo. Nadie puede asegurar eso.",
+  "Traer viviendas de inmobiliarias o corredores como si fueran de dueños.",
+];
+
+// What owners usually ask an aliado, answered the way Zentro wants it said.
+const objections = [
+  { q: "\"¿Cuánto me cobran?\"", a: "Nada. Publicar es gratis y no hay comisión por alquilar. Si quiere ayuda extra, como fotos o un anuncio destacado, es opcional y tiene precio fijo." },
+  { q: "\"¿Y entonces de qué viven?\"", a: "De servicios opcionales para los dueños que los quieren: fotos, recorridos 3D, anuncios destacados y paquetes." },
+  { q: "\"¿Quién va a ver mi número?\"", a: "Las personas interesadas en su vivienda, que le escriben directo por WhatsApp. Antes de publicar revisamos cada anuncio." },
 ];
 
 export default function EquipoPage() {
@@ -51,7 +59,7 @@ export default function EquipoPage() {
   const featuredGain = featuredPrice * rates.featured;
   const month = (approved: number, extra = 0) => listingAmount(approved, false) + goalBonus(approved) + extra;
   const scenarios = [
-    { title: "Peor caso", worst: true, total: 0, text: "No consigues ningún anuncio. No ganas, pero tampoco pierdes: entrar no cuesta nada y no compras material." },
+    { title: "Peor caso", worst: true, total: 0, text: "No consigues ningún anuncio. No ganas, pero solo pusiste tu tiempo: entrar no cuesta nada y no compras material." },
     { title: "Unas horas por semana", total: month(5), text: "5 anuncios de tus conocidos." },
     { title: "Constante", total: month(15, photoSold), text: `15 anuncios y vendes 1 sesión de fotos. Ya cobras el bono de ${formatBs(goalBonus(15))}.` },
     { title: "Activo", total: month(30, 2 * packageGain + 3 * featuredGain), text: `30 anuncios, 2 paquetes "${pkg?.title ?? ""}" y 3 destacados.` },
@@ -65,8 +73,9 @@ export default function EquipoPage() {
       q: "¿Cuándo cuenta un anuncio?",
       a: [
         "Cuando nuestro equipo lo revisa, lo aprueba y queda publicado. Que el dueño solo se registre no cuenta.",
-        "El dueño tiene que ser nuevo en Zentro Urbano, la vivienda tiene que ser real, estar en Santa Cruz y estar disponible.",
-        "Tu código tiene que llegarnos antes de que el dueño publique: tú nos lo mandas por WhatsApp o el dueño lo escribe al registrarse.",
+        "Tiene que ser el dueño directo de la vivienda, no una inmobiliaria ni un corredor. Lo llamamos para confirmarlo antes de aprobar.",
+        "El dueño tiene que ser nuevo en Zentro Urbano, y la vivienda tiene que ser real, estar en Santa Cruz y estar disponible.",
+        "Antes de que el dueño publique, nos mandas por WhatsApp tu código con su nombre y su número. Así sabemos que vino contigo.",
       ],
     },
     {
@@ -183,9 +192,16 @@ export default function EquipoPage() {
         <p className="eqp-sub">Lo que ganas depende de cuántos dueños alcanzas. Así pasan los aliados de unos pocos anuncios a decenas por mes.</p>
         <ol className="eqp-grow">
           <li><span className="eqp-ico"><Users size={22} aria-hidden="true" /></span><small>Nivel 1 · Tu círculo</small><h3>Familia, vecinos y conocidos</h3><p>Todos conocen a alguien con un cuarto, una casa o un depa vacío. Es la forma más rápida de lograr tus primeros {listingPay.firstMonthFirst} anuncios a {formatBs(listingPay.firstMonthAmount)}.</p><b>De 5 a 10 por mes</b></li>
-          <li><span className="eqp-ico"><Building2 size={22} aria-hidden="true" /></span><small>Nivel 2 · Sales a buscar</small><h3>Donde hay muchas viviendas juntas</h3><p>Llama a los números de los carteles &quot;Se alquila&quot; de tu barrio. Habla con porteros y administradores de edificios y condominios, que conocen a todos los dueños. Escríbeles a los dueños que publican en grupos de Facebook y Marketplace.</p><b>De 25 a 50 o más por mes</b></li>
+          <li><span className="eqp-ico"><Building2 size={22} aria-hidden="true" /></span><small>Nivel 2 · Sales a buscar</small><h3>Donde hay muchas viviendas juntas</h3><p>Llama a los carteles &quot;Se alquila&quot; de tu barrio y pregunta si hablas con el dueño. Habla con porteros y administradores de edificios y condominios, que conocen a todos los dueños. Escríbeles a los dueños directos que publican en Facebook y Marketplace y todavía no están en Zentro Urbano.</p><b>De 25 a 50 o más por mes</b></li>
           <li><span className="eqp-ico"><Crown size={22} aria-hidden="true" /></span><small>Nivel 3 · Embajador</small><h3>Vendes servicios y armas tu equipo</h3><p>Con {ambassador.listings} anuncios y {ambassador.sales} ventas subes a Embajador: tus comisiones suben 5 puntos y ganas {formatBs(ambassador.referralBonus)} por cada aliado nuevo que traigas.</p><b>Anuncios + ventas + equipo</b></li>
         </ol>
+      </section>
+
+      <section className="eqp-block">
+        <p className="eqp-kicker">Qué le dices al dueño</p>
+        <h2>Explícalo en 30 segundos.</h2>
+        <blockquote className="eqp-pitch">&quot;Hola, trabajo con Zentro Urbano, una página de alquileres de Santa Cruz. Publicar tu vivienda es gratis y no pagas comisión cuando la alquilas. Los interesados te escriben directo a tu WhatsApp. Si quieres, te ayudo a subirla ahora.&quot;</blockquote>
+        <div className="eqp-objections">{objections.map(item => <article key={item.q}><h3>{item.q}</h3><p>{item.a}</p></article>)}</div>
       </section>
 
       <section className="eqp-block">
