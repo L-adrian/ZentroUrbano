@@ -72,7 +72,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .zu-skip-link { position: fixed; top: -100px; left: 16px; padding: 12px; background: var(--surface); z-index: 3000; }
 .zu-skip-link:focus { top: 8px; }
 .zu-header { position: sticky; top: 0; z-index: 1100; background: var(--surface); border-bottom: 1px solid var(--line); }
-.header-inner { display: flex; align-items: center; gap: 42px; height: 76px; }
+.header-inner { display: flex; align-items: center; gap: 32px; height: 76px; }
 .zu-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 21px; font-weight: 760; color: var(--foreground); white-space: nowrap; }
 .logo-accent { color: var(--brand); font-weight: 500; }
 .logo-mark { display: grid; place-items: center; height: 35px; width: 35px; border-radius: 8px; background: var(--brand); color: white; }
@@ -80,11 +80,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .header-nav a { display: flex; align-items: center; gap: 7px; padding: 10px 12px; font-size: 13px; font-weight: 550; color: var(--muted); border-radius: 6px; white-space: nowrap; }
 .header-nav a[aria-current], .header-nav a:hover { color: var(--brand); background: var(--brand-soft); }
 .header-actions { margin-left: auto; }
+/* The logo and the buttons keep their size; if a wide font ever runs out of room, the links clip instead of the page scrolling sideways. */
+.header-nav { gap: 4px; min-width: 0; overflow: clip; overflow-clip-margin: 4px; }
+.zu-logo, .header-actions, .header-actions > * { flex-shrink: 0; }
 .header-theme { display: flex; }
 .header-contact { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 44px; padding-inline: 8px; color: var(--muted); font-size: 13px; font-weight: 550; white-space: nowrap; border-radius: 6px; }
 .header-contact:hover, .header-contact[aria-current] { color: var(--brand); background: var(--brand-soft); }
 .header-publish { white-space: nowrap; }
-@media (min-width: 1101px) and (max-width: 1439px) { .header-contact span { display: none; } }
+/* Desktop header: text-only links and an icon-only contact button, so the five links fit next to the buttons. */
+@media (min-width: 1101px) { .header-contact span, .header-nav a svg { display: none; } }
 .menu-theme { display: none; }
 .currency-control { display: grid; justify-items: center; gap: 2px; width: 148px; flex-shrink: 0; }
 .currency-reference { min-height: 15px; font-size: 11px; line-height: 15px; color: var(--muted); text-align: center; }
@@ -296,7 +300,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .rental-card { animation: zu-appear .35s ease-out both; }.zu-skeleton { animation: zu-pulse 1.3s ease-in-out infinite; }.zu-spin { animation: zu-spin 1s linear infinite; }
 }
 @media (max-width: 1100px) { .header-inner { gap: 20px; }.header-nav { display: none; }.rental-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }.home-search { grid-template-columns: 1.3fr 1fr 1fr auto; }.home-search label:nth-last-of-type(1) { display: none; } }
-@media (min-width: 1101px) and (max-width: 1279px) { .header-inner { gap: 16px; }.header-nav { gap: 0; }.header-nav a { padding-inline: 8px; } }
+@media (min-width: 1101px) and (max-width: 1279px) { .header-inner { gap: 16px; }.header-nav { gap: 0; }.header-nav a { padding-inline: 8px; }.header-theme { display: none; }.menu-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }.account-dropdown .menu-theme .zu-icon-button { width: 38px; justify-content: center; padding: 0; } }
 @media (max-width: 768px) {
   body { padding-bottom: calc(66px + env(safe-area-inset-bottom)); }
   .zu-container { padding-inline: 20px; }.header-inner { height: 64px; gap: 8px; }.zu-logo { font-size: 19px; gap: 8px; }.logo-mark { height: 31px; width: 31px; }.header-currency, .header-publish { display: none; }.header-actions { gap: 7px; }.zu-icon-button { height: 38px; width: 38px; }
