@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getPropertyBySlugData } from "@/lib/property-data";
 import { ownerFirstName } from "@/lib/property-contact";
-import { boliviaDayKey, visitShortLabel, visitorPublicName, visitSettingsSummary } from "@/lib/visit-slots";
+import { boliviaDayKey, visitShortLabel, visitSettingsSummary } from "@/lib/visit-slots";
 import { getVisitPlan, listUpcomingBookings } from "@/lib/visits";
 import "@/components/visits-team.css";
 
@@ -46,7 +46,7 @@ export default async function VisitTimesPage({ params }: { params: Promise<{ slu
           {host.kind === "embajador"
             ? <>Muestra la vivienda {host.name}, embajador de Zentro Urbano.</>
             : <>Las visitas se coordinan con {ownerFirstName(host.name) ?? "el dueño"}.</>}
-          {plan ? ` Horario: ${visitSettingsSummary(plan.settings).toLocaleLowerCase("es")}.` : ""}
+          {plan?.settings.enabled ? ` Horario: ${visitSettingsSummary(plan.settings).toLocaleLowerCase("es")}.` : ""}
         </p>
       ) : null}
 
@@ -63,7 +63,6 @@ export default async function VisitTimesPage({ params }: { params: Promise<{ slu
                 {items.map((booking) => (
                   <li key={booking.id}>
                     <strong>{visitShortLabel(booking.startsAt).split(" · ")[1]}</strong>
-                    <span>{visitorPublicName(booking.visitorName)}</span>
                     <em>Reservado</em>
                   </li>
                 ))}

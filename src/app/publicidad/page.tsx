@@ -5,7 +5,7 @@ import { siteConfig, whatsappUrl } from "@/lib/site";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Anuncia tu negocio en Zentro Urbano",
-  description: "Espacios publicitarios para empresas de mudanzas, limpieza, mantenimiento y equipamiento del hogar, frente a más de 10.000 personas al día que buscan alquiler en Santa Cruz.",
+  description: "Espacios publicitarios para empresas de mudanzas, limpieza, mantenimiento y equipamiento del hogar, frente a personas que buscan alquiler en Santa Cruz.",
   path: "/publicidad",
 });
 const plans = [
@@ -20,7 +20,7 @@ export default function AdvertisingPage() {
     <header className="advertising-heading"><p className="zu-eyebrow"><Megaphone size={15} /> PUBLICIDAD PARA NEGOCIOS</p><h1>Anuncia tu negocio en Zentro Urbano</h1><p>Quien busca alquiler está por mudarse, y pronto va a necesitar una mudanza, limpieza, arreglos o muebles. Si tu negocio ofrece eso, este es el momento para que te conozcan.</p></header>
     <section aria-label="Alcance" className="advertising-reach">
       <Users size={22} />
-      <div><strong>Más de 10.000 personas al día</strong><p>Gente en Santa Cruz que busca un lugar para vivir y está a punto de mudarse.</p></div>
+      <div><strong>Gente que está por mudarse</strong><p>Quien entra a Zentro Urbano busca un lugar para vivir en Santa Cruz. Te mostramos cuántas personas vieron tu anuncio y cuántas hicieron clic.</p></div>
     </section>
     <section aria-label="Planes de publicidad" className="advertising-plans">
       {plans.map(plan => <article key={plan.name}>

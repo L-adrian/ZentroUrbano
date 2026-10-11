@@ -7,9 +7,9 @@ import { teamMemberSlug, teamPhotoUrl } from "../src/lib/team-roles";
 import {
   buildVisitDays,
   defaultVisitSettings,
+  unsetVisitSettings,
   isBookableStart,
   normalizeVisitSettings,
-  visitorPublicName,
   visitSettingsSummary,
   visitShortLabel,
   visitWhenLabel,
@@ -58,8 +58,8 @@ test("visit labels are written in Bolivian time", () => {
   assert.equal(visitWhenLabel("2026-10-17T14:00:00.000Z"), "sábado 17 de octubre a las 10:00");
   assert.equal(visitShortLabel("2026-10-17T14:00:00.000Z"), "Sáb 17 oct · 10:00");
   assert.equal(visitSettingsSummary(defaultVisitSettings), "Lunes a sábado, de 09:00 a 18:00");
-  assert.equal(visitorPublicName("Ana María Rojas"), "Ana María R.");
-  assert.equal(visitorPublicName("Carla"), "Carla");
+  // Homes whose host never chose hours do not take bookings.
+  assert.equal(isBookableStart("2026-10-12T14:00:00.000Z", unsetVisitSettings, saturdayMorning), false);
 });
 
 test("visit settings accept only whole half hours between 06:00 and 22:00 with at least one hour", () => {
