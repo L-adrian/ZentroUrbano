@@ -1,4 +1,4 @@
-import { ExternalLink, MessageCircle } from "lucide-react";
+import { CalendarDays, ExternalLink, MessageCircle } from "lucide-react";
 import { PriceDisplay } from "@/components/currency-preference";
 import { PropertyShareButton } from "@/components/property-share-button";
 import { getPropertyContactCopy, isExternalContactUrl, whatsappContactPath } from "@/lib/property-contact";
@@ -7,9 +7,10 @@ import { getAvailabilityState, getEntryCost } from "@/lib/listing-summary";
 
 type MobileStickyContactProps = {
   property: Property;
+  visitHref?: string | null;
 };
 
-export function MobileStickyContact({ property }: MobileStickyContactProps) {
+export function MobileStickyContact({ property, visitHref = null }: MobileStickyContactProps) {
   const entry = getEntryCost(property);
   const availability = getAvailabilityState(property);
   const contactCopy = getPropertyContactCopy(property);
@@ -38,6 +39,16 @@ export function MobileStickyContact({ property }: MobileStickyContactProps) {
           label="Compartir ficha"
           className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-neutral-300 bg-white text-neutral-950"
         />
+        {visitHref ? (
+          <a
+            href={visitHref}
+            aria-label="Agendar una visita"
+            title="Agendar una visita"
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center border border-neutral-300 bg-white text-neutral-950"
+          >
+            <CalendarDays className="h-5 w-5" aria-hidden="true" />
+          </a>
+        ) : null}
         <a
           href={whatsappContactPath(property.slug, "barra")}
           target="_blank"

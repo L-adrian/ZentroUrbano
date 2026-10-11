@@ -60,3 +60,25 @@ export type WhatsappContactSource = (typeof whatsappContactSources)[number];
 export function whatsappContactPath(slug: string, source: WhatsappContactSource) {
   return `/api/propiedades/${slug}/whatsapp?desde=${source}`;
 }
+
+// After a visit is booked on the listing page: the visitor sends this to the owner (or to the
+// Zentro embajador in charge of the home), with the link to the page of booked times.
+export function buildVisitWhatsappMessage(input: {
+  hostKind: "owner" | "embajador";
+  hostName: string | null;
+  visitorName: string;
+  property: Pick<Property, "type" | "zone" | "rentalDetails">;
+  when: string;
+  listingUrl: string;
+  visitsUrl: string;
+}) {
+  const firstName = ownerFirstName(input.hostName);
+  const kind = (input.property.rentalDetails?.type ?? input.property.type).toLocaleLowerCase("es");
+  const home = input.hostKind === "owner" ? `tu ${kind}` : "la vivienda";
+  return [
+    `${firstName ? `Hola ${firstName}` : "Hola"}, soy ${input.visitorName}. Reservé por Zentro Urbano una visita para ver ${home} en ${input.property.zone} el ${input.when}.`,
+    `Anuncio: ${input.listingUrl}`,
+    `Horarios reservados: ${input.visitsUrl}`,
+    "¿Me confirmas la visita?",
+  ].join("\n");
+}

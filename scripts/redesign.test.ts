@@ -12,14 +12,14 @@ test("prices start in bolivianos and exchange-rate notes match the actual conver
   const bob = { price: 3000, currency: "BOB" as const, operation: "Alquiler" as const };
   assert.equal(formatPriceInCurrency(bob, defaultDisplayCurrency), "Bs 3.000/mes");
   assert.equal(getPropertyExchangeRateNote(bob, "BOB"), null);
-  assert.equal(getPropertyExchangeRateNote(bob, "USD"), "T/C referencial: 1 USD = 7 Bs");
-  assert.equal(formatPriceInCurrency(bob, "USD"), "$us 429/mes");
-  assert.equal(getPropertyExchangeRateNote({ ...bob, exchangeRate: 10 }, "USD"), "T/C referencial: 1 USD = 7 Bs");
+  assert.equal(getPropertyExchangeRateNote(bob, "USD"), "T/C referencial: 1 USD = 12 Bs");
+  assert.equal(formatPriceInCurrency(bob, "USD"), "$us 250/mes");
+  assert.equal(getPropertyExchangeRateNote({ ...bob, exchangeRate: 10 }, "USD"), "T/C referencial: 1 USD = 12 Bs");
   const usd = { ...bob, price: 400, currency: "USD" as const, exchangeRate: 8.25 };
   for (const currency of ["BOB", "USD"] as const) {
     assert.equal(getPropertyExchangeRateNote(usd, currency), "T/C del propietario: 1 USD = 8,25 Bs");
-    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: null }, currency), "T/C referencial: 1 USD = 7 Bs");
-    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: 0 }, currency), "T/C referencial: 1 USD = 7 Bs");
+    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: null }, currency), "T/C referencial: 1 USD = 12 Bs");
+    assert.equal(getPropertyExchangeRateNote({ ...usd, exchangeRate: 0 }, currency), "T/C referencial: 1 USD = 12 Bs");
   }
   assert.equal(formatPriceInCurrency(usd, defaultDisplayCurrency), "Bs 3.300/mes");
   assert.equal(formatExchangeRate(7.1234), "1 USD = 7,1234 Bs");
@@ -77,8 +77,8 @@ test("USD listings use their own exchange rate in display and budget calculation
   assert.equal(getPropertyPriceInCurrency({ ...property, exchangeRate: 10 }, "BOB"), 4000);
   assert.equal(getPropertyPriceInCurrency(property, "USD"), 400);
   assert.match(formatPriceInCurrency(property, "BOB"), /3[.,]300\/mes/);
-  assert.equal(getPropertyPriceInCurrency({ ...property, exchangeRate: null }, "BOB"), 2800);
-  assert.equal(getPropertyExchangeRate({ currency: "BOB", exchangeRate: 10 }), 7);
+  assert.equal(getPropertyPriceInCurrency({ ...property, exchangeRate: null }, "BOB"), 4800);
+  assert.equal(getPropertyExchangeRate({ currency: "BOB", exchangeRate: 10 }), 12);
 });
 
 test("exchange rate accepts decimals but never non-finite, negative or zero values", () => {

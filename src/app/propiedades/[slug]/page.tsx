@@ -47,6 +47,9 @@ import { whatsappContactPath } from "@/lib/property-contact";
 import { getPropertyParkingLabel } from "@/lib/property-parking";
 import { publishedTour } from "@/lib/property-tours";
 import { PrivateTourShowcaseViewer } from "@/components/private-tour-showcase";
+import { PropertyVisitSection } from "@/components/property-visit-section";
+import { buildVisitDays } from "@/lib/visit-slots";
+import { getVisitPlan, listUpcomingBookings } from "@/lib/visits";
 
 // Prices and availability must not survive edits in an external CDN cache.
 export const dynamic = "force-dynamic";
@@ -152,12 +155,17 @@ export default async function PropertyDetailPage({
     { name: property.title, path: `/propiedades/${property.slug}` },
   ]);
 
-  const [similarProperties, tour, viewStats] = await Promise.all([
+  const [similarProperties, tour, viewStats, visitPlan, bookings] = await Promise.all([
     getSimilarPropertiesData(property),
     publishedTour(property.slug),
     getPublicViewStats(property.slug),
+    getVisitPlan(property),
+    listUpcomingBookings(property.slug),
   ]);
   const availability = getAvailabilityState(property);
+  const visitDays = visitPlan?.host && bookings ? buildVisitDays(visitPlan.settings, bookings.map((booking) => booking.startsAt)) : null;
+  // Booking box shown: the sticky buttons jump to it.
+  const visitHref = visitPlan?.host && visitPlan.settings.enabled && visitDays ? "#agendar-visita" : null;
 
   return (
     <main id="contenido" className="property-detail bg-white pb-24 lg:pb-0">
@@ -319,6 +327,8 @@ export default async function PropertyDetailPage({
               </ul>
             </ContentSection>
 
+            <PropertyVisitSection slug={property.slug} plan={visitPlan} days={visitDays} />
+
             <ContentSection title="Ubicación">
               {property.neighborhoodHighlights.length > 0 ? (
                 <p className="listing-nearby">
@@ -330,7 +340,7 @@ export default async function PropertyDetailPage({
           </div>
 
           <aside className="lg:sticky lg:top-24 lg:self-start">
-            <AgentContactCard property={property} availability={availability} />
+            <AgentContactCard property={property} availability={availability} visitHref={visitHref} />
           </aside>
         </div>
         </div>
@@ -355,7 +365,7 @@ export default async function PropertyDetailPage({
           </div>
         </section>
       ) : null}
-      <MobileStickyContact property={property} />
+      <MobileStickyContact property={property} visitHref={visitHref} />
     </main>
   );
 }

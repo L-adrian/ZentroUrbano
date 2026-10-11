@@ -21,7 +21,7 @@ export const serverTrackedEvents = [
 ] as const;
 
 // Stored only by server routes that validate them; the beacon cannot send these.
-export const serverOnlyEvents = ["property_report", "property_availability_confirmed", "property_marked_rented"] as const;
+export const serverOnlyEvents = ["property_report", "property_availability_confirmed", "property_marked_rented", "property_visit_booked"] as const;
 
 export type TrackingEventType = (typeof serverTrackedEvents)[number] | (typeof serverOnlyEvents)[number];
 
