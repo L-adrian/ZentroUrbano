@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import { DepartmentEmpty } from "@/components/department-empty";
 import { DirectRentalExplorer } from "@/components/direct-rental-explorer";
 import { getPublishedPropertiesData } from "@/lib/property-data";
 import { getDirectRentals, withoutOwnerContact } from "@/lib/rentals";
+import { inSelectedDepartment } from "@/lib/region-server";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -23,20 +25,20 @@ export const metadata: Metadata = buildSeoMetadata({
 // bedrooms, bathrooms, amenity), so they survive going back from a listing and can be shared.
 export default async function PropertiesPage() {
   const publishedProperties = await getPublishedPropertiesData();
-  const directRentals = getDirectRentals(publishedProperties);
+  const { department, properties: directRentals } = await inSelectedDepartment(getDirectRentals(publishedProperties));
 
   return (
     <main id="contenido" className="min-h-screen bg-white text-neutral-950">
       <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-6 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Alquileres directos en Santa Cruz
+          Alquileres directos en {department.name}
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
           Contacta al propietario sin intermediarios ni comisión inmobiliaria.
         </p>
       </div>
 
-      <DirectRentalExplorer properties={withoutOwnerContact(directRentals)} />
+      {directRentals.length ? <DirectRentalExplorer properties={withoutOwnerContact(directRentals)} /> : <DepartmentEmpty department={department} />}
     </main>
   );
 }
