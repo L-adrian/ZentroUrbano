@@ -11,11 +11,12 @@ import { SplashScreen } from "@/components/splash-screen";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { splashScript } from "@/lib/splash";
-import { themeScript } from "@/lib/theme";
+import { departmentThemeScript, themeScript } from "@/lib/theme";
 import { absoluteUrl, siteConfig } from "@/lib/site";
 import { jsonLdScript, organizationJsonLd, websiteJsonLd } from "@/lib/structured-data";
 import "./globals.css";
 import "./redesign.css";
+import "./departamentos.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -81,7 +82,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="es-BO" className={`${geistSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /><script dangerouslySetInnerHTML={{ __html: splashScript }} /><script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript([organizationJsonLd(), websiteJsonLd()])} /></head>
+      <head><script dangerouslySetInnerHTML={{ __html: themeScript }} /><script dangerouslySetInnerHTML={{ __html: departmentThemeScript }} /><script dangerouslySetInnerHTML={{ __html: splashScript }} /><script type="application/ld+json" dangerouslySetInnerHTML={jsonLdScript([organizationJsonLd(), websiteJsonLd()])} /></head>
       <body className="flex min-h-full flex-col">
         <SplashScreen />
         <Suspense fallback={null}><RouteProgress /></Suspense>

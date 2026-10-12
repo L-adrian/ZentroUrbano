@@ -23,6 +23,7 @@ function subscribe(onChange: () => void) {
 function saveChoice(slug: string) {
   // No expiry: a session cookie, gone when the browser closes, so the next visit asks again.
   document.cookie = `${departmentCookieName}=${slug}; path=/; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+  document.documentElement.dataset.departamento = slug;
   window.dispatchEvent(new Event(choiceEvent));
 }
 

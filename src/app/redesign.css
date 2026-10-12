@@ -240,7 +240,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .pixel-neighborhood.is-hero img { border-radius: 14px; }
 .pixel-neighborhood.is-scene { width: 100%; }
 .pixel-neighborhood.is-scene img { border-radius: 0; image-rendering: pixelated; }
-.support-whatsapp { background: #087c65; color: #fff; border-color: #087c65; font-size: 12px; }.support-whatsapp:hover { background: #05624f; }.dark .support-whatsapp { background: #43c49b; border-color: #43c49b; color: #08291e; }.dark .support-whatsapp:hover { background: #69d4b1; }.support-whatsapp svg { width: 19px; height: 19px; }
+.support-whatsapp { background: var(--brand); color: #fff; border-color: var(--brand); font-size: 12px; }.support-whatsapp:hover { background: var(--brand-hover); }.dark .support-whatsapp { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }.dark .support-whatsapp:hover { background: var(--brand-hover); }.support-whatsapp svg { width: 19px; height: 19px; }
 .publication-account-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-block: 1px solid var(--line); padding-block: 14px; margin-bottom: 24px; font-size: 12px; }.publication-account-bar > span { color: var(--muted); }.publication-account-bar strong { color: var(--foreground); }.auth-support { display: flex; justify-content: center; margin-top: 20px; }
 .footer-directory { display: grid; grid-template-columns: 1.25fr repeat(3,minmax(0,1fr)); gap: 28px; padding-block: 32px; }.footer-brand > p { font-size: 13px; color: var(--muted); line-height: 1.8; margin-block: 15px; }.footer-directory nav { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }.footer-directory nav h2 { font-size: 13px; font-weight: 650; margin-bottom: 10px; }.footer-directory nav a { font-size: 12px; color: var(--muted); line-height: 1.6; padding-block: 4px; }.footer-directory nav a:hover { color: var(--brand); text-decoration: underline; text-underline-offset: 4px; }
 .professional-footer .footer-bottom { align-items: center; justify-content: flex-start; gap: 24px; }
@@ -440,10 +440,10 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-pricing { min-width: 0; }
 .rental-card-price { font-size: 20px; }
 .rental-entry-label { font-size: 13px; }
-.rental-card-contact { width: auto; height: auto; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; padding: 0 12px; border-radius: 7px; border-color: #087c65; background: #087c65; color: #fff; font-size: 14px; font-weight: 650; white-space: nowrap; }
-.rental-card-contact:hover { background: #05624f; border-color: #05624f; }
-.dark .rental-card-contact { background: #43c49b; border-color: #43c49b; color: #08291e; }
-.dark .rental-card-contact:hover { background: #69d4b1; border-color: #69d4b1; }
+.rental-card-contact { width: auto; height: auto; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0; padding: 0 12px; border-radius: 7px; border-color: var(--brand); background: var(--brand); color: #fff; font-size: 14px; font-weight: 650; white-space: nowrap; }
+.rental-card-contact:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
+.dark .rental-card-contact { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.dark .rental-card-contact:hover { background: var(--brand-hover); border-color: var(--brand-hover); }
 .rental-card-contact.is-external, .dark .rental-card-contact.is-external { background: transparent; border-color: var(--line); color: var(--brand); }
 .rental-card-contact.is-external:hover { background: var(--brand-soft); border-color: var(--brand); }
 .rental-owner-label { flex-wrap: wrap; row-gap: 2px; font-size: 12px; margin-top: 8px; }
@@ -486,14 +486,14 @@ button, a { -webkit-tap-highlight-color: transparent; }
 /* Open gallery: price and WhatsApp stay one tap away. */
 .gallery-contact-bar { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 24px; border-top: 1px solid #ffffff25; }
 .gallery-contact-price { font-size: 16px; font-weight: 700; color: #fff; }
-.gallery-contact-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: #087c65; color: #fff; font-size: 14px; font-weight: 650; }
-.gallery-contact-button:hover { background: #05624f; }
+.gallery-contact-button { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px; border-radius: 8px; background: var(--brand); color: #fff; font-size: 14px; font-weight: 650; }
+.gallery-contact-button:hover { background: var(--brand-hover); }
 @media (max-width: 768px) { .gallery-contact-bar { padding-inline: 14px; } }
 
 /* Help button: smaller, light and round, so it is not mistaken for the owner's WhatsApp. */
 .support-whatsapp-floating { min-height: 44px; padding: 0 16px; border-radius: 999px; background: var(--surface); color: var(--foreground); border: 1px solid var(--line); font-size: 13px; }
 .support-whatsapp-floating:hover { background: var(--subtle); }
-.support-whatsapp-floating svg { width: 17px; height: 17px; color: #087c65; }
+.support-whatsapp-floating svg { width: 17px; height: 17px; color: var(--brand); }
 .dark .support-whatsapp-floating { background: var(--surface); color: var(--foreground); border-color: var(--line); }
 .dark .support-whatsapp-floating:hover { background: var(--subtle); }
 .safety-list { display: grid; gap: 8px; margin-top: 10px; padding-left: 18px; list-style: disc; font-size: 14px; line-height: 1.6; color: var(--muted); }
@@ -659,7 +659,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-badges { position: absolute; left: 10px; bottom: 9px; display: flex; flex-wrap: wrap; gap: 5px; }
 .rental-card-badges:empty { display: none; }
 .rental-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: 700; line-height: 1.2; }
-.rental-badge.is-new { background: #087c65; color: #fff; }
+.rental-badge.is-new { background: var(--brand); color: #fff; }
 .rental-card-notes { display: grid; gap: 2px; margin: 2px 0 4px; padding: 0; list-style: none; color: var(--brand); font-size: 13px; font-weight: 600; line-height: 1.4; }
 .rental-entry-label.is-pending > * { color: var(--muted); font-weight: 500; }
 /* Phones: each card is its own box, so photos and prices do not run together. */
@@ -821,7 +821,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 /* Mi cuenta: "Verificar ubicación". The pin stays in the middle and the map moves under it. */
 .owner-location-map { position: relative; height: min(440px, 58vh); min-height: 300px; background: var(--subtle); }
 .owner-location-pin { position: absolute; left: calc(50% - 18px); top: calc(50% - 44px); z-index: 500; pointer-events: none; }
-.owner-location-dot { position: absolute; left: calc(50% - 4px); top: calc(50% - 4px); z-index: 499; width: 8px; height: 8px; border-radius: 999px; background: #087c65; box-shadow: 0 0 0 3px #ffffffcc; pointer-events: none; }
+.owner-location-dot { position: absolute; left: calc(50% - 4px); top: calc(50% - 4px); z-index: 499; width: 8px; height: 8px; border-radius: 999px; background: var(--brand); box-shadow: 0 0 0 3px #ffffffcc; pointer-events: none; }
 .owner-location-tools { position: absolute; right: 12px; top: 12px; z-index: 600; display: grid; gap: 8px; }
 .owner-location-tools button { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--foreground); box-shadow: 0 2px 8px #00000014; cursor: pointer; }
 .owner-location-tools button:hover { background: var(--subtle); }
