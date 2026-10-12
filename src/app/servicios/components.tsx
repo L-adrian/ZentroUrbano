@@ -6,7 +6,7 @@ import {
   MessageCircle, PenLine, ShieldCheck, Star, Tag, UserRound, type LucideIcon,
 } from "lucide-react";
 import {
-  formatBob, getService, packageValue, type Gain, type Service, type ServiceIcon, type ServicePackage,
+  formatBob, getPackage, getService, packageValue, services, type Gain, type Service, type ServiceIcon, type ServicePackage,
 } from "@/lib/services";
 
 const icons: Record<ServiceIcon, LucideIcon> = {
@@ -31,6 +31,8 @@ export function AudienceSwitch({ active }: { active: "owner" | "tenant" }) {
   </div>;
 }
 
+const cheapestService = Math.min(...services.filter(service => service.audience === "owner").map(service => service.price));
+
 export function OwnerHeading({ view }: { view: "packages" | "services" }) {
   return <>
     <AudienceSwitch active="owner" />
@@ -39,7 +41,7 @@ export function OwnerHeading({ view }: { view: "packages" | "services" }) {
     <p className="lead">Publicar en Zentro Urbano sigue siendo gratis. Si quieres ayuda, elige un paquete o solo el servicio que necesitas, con precio fijo. Nunca cobramos un porcentaje de tu alquiler.</p>
     <nav className="seg" aria-label="Tipo de servicio">
       <Link className={view === "packages" ? "on" : ""} href="/servicios"><Tag size={18} />Paquetes</Link>
-      <Link className={view === "services" ? "on" : ""} href="/servicios/individuales"><Check size={18} />Servicios individuales</Link>
+      <Link className={view === "services" ? "on" : "hint"} href="/servicios/individuales"><Check size={18} />Servicios individuales{view === "packages" && <span className="seg-badge">desde {formatBob(cheapestService)}</span>}</Link>
     </nav>
   </>;
 }
@@ -164,7 +166,7 @@ export function CompareAgency() {
   return <>
     <section className="compare">
       <div><h2 className="compare-title"><Coins size={18} />Con una inmobiliaria</h2><p>Suele cobrarse un mes de alquiler como comisión. En un alquiler de Bs 3.500:</p><div className="big">Bs 3.500</div></div>
-      <div className="good"><h2 className="compare-title"><Check size={18} />Con Zentro Urbano</h2><p>Pagas solo si se alquila, con precio fijo:</p><div className="big">Bs 490</div></div>
+      <div className="good"><h2 className="compare-title"><Check size={18} />Con Zentro Urbano</h2><p>Pagas solo si se alquila, con precio fijo:</p><div className="big">{formatBob(getPackage("pagas-solo-si-se-alquila")?.price ?? 0)}</div></div>
     </section>
     <p className="note">Precios en bolivianos. Te confirmamos el precio final por WhatsApp antes de empezar. Zentro Urbano no cobra comisión ni porcentaje del alquiler, y no garantiza que la vivienda se alquile en un plazo determinado.</p>
   </>;
