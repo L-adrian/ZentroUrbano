@@ -1102,6 +1102,7 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (min-width: 1280px) { .header-nav a { padding-inline: 10px; } }
 @media (min-width: 1101px) and (max-width: 1279px) { .header-contact { display: none; } }
 @media (max-width: 1279px) { .region-chip .region-flag { display: none; } }
+.region-chip .region-flag.is-department { display: block; width: 22px; height: 15px; }
 @media (max-width: 768px) {
   .region-chip { height: 36px; padding-inline: 10px; font-size: 12.5px; gap: 6px; }
   .region-menu { position: static; }

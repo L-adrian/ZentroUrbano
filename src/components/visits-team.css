@@ -121,6 +121,9 @@
 .team-roles-explained li { display: grid; justify-items: center; gap: 8px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
 .team-roles-explained p { font-size: 14px; line-height: 1.55; color: var(--foreground); }
 .team-list-section { padding-block: 32px 72px; }
+.team-hero > .zu-container > .team-place { display: flex; width: fit-content; align-items: center; gap: 8px; margin: 14px auto 0; padding: 6px 14px; border: 1px solid color-mix(in srgb, var(--brand) 25%, var(--line)); border-radius: 999px; background: var(--surface); font-size: 14px; line-height: 1.2; color: var(--muted); }
+.team-place strong { color: var(--foreground); font-weight: 650; }
+.team-empty p + p { margin-top: 6px; }
 .team-empty { margin: 0 auto; max-width: 640px; text-align: center; }
 /* Cards keep a readable width and the row stays centered, even with only one or two people. */
 .team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 340px)); justify-content: center; gap: 16px; margin: 0; padding: 0; list-style: none; }

@@ -20,6 +20,8 @@ export type PublicTeamMember = {
   slug: string;
   name: string;
   level: TeamRole;
+  // Department slug (src/lib/regions.ts): the team page shows only the visitor's department.
+  department: string;
   zone: string | null;
   bio: string | null;
   photoUrl: string | null;
