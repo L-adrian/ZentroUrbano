@@ -5,6 +5,7 @@ import sharp from "sharp";
 import { getPublicationCosts } from "../src/lib/publication-costs";
 import { getGoogleMapsDirectionsUrl, MAP_MAX_NATIVE_ZOOM, MAP_MAX_ZOOM, MAP_TILE_PROVIDERS } from "../src/lib/map-config";
 import robots from "../src/app/robots";
+import { bolivia } from "../src/lib/regions";
 import { defaultDisplayCurrency, formatExchangeRate, formatPriceInCurrency, getPropertyExchangeRateNote, getPropertyPriceInCurrency, getPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "../src/lib/currency";
 
 test("prices start in bolivianos and exchange-rate notes match the actual conversion", () => {
@@ -39,19 +40,23 @@ test("money inputs preserve thousands and distinguish decimal cents", () => {
 });
 
 test("pixel neighborhood scene is light, pixel-sized and has a still frame for reduced motion", async () => {
-  const gif = await readFile(new URL("../public/images/pixel/barrio-chibi.gif", import.meta.url));
-  const animated = await sharp(gif, { animated: true }).metadata();
-  assert.equal(animated.format, "gif");
-  assert.equal(animated.width, 200);
-  assert.equal(animated.pageHeight, 96);
-  assert.ok((animated.pages ?? 1) > 1);
-  assert.ok(gif.length < 260_000);
-  const still = await sharp(await readFile(new URL("../public/images/pixel/barrio-chibi.png", import.meta.url))).metadata();
-  assert.equal(still.width, 200);
-  assert.equal(still.height, 96);
+  // The original scene plus one version per department (typical costumes and flag colors).
+  const scenes = ["barrio-chibi", ...bolivia.departments.map((department) => `departamentos/${department.slug}`)];
+  for (const scene of scenes) {
+    const gif = await readFile(new URL(`../public/images/pixel/${scene}.gif`, import.meta.url));
+    const animated = await sharp(gif, { animated: true }).metadata();
+    assert.equal(animated.format, "gif", scene);
+    assert.equal(animated.width, 200, scene);
+    assert.equal(animated.pageHeight, 96, scene);
+    assert.ok((animated.pages ?? 1) > 1, scene);
+    assert.ok(gif.length < 260_000, scene);
+    const still = await sharp(await readFile(new URL(`../public/images/pixel/${scene}.png`, import.meta.url))).metadata();
+    assert.equal(still.width, 200, scene);
+    assert.equal(still.height, 96, scene);
+  }
   const component = await readFile(new URL("../src/components/pixel-neighborhood.tsx", import.meta.url), "utf8");
-  assert.match(component, /prefers-reduced-motion: reduce\)" srcSet="\/images\/pixel\/barrio-chibi\.png"/);
-  assert.match(component, /alt="[^"]+"/);
+  assert.match(component, /prefers-reduced-motion: reduce\)" srcSet=\{`\$\{base\}\.png`\}/);
+  assert.match(component, /alt=\{`[^`]+`\}/);
 });
 
 test("family illustration is static, transparent and sharp at 3x its largest display size", async () => {
