@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check, ChevronDown, House, MapPin } from "lucide-react";
+import { ArrowRight, Check, ChevronDown, House } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { RegionFlag } from "@/components/region-flag";
@@ -81,7 +81,7 @@ export function RegionPicker() {
   return <>
     <div ref={menu} className="region-menu">
       <button type="button" className="region-chip" aria-expanded={open} aria-haspopup="true" aria-label={`${department.name}, ${bolivia.name}. Cambiar de ciudad`} onClick={() => setOpen((value) => !value)} title="Cambiar de ciudad">
-        <MapPin size={16} aria-hidden="true" />
+        <RegionFlag code={department.slug} className="region-flag is-department" />
         <span>{department.name}</span>
         <RegionFlag code={bolivia.code} />
         <ChevronDown size={14} aria-hidden="true" />

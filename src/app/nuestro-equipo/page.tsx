@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Home, MapPin, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
+import { RegionFlag } from "@/components/region-flag";
 import { TeamAvatar } from "@/components/team-avatar";
 import { getPublishedPropertiesData } from "@/lib/property-data";
+import { getSelectedDepartment } from "@/lib/region-server";
+import { bolivia } from "@/lib/regions";
 import { getDirectRentals } from "@/lib/rentals";
 import { buildSeoMetadata } from "@/lib/seo";
 import { listTeam } from "@/lib/team";
@@ -11,24 +14,32 @@ import "@/components/visits-team.css";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Nuestro equipo",
-  description: "Las personas reales de Zentro Urbano en Santa Cruz: embajadores que muestran las viviendas y colaboradores que ayudan a los dueños, sin comisiones.",
+  description: "Las personas reales de Zentro Urbano en Bolivia: embajadores que muestran las viviendas y colaboradores que ayudan a los dueños, sin comisiones.",
   path: "/nuestro-equipo",
 });
 
 export const dynamic = "force-dynamic";
 
-// Public team page ("Equipo" in the header): the real people of Zentro and the homes they work on.
+// Public team page ("Equipo" in the header): the real people of Zentro in the department the
+// visitor chose, and the homes they work on.
 export default async function TeamPage() {
-  const [team, properties] = await Promise.all([listTeam(true).catch(() => null), getPublishedPropertiesData()]);
+  const [team, properties, department] = await Promise.all([listTeam(true).catch(() => null), getPublishedPropertiesData(), getSelectedDepartment()]);
   const homes = new Map(getDirectRentals(properties).map((property) => [property.slug, property]));
-  const members = team?.members ?? [];
+  const members = (team?.members ?? []).filter((member) => member.department === department.slug);
 
   return (
     <main id="contenido" className="team-page">
       <section className="team-hero">
         <div className="zu-container">
           <p className="zu-eyebrow"><UsersRound size={16} aria-hidden="true" />EQUIPO</p>
-          <h1>Personas reales, en Santa Cruz.</h1>
+          <p className="team-place">
+            <RegionFlag code={department.slug} className="region-flag is-country" />
+            <strong>{department.name}</strong>
+            <span aria-hidden="true">·</span>
+            <RegionFlag code={bolivia.code} />
+            {bolivia.name}
+          </p>
+          <h1>{`Personas reales, en ${department.name}.`}</h1>
           <p>
             Detrás de Zentro Urbano hay gente de carne y hueso. Cada persona de esta página está registrada y verificada por nosotros. Nunca te van a cobrar comisión por alquilar.
           </p>
@@ -45,7 +56,10 @@ export default async function TeamPage() {
 
       <section className="zu-container team-list-section" aria-label="Personas del equipo">
         {members.length === 0 ? (
-          <p className="guide-note team-empty">Muy pronto vas a conocer aquí a las personas que muestran las viviendas y ayudan a los dueños.</p>
+          <div className="guide-note team-empty">
+            <p><strong>{`Aún no hay equipo en ${department.name}.`}</strong></p>
+            <p>Muy pronto vas a conocer aquí a las personas que muestran las viviendas y ayudan a los dueños. Puedes ver el equipo de otra ciudad cambiándola desde el menú de arriba.</p>
+          </div>
         ) : (
           <ul className="team-grid">
             {members.map((member) => {

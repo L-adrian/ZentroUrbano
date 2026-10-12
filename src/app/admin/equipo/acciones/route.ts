@@ -5,6 +5,7 @@ import {
   assignTeamMember,
   createTeamMember,
   isMissingTable,
+  MissingDepartmentColumnError,
   readMemberInput,
   setTeamMemberPhoto,
   setTeamMemberStatus,
@@ -82,6 +83,7 @@ export async function POST(request: Request) {
         return reply(400, { ok: false });
     }
   } catch (error) {
+    if (error instanceof MissingDepartmentColumnError) return reply(503, { ok: false, message: error.message });
     if (isMissingTable(error)) return reply(503, { ok: false, message: "Falta aplicar la migración 008 (equipo y visitas) en la base de datos." });
     console.error("team admin action failed", error);
     return reply(503, { ok: false, message: "No se pudo guardar. Actualiza la página y reintenta." });

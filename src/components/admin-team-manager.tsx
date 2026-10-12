@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { TeamAvatar } from "@/components/team-avatar";
 import { VisitSettingsEditor } from "@/components/visit-settings-editor";
+import { bolivia, defaultDepartment, findDepartment } from "@/lib/regions";
 import { formatAlertWhatsapp } from "@/lib/search-alert-input";
 import { teamRoleLabels, teamRoles, type TeamRole } from "@/lib/team-roles";
 import { defaultVisitSettings, visitShortLabel, type VisitSettings } from "@/lib/visit-slots";
@@ -104,7 +105,7 @@ function AdminCard({ title, wide = false, children }: { title: string; wide?: bo
   );
 }
 
-type MemberValues = { name: string; level: TeamRole; whatsapp: string; zone: string; bio: string };
+type MemberValues = { name: string; level: TeamRole; department: string; whatsapp: string; zone: string; bio: string };
 
 function MemberForm({ initial, submitLabel, onSubmit, onCancel }: {
   initial?: MemberValues;
@@ -112,7 +113,7 @@ function MemberForm({ initial, submitLabel, onSubmit, onCancel }: {
   onSubmit: (values: MemberValues) => Promise<void>;
   onCancel?: () => void;
 }) {
-  const empty: MemberValues = { name: "", level: "colaborador", whatsapp: "", zone: "", bio: "" };
+  const empty: MemberValues = { name: "", level: "colaborador", department: defaultDepartment.slug, whatsapp: "", zone: "", bio: "" };
   const [values, setValues] = useState<MemberValues>(initial ?? empty);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -142,6 +143,9 @@ function MemberForm({ initial, submitLabel, onSubmit, onCancel }: {
         ))}
       </fieldset>
       <label className="admin-team-field"><span>WhatsApp</span><input value={values.whatsapp} onChange={(event) => set("whatsapp", event.target.value)} type="tel" inputMode="tel" maxLength={20} placeholder="7xxxxxxx (para recibir visitas)" /></label>
+      <label className="admin-team-field"><span>Departamento</span><select value={values.department} onChange={(event) => set("department", event.target.value)}>
+        {bolivia.departments.map((department) => <option key={department.slug} value={department.slug}>{department.name}</option>)}
+      </select></label>
       <label className="admin-team-field"><span>Zona donde trabaja</span><input value={values.zone} onChange={(event) => set("zone", event.target.value)} maxLength={120} placeholder="Ej.: Equipetrol y zona norte" /></label>
       <label className="admin-team-field"><span>Sobre la persona</span><textarea value={values.bio} onChange={(event) => set("bio", event.target.value)} maxLength={300} rows={3} placeholder="Una o dos frases que se ven en la página del equipo" /></label>
       {error ? <p role="alert" className="visit-error">{error}</p> : null}
@@ -247,12 +251,12 @@ function MemberRow({ member, homes, onChanged }: { member: TeamMember; homes: (T
         <div>
           <strong>{member.name}</strong>
           <span className={`team-role is-${member.level}`}>{teamRoleLabels[member.level]}{member.status === "active" ? "" : " · inactivo"}</span>
-          <small>{[member.whatsapp ? formatAlertWhatsapp(member.whatsapp) : "Sin WhatsApp", member.zone].filter(Boolean).join(" · ")}</small>
+          <small>{[findDepartment(member.department)?.name, member.whatsapp ? formatAlertWhatsapp(member.whatsapp) : "Sin WhatsApp", member.zone].filter(Boolean).join(" · ")}</small>
         </div>
       </div>
       {editing ? (
         <MemberForm
-          initial={{ name: member.name, level: member.level, whatsapp: member.whatsapp ? member.whatsapp.slice(3) : "", zone: member.zone ?? "", bio: member.bio ?? "" }}
+          initial={{ name: member.name, level: member.level, department: member.department, whatsapp: member.whatsapp ? member.whatsapp.slice(3) : "", zone: member.zone ?? "", bio: member.bio ?? "" }}
           submitLabel="Guardar cambios"
           onCancel={() => setEditing(false)}
           onSubmit={async (values) => { await post({ action: "update", id: member.id, ...values }); setEditing(false); onChanged(); }}
