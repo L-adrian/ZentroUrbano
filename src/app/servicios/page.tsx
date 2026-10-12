@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { buildSeoMetadata } from "@/lib/seo";
 import { packageGoals, servicePackages } from "@/lib/services";
 import { CompareAgency, FilterTabs, HeroPackage, OwnerHeading, PackageGrid } from "./components";
@@ -21,7 +22,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
     {goal === "Todos" && hero && <HeroPackage pkg={hero} />}
     <FilterTabs options={packageGoals} active={goal} param="objetivo" path="/servicios" />
     <PackageGrid packages={shown} />
-    <p className="pk-note">¿Prefieres armarlo a tu manera? <Link href="/servicios/individuales">Mira los servicios individuales</Link>.</p>
+    <Link className="pk-more" href="/servicios/individuales"><span><b>¿Prefieres armarlo a tu manera?</b>Elige solo el servicio que necesitas: fotos, contrato, visitas y más.</span><em>Ver servicios individuales <ArrowRight size={18} /></em></Link>
     <CompareAgency />
   </>;
 }
