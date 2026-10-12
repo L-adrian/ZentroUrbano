@@ -37,7 +37,7 @@ export default async function HomePage() {
       <div className="zu-container">
         <div className="home-hero-top">
           <div className="home-hero-lead"><p className="zu-eyebrow"><MapPin size={14} /> {department.name.toUpperCase()}, BOLIVIA</p><h1>Un nuevo lugar.<br /><span>Sin intermediarios.</span></h1><p className="heading-subtitle">Alquiler de casas y departamentos en {department.capital.replace(" · ", " y ")}, directo con el dueño.</p></div>
-          <div className="home-hero-scene"><PixelNeighborhood scene /></div>
+          <div className="home-hero-scene"><PixelNeighborhood scene department={department.slug} /></div>
         </div>
         <div className="home-hero-bottom">
           <HomeRentalSearch zones={getRentalZones(rentals)} />

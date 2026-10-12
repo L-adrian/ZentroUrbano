@@ -1,0 +1,150 @@
+/* Each department has its own colors, taken from its flag (Santa Cruz keeps the green of the base theme).
+   <html data-departamento> is set from the zu_departamento cookie before paint and when the visitor switches. */
+:root[data-departamento="la-paz"] {
+  --brand-solid: #b3182b;
+  --brand: #b3182b;
+  --brand-hover: #8c1222;
+  --brand-positive: #b3182b;
+  --brand-surface: #f3f8f3;
+  --brand-soft: #e2f1e5;
+  --brand-deep: #1d4a2c;
+  --brand-ink: #132f1d;
+}
+:root.dark[data-departamento="la-paz"] {
+  --brand: #f07383;
+  --brand-hover: #f59eaa;
+  --brand-positive: #f07383;
+  --brand-soft: #203a28;
+  --brand-surface: #1a2a1f;
+}
+:root[data-departamento="cochabamba"] {
+  --brand-solid: #1a6f9e;
+  --brand: #1a6f9e;
+  --brand-hover: #13577c;
+  --brand-positive: #1a6f9e;
+  --brand-surface: #f0f7fb;
+  --brand-soft: #ddeff8;
+  --brand-deep: #143f58;
+  --brand-ink: #0d2b3d;
+}
+:root.dark[data-departamento="cochabamba"] {
+  --brand: #62b9e6;
+  --brand-hover: #8ccdf0;
+  --brand-positive: #62b9e6;
+  --brand-soft: #1d3442;
+  --brand-surface: #182630;
+}
+:root[data-departamento="chuquisaca"] {
+  --brand-solid: #ac1f2d;
+  --brand: #ac1f2d;
+  --brand-hover: #871824;
+  --brand-positive: #ac1f2d;
+  --brand-surface: #fbf3f3;
+  --brand-soft: #f8e3e5;
+  --brand-deep: #57202a;
+  --brand-ink: #38141b;
+}
+:root.dark[data-departamento="chuquisaca"] {
+  --brand: #ee7381;
+  --brand-hover: #f39ca6;
+  --brand-positive: #ee7381;
+  --brand-soft: #3f2226;
+  --brand-surface: #291b1d;
+}
+:root[data-departamento="tarija"] {
+  --brand-solid: #c0152f;
+  --brand: #c0152f;
+  --brand-hover: #961025;
+  --brand-positive: #c0152f;
+  --brand-surface: #fcf3f3;
+  --brand-soft: #fbe2e5;
+  --brand-deep: #5c1621;
+  --brand-ink: #3b0e16;
+}
+:root.dark[data-departamento="tarija"] {
+  --brand: #f26b7c;
+  --brand-hover: #f69aa6;
+  --brand-positive: #f26b7c;
+  --brand-soft: #402126;
+  --brand-surface: #2a1a1c;
+}
+:root[data-departamento="oruro"] {
+  --brand-solid: #a3172f;
+  --brand: #a3172f;
+  --brand-hover: #7e1124;
+  --brand-positive: #a3172f;
+  --brand-surface: #fbf4f2;
+  --brand-soft: #f7e2e2;
+  --brand-deep: #4f1a22;
+  --brand-ink: #331117;
+}
+:root.dark[data-departamento="oruro"] {
+  --brand: #ec7085;
+  --brand-hover: #f29aaa;
+  --brand-positive: #ec7085;
+  --brand-soft: #3e2127;
+  --brand-surface: #291a1d;
+}
+:root[data-departamento="potosi"] {
+  --brand-solid: #b01c26;
+  --brand: #b01c26;
+  --brand-hover: #8a151e;
+  --brand-positive: #b01c26;
+  --brand-surface: #f9f5f5;
+  --brand-soft: #f4e3e3;
+  --brand-deep: #4a2226;
+  --brand-ink: #301619;
+}
+:root.dark[data-departamento="potosi"] {
+  --brand: #ef7179;
+  --brand-hover: #f49ca1;
+  --brand-positive: #ef7179;
+  --brand-soft: #3d2224;
+  --brand-surface: #281b1c;
+}
+:root[data-departamento="beni"] {
+  --brand-solid: #0b7a3e;
+  --brand: #0b7a3e;
+  --brand-hover: #075f30;
+  --brand-positive: #0b7a3e;
+  --brand-surface: #fbf8ea;
+  --brand-soft: #f6eec6;
+  --brand-deep: #1d4a2a;
+  --brand-ink: #13301c;
+}
+:root.dark[data-departamento="beni"] {
+  --brand: #4cc983;
+  --brand-hover: #78d9a2;
+  --brand-positive: #4cc983;
+  --brand-soft: #3a3a1e;
+  --brand-surface: #22261a;
+}
+:root[data-departamento="pando"] {
+  --brand-solid: #1d7a46;
+  --brand: #1d7a46;
+  --brand-hover: #155e36;
+  --brand-positive: #1d7a46;
+  --brand-surface: #f3f8f4;
+  --brand-soft: #e1f1e6;
+  --brand-deep: #1d4a30;
+  --brand-ink: #13301f;
+}
+:root.dark[data-departamento="pando"] {
+  --brand: #56c98c;
+  --brand-hover: #80d8a8;
+  --brand-positive: #56c98c;
+  --brand-soft: #203a2a;
+  --brand-surface: #1a2a20;
+}
+
+/* Older components still carry the Santa Cruz greens as Tailwind arbitrary classes; outside Santa Cruz they follow the
+   department colors. Matched at a class boundary so "hover:bg-[…]" does not count as "bg-[…]". */
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class^="bg-[#176b4d]"], :root[data-departamento]:not([data-departamento="santa-cruz"]) [class*=" bg-[#176b4d]"] { background-color: var(--brand-solid); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class^="bg-[#21352b]"], :root[data-departamento]:not([data-departamento="santa-cruz"]) [class*=" bg-[#21352b]"] { background-color: var(--brand-deep); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="hover:bg-[#10533b]"]:hover, :root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="hover:bg-[#176b4d]"]:hover { background-color: var(--brand-hover); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="hover:bg-[#21352b]"]:hover { background-color: var(--brand-deep); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="accent-[#176b4d]"] { accent-color: var(--brand); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="focus:border-[#176b4d]"]:focus, :root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="focus:border-[#21352b]"]:focus, :root[data-departamento]:not([data-departamento="santa-cruz"]) [class*="hover:border-[#176b4d]"]:hover { border-color: var(--brand); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class^="text-[#176b4d]"], :root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class*=" text-[#176b4d]"] { color: var(--brand); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class*="text-[#10533b]"] { color: var(--brand-hover); }
+:root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class^="text-[#21352b]"], :root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class*=" text-[#21352b]"], :root[data-departamento]:not([data-departamento="santa-cruz"]):not(.dark) [class*="hover:text-[#21352b]"]:hover { color: var(--brand-deep); }
