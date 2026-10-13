@@ -36,7 +36,7 @@ export default async function PropertiesPage({ searchParams }: { searchParams: P
           {isBusiness ? `Locales en alquiler en ${department.name}` : `Alquileres directos en ${department.name}`}
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          {isBusiness ? "Locales, tiendas y oficinas para tu negocio, directo con el dueño y sin comisión." : "Contacta al propietario sin intermediarios ni comisión inmobiliaria."}
+          {isBusiness ? "Tiendas, oficinas, consultorios, galpones, depósitos y más para tu negocio, directo con el dueño y sin comisión." : "Contacta al propietario sin intermediarios ni comisión inmobiliaria."}
         </p>
       </div>
 

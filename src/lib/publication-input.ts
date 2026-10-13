@@ -15,6 +15,8 @@ export type PublicationDetails = {
   title:string; type:"Casa"|"Departamento"|"Monoambiente"|"Local"; zone:string; address:string;
   // Only for locales: meters of street front, allowed business use and what the space has.
   frontage?:number; businessUse?:string; businessFeatures?:string[];
+  // Only for locales: what kind of commercial space it is (tienda, oficina, galpón…).
+  businessKind?:BusinessKind;
   bedrooms:number|null; bathrooms:number|null; garage:number; area:number|null;
   pets:boolean; furnished:boolean; security:boolean; pool:boolean; patio:boolean; grill:boolean; elevator:boolean;
   price:number; currency:"BOB"|"USD"; exchangeRate:number|null; commonExpenses:number;
@@ -25,6 +27,23 @@ export type PublicationDetails = {
 
 // What an owner can mark for a local. The first five are also catalog filters ("Debe tener").
 export const businessFeatureChoices = ["Vitrina a la calle", "Baño propio", "Depósito", "Parqueo para clientes", "Luz trifásica", "Se permite letrero", "Sin derecho de llave"] as const;
+
+// Kinds of commercial space, in the words people use in Bolivia. Also the catalog filter "Tipo de local".
+export const businessKindChoices = [
+  "Tienda a la calle",
+  "Local en galería",
+  "Oficina",
+  "Consultorio",
+  "Galpón",
+  "Depósito o almacén",
+  "Kiosco o puesto",
+  "Local para restaurante",
+  "Canchón o lote comercial",
+] as const;
+export type BusinessKind = (typeof businessKindChoices)[number];
+export function isBusinessKind(value: unknown): value is BusinessKind {
+  return typeof value === "string" && (businessKindChoices as readonly string[]).includes(value);
+}
 
 export type PublicationFieldErrors = Partial<Record<keyof PublicationDetails | "contactName" | "whatsapp" | "details", string>>;
 
@@ -81,6 +100,8 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   const isLocal=input.type === "Local";
   const frontage=isLocal ? number("frontage",1000) : null;
   if (isLocal && input.frontage !== "" && input.frontage != null && frontage === null) fieldErrors.frontage = "Frente: indica los metros a la calle (hasta 1.000), o deja el campo vacío.";
+  const businessKind=isLocal && isBusinessKind(input.businessKind) ? input.businessKind : undefined;
+  if (isLocal && input.businessKind != null && input.businessKind !== "" && !businessKind) fieldErrors.businessKind = "Elige qué tipo de local es.";
   const businessFeatures=isLocal && Array.isArray(input.businessFeatures) ? input.businessFeatures.filter((item):item is string=>typeof item === "string" && (businessFeatureChoices as readonly string[]).includes(item)) : [];
   if (!["BOB","USD"].includes(String(input.currency))) fieldErrors.currency = "Selecciona bolivianos o dólares.";
   if (input.currency === "USD" && exchangeRate === null) fieldErrors.exchangeRate = "Indica un tipo de cambio mayor a 0 y de hasta 1.000 Bs por USD.";
@@ -106,7 +127,7 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
     ...(text("parkingNote",120) ? {parkingNote:text("parkingNote",120)} : {}),
     ...(text("mediaNote",500) ? {mediaNote:text("mediaNote",500)} : {}),
     ...beforeVisit.values,
-    ...(isLocal ? {...(frontage ? {frontage} : {}),...(text("businessUse",160) ? {businessUse:text("businessUse",160)} : {}),businessFeatures} : {}),
+    ...(isLocal ? {...(businessKind ? {businessKind} : {}),...(frontage ? {frontage} : {}),...(text("businessUse",160) ? {businessUse:text("businessUse",160)} : {}),businessFeatures} : {}),
     bedrooms:number("bedrooms",100,true),bathrooms:number("bathrooms",100,true),area:number("area",1_000_000,true),garage,commonExpenses,guarantee,guaranteeAmount,
     pets:petsPolicy ? petsPolicy === "allowed" : input.pets as boolean,furnished:input.furnished as boolean,security:input.security as boolean,pool:input.pool as boolean,patio:input.patio as boolean,grill:input.grill as boolean,elevator:input.elevator as boolean}};
 }

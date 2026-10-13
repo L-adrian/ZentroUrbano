@@ -72,6 +72,7 @@ import {
   type RentalType,
 } from "@/lib/property-search";
 import type { Property } from "@/lib/properties";
+import { businessKindChoices } from "@/lib/publication-input";
 import { canonicalZone, getZoneSector, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
@@ -158,6 +159,7 @@ export function DirectRentalExplorer({
       unnamed,
       bedrooms: count("bedrooms", rentalBedroomOptions),
       bathrooms: count("bathrooms", rentalBathroomOptions),
+      businessKinds: new Map(businessKindChoices.map((kind) => [kind, countWith({ businessKind: kind }).length])),
     };
   }, [appliedFilters, displayCurrency, properties, zoneAverages]);
   // Zona Norte, Sur, Este… each with its neighborhoods and avenues; places outside the list last.
@@ -375,7 +377,7 @@ export function DirectRentalExplorer({
       if (checked) types.add(type);
       else types.delete(type);
       const next = { ...current, type: toRentalTypeFilter(types) };
-      return isBusiness && checked ? { ...next, bedrooms: "", bathrooms: "" } : { ...next, business: isBusiness ? current.business : "" };
+      return isBusiness && checked ? { ...next, bedrooms: "", bathrooms: "" } : { ...next, business: isBusiness ? current.business : "", businessKind: isBusiness ? current.businessKind : "" };
     });
   }
 
@@ -472,6 +474,25 @@ export function DirectRentalExplorer({
             <FilterGroup title="Zonas">
               <ZonePicker groups={zoneGroups} selected={selectedZones} onToggle={toggleZone} onClear={() => updateFilter("zone", "")} />
             </FilterGroup>
+
+            {isBusinessSearch ? (
+              <FilterGroup title="Tipo de local">
+                {businessKindChoices.map((kind) => (
+                  <FilterCheckbox
+                    key={kind}
+                    label={kind}
+                    count={optionCounts.businessKinds.get(kind) ?? 0}
+                    checked={splitBusiness(filters.businessKind).includes(kind)}
+                    onChange={(checked) =>
+                      setFilters((current) => {
+                        const rest = splitBusiness(current.businessKind).filter((item) => item !== kind);
+                        return { ...current, businessKind: businessKindChoices.filter((item) => (checked ? [...rest, kind] : rest).includes(item)).join(",") };
+                      })
+                    }
+                  />
+                ))}
+              </FilterGroup>
+            ) : null}
 
             {isBusinessSearch ? (
               <FilterGroup title="Debe tener">
@@ -1187,12 +1208,14 @@ function FilterCheckbox({
   label,
   icon,
   badge,
+  count,
   checked,
   onChange,
 }: {
   label: string;
   icon?: React.ReactNode;
   badge?: string;
+  count?: number;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
@@ -1202,6 +1225,7 @@ function FilterCheckbox({
       {icon ? <span aria-hidden="true" className="catalog-check-icon">{icon}</span> : null}
       <span>{label}</span>
       {badge ? <span className="catalog-check-badge">{badge}</span> : null}
+      {count === undefined ? null : <span className="catalog-check-count">{count}</span>}
     </label>
   );
 }

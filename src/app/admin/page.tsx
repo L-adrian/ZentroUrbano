@@ -5,6 +5,8 @@ import { AdminAccountsOverview } from "@/components/admin-accounts-overview";
 import { AdminContactLeads } from "@/components/admin-contact-leads";
 import { AdminListingFunnel } from "@/components/admin-listing-funnel";
 import { AdminListingHealth } from "@/components/admin-listing-health";
+import { AdminListingPlaces } from "@/components/admin-listing-places";
+import { curatedRentalProperties } from "@/lib/curated-rentals";
 import { getAdminAccountsOverview, getAdminListingHealth } from "@/lib/admin-accounts";
 import { buildListingFunnel } from "@/lib/listing-funnel";
 import { getListingFunnel30 } from "@/lib/property-audience";
@@ -34,6 +36,11 @@ export default async function AdminPage() {
   const titles = new Map([...properties.map((property) => [property.slug, property.title] as const), ...(funnel?.listings ?? []).map((listing) => [listing.slug, listing.title] as const)]);
   const live = new Set(properties.map((property) => property.slug));
   const hidden = new Set((funnel?.listings ?? []).filter((listing) => !live.has(listing.slug)).map((listing) => listing.slug));
+  // Listings written in the site's code are fixed there, so only database listings are editable.
+  const curated = new Set(curatedRentalProperties.map((property) => property.slug));
+  const places = properties
+    .filter((property) => !curated.has(property.slug))
+    .map((property) => ({ slug: property.slug, title: property.title, zone: property.zone, lat: property.coordinates.lat, lng: property.coordinates.lng, ownerConfirmed: Boolean(property.rentalDetails?.locationConfirmedAt) }));
   const funnelRows = funnel ? buildListingFunnel(funnel.counts, funnel.sources, titles, 60, hidden) : null;
 
   return (
@@ -64,9 +71,11 @@ export default async function AdminPage() {
             <Link href="/admin/recorridos" className="zu-button zu-button-secondary"><Box size={18} />Gestionar recorridos 3D</Link>
             <a href="#anuncios-con-avisos" className="zu-button zu-button-secondary">Avisos ({health.reported.length})</a>
             <a href="#disponibilidad-por-confirmar" className="zu-button zu-button-secondary">Por confirmar ({health.checks.length})</a>
+            <a href="#zona-y-ubicacion" className="zu-button zu-button-secondary">Zona y ubicación ({places.length})</a>
             <a href="#recorrido-de-anuncios" className="zu-button zu-button-secondary"><BarChart3 size={18} />Qué hizo la gente (30 días)</a>
           </div>
           <AdminListingHealth checks={health.checks} reported={health.reported} />
+          <AdminListingPlaces listings={places} />
           <AdminListingFunnel rows={funnelRows} />
           <AdminAccountsOverview
             databaseReady={accountsOverview.databaseReady}

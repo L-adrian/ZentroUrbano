@@ -15,6 +15,7 @@ import {
 } from "../src/lib/catalog-geo";
 import { getMonthlyCost } from "../src/lib/listing-summary";
 import { withoutOwnerContact } from "../src/lib/rentals";
+import { describeFilterPlace, zoneConflict } from "../src/lib/santa-cruz-zones";
 import { normalizeAlertEmail, normalizeAlertWhatsapp } from "../src/lib/search-alert-input";
 import {
   addRecentListing,
@@ -411,4 +412,31 @@ test("Avísame contact: phones and emails are told apart, and emails cannot carr
   assert.equal(normalizeAlertEmail("Ana.70012345@Gmail.com"), "ana.70012345@gmail.com");
   assert.equal(normalizeAlertEmail("victim@example.com?cc=attacker%40evil.com&body=x"), null);
   assert.equal(normalizeAlertEmail("a#b@example.com"), null);
+});
+
+test("kinds of local: the owner's choice or a tag decides, and the filter travels as tipo_local", () => {
+  const galpon = rental("galpon", { type: "Local", rentalDetails: { businessKind: "Galpón" } as never });
+  const oficina = rental("oficina", { type: "Local", tags: ["Oficina", "Baño propio"] });
+  const sinTipo = rental("sin-tipo", { type: "Local", tags: ["Depósito"] });
+  const casa = rental("casa", { type: "Casa" });
+  const all = [galpon, oficina, sinTipo, casa];
+
+  assert.deepEqual(slugs(searchRentals(all, filters({ type: "Local", businessKind: "Galpón" }), "BOB")), ["galpon"]);
+  assert.deepEqual(slugs(searchRentals(all, filters({ type: "Local", businessKind: "Galpón,Oficina" }), "BOB")).sort(), ["galpon", "oficina"]);
+  // A local that only has a storage room is not a "Depósito o almacén".
+  assert.deepEqual(slugs(searchRentals(all, filters({ type: "Local", businessKind: "Depósito o almacén" }), "BOB")), []);
+  assert.equal(slugs(searchRentals(all, filters({ type: "Local" }), "BOB")).length, 3);
+
+  const params = buildRentalSearchParams(filters({ type: "Local", businessKind: "Oficina" }), "BOB");
+  assert.deepEqual(params.getAll("tipo_local"), ["Oficina"]);
+  assert.equal(readRentalSearchParams(new URLSearchParams("type=Local&tipo_local=Galpón&tipo_local=Inventado")).businessKind, "Galpón");
+});
+
+test("admin zone check: the filter place and a zone that disagrees with the map point", () => {
+  const south = { lat: -17.8554, lng: -63.1901 };
+  assert.equal(describeFilterPlace("equipetrol norte", south).startsWith("Zona"), true);
+  assert.equal(describeFilterPlace("Equipetrol", south), "Zona Norte · Equipetrol");
+  assert.deepEqual(zoneConflict("Zona Norte", south), { named: "Zona Norte", byPoint: "Zona Sur" });
+  assert.equal(zoneConflict("Zona Sur", south), null);
+  assert.equal(zoneConflict("Un barrio nuevo", south), null);
 });

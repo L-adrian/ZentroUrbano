@@ -1,3 +1,4 @@
+import { getBusinessKind } from "@/lib/business-kinds";
 import { parseCurrencyAmount } from "@/lib/currency";
 import type { Property } from "@/lib/properties";
 import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
@@ -122,7 +123,10 @@ export function getMonthlyCost(property: Pick<Property, "price" | "rentalDetails
 // Confirmed amenities only; "unknown" is never shown as a tag.
 export function getListingHighlights(property: Property, limit = 3) {
   // A local shows what a business looks for (vitrina, depósito, trifásica…), taken from its tags.
-  if (property.type === "Local") return property.tags.slice(0, limit);
+  if (property.type === "Local") {
+    const kind = getBusinessKind(property);
+    return [...(kind ? [kind] : []), ...property.tags.filter((tag) => tag !== kind)].slice(0, limit);
+  }
   return [
     property.pets ? "Acepta mascotas" : null,
     property.garage > 0 ? "Parqueo" : null,

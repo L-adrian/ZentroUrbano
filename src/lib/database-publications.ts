@@ -86,6 +86,9 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
     } else if (decision === "approve") {
       const details=parsePublicationDetails(record.details);
       if (!details) throw new PublicationError(400,"Faltan datos estructurados. Solicita al propietario un nuevo envío completo.");
+      // The administrator can fix the zone the owner typed ("equipetrol norte" → "Equipetrol").
+      const zone=typeof input.zone === "string" ? input.zone.trim().slice(0,160) : "";
+      if (zone) details.zone=zone;
       const [owners]=await connection.execute<RowDataPacket[]>("SELECT * FROM client_accounts WHERE id=? AND kind='owner' AND status='active'",[record.accountId]);
       if (!owners.length) throw new PublicationError(409,"El propietario ya no tiene una cuenta activa.");
       const [photos]=await connection.execute<RowDataPacket[]>("SELECT filename,original_data FROM publication_photos WHERE request_id=? ORDER BY filename",[id]);
@@ -243,6 +246,25 @@ export async function confirmListingLocation(accountId:string,slug:string,point:
       [JSON.stringify(point),mapUrl,confirmedAt,slug],
     );
     return {slug,locationConfirmedAt:confirmedAt};
+  });
+}
+
+// Administrator's fix of a published listing's zone and map point. A moved point is no longer the
+// one the owner confirmed, so "Ubicación confirmada por el dueño" goes away.
+export async function updateListingPlace(slug:string,zone:string,point:{lat:number;lng:number}) {
+  return withTransaction(async connection=>{
+    const [rows]=await connection.execute<RowDataPacket[]>("SELECT coordinates,map_url,rental_details FROM properties WHERE slug=? FOR UPDATE",[slug]);
+    if (!rows.length) throw new PublicationError(404,"Este anuncio no está en la base de datos; se edita en el código del sitio.");
+    const current=parseDbJson<{lat:number;lng:number}>(rows[0].coordinates);
+    const moved=!current || current.lat !== point.lat || current.lng !== point.lng;
+    const mapUrl=moved && isGeneratedMapUrl(rows[0].map_url) ? (rows[0].map_url ? generatedMapUrl(point) : null) : rows[0].map_url;
+    let details=rows[0].rental_details ? parseDbJson<Record<string,unknown>>(rows[0].rental_details) : null;
+    if (details) {
+      details={...details,zone};
+      if (moved) delete details.locationConfirmedAt;
+    }
+    await connection.execute("UPDATE properties SET zone=?,coordinates=?,map_url=?,rental_details=?,updated_at=updated_at WHERE slug=?",[zone,JSON.stringify(point),mapUrl,details ? JSON.stringify(details) : rows[0].rental_details,slug]);
+    return {slug,zone,point};
   });
 }
 
