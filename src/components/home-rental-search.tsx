@@ -4,6 +4,7 @@ import { Building2, MapPin, Search, Wallet, LoaderCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useCurrencyPreference } from "@/components/currency-preference";
 import { formatPriceBound, parsePriceInput } from "@/lib/property-search";
+import { businessKindChoices } from "@/lib/publication-input";
 
 export function HomeRentalSearch({ zones }: { zones: string[] }) {
   const currency = useCurrencyPreference();
@@ -14,6 +15,8 @@ export function HomeRentalSearch({ zones }: { zones: string[] }) {
   const [type, setType] = useState("");
   // "3.000", "3 mil" or "3k" all mean three thousand; only the understood amount is sent.
   const maxPrice = parsePriceInput(budget, currency);
+  // A kind of local travels as "Local:Galpón": type=Local plus tipo_local=Galpón.
+  const [typeValue, businessKind] = type.split(":");
   useEffect(() => {
     const restore = () => setSearching(false);
     window.addEventListener("pageshow", restore);
@@ -21,8 +24,10 @@ export function HomeRentalSearch({ zones }: { zones: string[] }) {
   }, []);
   // Zone has its own field, so the first question is the kind of home; free text goes last and hides on narrow screens.
   return <form action="/propiedades" method="get" className="home-search" onSubmit={() => setSearching(true)}>
+    {typeValue ? <input type="hidden" name="type" value={typeValue} /> : null}
+    {businessKind ? <input type="hidden" name="tipo_local" value={businessKind} /> : null}
     {maxPrice ? <><input type="hidden" name="maxPrice" value={maxPrice.amount} /><input type="hidden" name="currency" value={maxPrice.currency} /></> : null}
-    <label className="search-query"><span><Building2 size={16} />¿Qué estás buscando?</span><select name={type ? "type" : undefined} value={type} onChange={event => setType(event.target.value)}><option value="">Casa o departamento</option><optgroup label="Vivienda"><option>Casa</option><option>Departamento</option><option>Monoambiente</option></optgroup><optgroup label="Para tu negocio"><option value="Local">Local o tienda (nuevo)</option></optgroup></select></label>
+    <label className="search-query"><span><Building2 size={16} />¿Qué estás buscando?</span><select value={type} onChange={event => setType(event.target.value)}><option value="">Casa o departamento</option><optgroup label="Vivienda"><option>Casa</option><option>Departamento</option><option>Monoambiente</option></optgroup><optgroup label="Para tu negocio (nuevo)"><option value="Local">Todos los locales</option>{businessKindChoices.map(kind => <option key={kind} value={`Local:${kind}`}>{kind}</option>)}</optgroup></select></label>
     <label><span><MapPin size={16} />Zona</span><select name={zone ? "zone" : undefined} value={zone} onChange={event => setZone(event.target.value)}><option value="">Todas las zonas</option>{zones.map(item => <option key={item}>{item}</option>)}</select></label>
     <label><span><Wallet size={16} />Presupuesto mensual</span><input value={budget} onChange={event => setBudget(event.target.value)} type="text" inputMode="numeric" autoComplete="off" aria-describedby="home-budget-hint" placeholder={currency === "USD" ? "Hasta $us" : "Hasta Bs"} /></label>
     <label><span><Search size={16} />Algo más</span><input name={query.trim() ? "q" : undefined} value={query} onChange={event => setQuery(event.target.value)} type="search" autoComplete="off" placeholder="Ej. mascotas, piscina" /></label>

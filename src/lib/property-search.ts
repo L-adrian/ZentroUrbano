@@ -24,6 +24,8 @@ import {
   type ZoneAverage,
   type ZoneAverageComparison,
 } from "@/lib/zone-prices";
+import { businessKindChoices } from "@/lib/publication-input";
+import { getBusinessKind } from "@/lib/business-kinds";
 import { formatZoneList, joinZones, splitZones, zoneMatches } from "@/lib/santa-cruz-zones";
 
 export type PropertySearchEvaluation = {
@@ -889,6 +891,8 @@ export type RentalSearchFilters = {
   area: MapArea | null;
   // Business features for locales, joined by commas.
   business: string;
+  // Kinds of local (Galpón, Oficina…), joined by commas. Any kind when empty.
+  businessKind: string;
   sort: RentalSort;
 };
 
@@ -931,6 +935,7 @@ export const emptyRentalSearchFilters: RentalSearchFilters = {
   near: "",
   area: null,
   business: "",
+  businessKind: "",
   sort: "",
 };
 
@@ -975,6 +980,7 @@ export const rentalSearchParamKeys = [
   "cerca",
   "area",
   "negocio",
+  "tipo_local",
   "orden",
 ];
 
@@ -995,6 +1001,7 @@ const rentalFilterKeys: RentalFilterKey[] = [
   "belowZoneAverage",
   "near",
   "area",
+  "businessKind",
   "business",
 ];
 
@@ -1109,6 +1116,10 @@ export function readRentalSearchParams(
     near: nearParam === null ? base.near : getKnownPlace(nearParam, places) ? nearParam : "",
     area: areaParam === null ? base.area : parseMapArea(areaParam),
     business: params.get("negocio") === null ? base.business : params.getAll("negocio").join(",").slice(0, 200),
+    businessKind:
+      params.get("tipo_local") === null
+        ? base.businessKind
+        : businessKindChoices.filter((kind) => params.getAll("tipo_local").includes(kind)).join(","),
     sort: sortParam === null ? base.sort : isRentalSort(sortParam) ? sortParam : "",
   };
 }
@@ -1151,6 +1162,7 @@ export function buildRentalSearchParams(
   if (filters.near) params.set("cerca", filters.near);
   if (filters.area) params.set("area", formatMapArea(filters.area));
   for (const feature of splitBusiness(filters.business)) params.append("negocio", feature);
+  for (const kind of splitBusiness(filters.businessKind)) params.append("tipo_local", kind);
   if (filters.sort) params.set("orden", filters.sort);
   return params;
 }
@@ -1221,6 +1233,8 @@ export function searchRentals(
     if (!zoneMatches(property, zones)) return [];
     if (!types.length && property.type === "Local") return [];
     if (types.length && !types.some((type) => (type === "Monoambiente" ? isMonoambiente(property) : property.type === type))) return [];
+    const kinds = splitBusiness(filters.businessKind);
+    if (kinds.length && !kinds.includes(getBusinessKind(property) ?? "")) return [];
     const wanted = splitBusiness(filters.business);
     if (wanted.length && !wanted.every((feature) => property.tags.some((tag) => tag.toLocaleLowerCase("es") === feature.toLocaleLowerCase("es")))) return [];
 
@@ -1349,6 +1363,8 @@ export function describeRentalFilter(
       return "Zona del mapa";
     case "business":
       return splitBusiness(filters.business).join(", ");
+    case "businessKind":
+      return splitBusiness(filters.businessKind).join(" o ");
   }
 }
 
@@ -1363,7 +1379,9 @@ export function describeRentalSearch(
   const query = filters.query.trim();
   const bedrooms = Number(filters.bedrooms);
   const bathrooms = Number(filters.bathrooms);
-  const kind = filters.type ? getRentalTypes(filters.type).join(" o ").toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
+  const kind = filters.businessKind && filters.type.includes("Local")
+    ? splitBusiness(filters.businessKind).join(" o ").toLocaleLowerCase("es")
+    : filters.type ? getRentalTypes(filters.type).map((type) => (type === "Local" ? "Local o tienda" : type)).join(" o ").toLocaleLowerCase("es") : filters.zone ? "vivienda" : "";
   const place = getKnownPlace(filters.near, places);
   return [
     kind ? `${kind}${filters.zone ? ` en ${formatZoneList(splitZones(filters.zone))}` : ""}` : null,

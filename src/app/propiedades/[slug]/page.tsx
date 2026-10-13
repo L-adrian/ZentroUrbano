@@ -18,6 +18,7 @@ import {
   Trees,
   Waves,
 } from "lucide-react";
+import { getBusinessKind } from "@/lib/business-kinds";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BackToCatalogLink } from "@/components/back-to-catalog-link";
@@ -208,7 +209,7 @@ export default async function PropertyDetailPage({
                   {property.operation}
                 </span>
                 <span className="rounded-full bg-[#eef7ef] px-3 py-1 text-sm font-semibold text-[#285340]">
-                  {property.type}
+                  {getBusinessKind(property) ?? property.type}
                 </span>
                 {property.listingPlan === "featured" ? (
                   <span className="listing-featured-chip rounded-full px-3 py-1 text-sm font-semibold">
@@ -401,7 +402,7 @@ function propertyQuickFacts(property: Property) {
   // A local has no bedrooms or pets: it shows what a business asks first.
   if (property.type === "Local") {
     return [
-      { label: "Tipo", value: "Local o tienda", icon: <Store className="h-4 w-4" /> },
+      { label: "Tipo", value: getBusinessKind(property) ?? "Local o tienda", icon: <Store className="h-4 w-4" /> },
       ...(property.area > 0 ? [{ label: "Superficie", value: `${property.area} m²`, icon: <Ruler className="h-4 w-4" /> }] : []),
       { label: "Baños", value: property.bathrooms > 0 ? property.bathrooms : "Consultar", icon: <Bath className="h-4 w-4" /> },
       { label: "Parqueo para clientes", value: property.garage > 0 ? getPropertyParkingLabel(property) : "No tiene", icon: <Car className="h-4 w-4" /> },

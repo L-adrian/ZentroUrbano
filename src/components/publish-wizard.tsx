@@ -27,7 +27,7 @@ import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState }
 import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
 import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
 import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
-import { businessFeatureChoices, expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
+import { businessFeatureChoices, businessKindChoices, isBusinessKind, expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { maxSelectedPhotoBytes, uploadMaxSide } from "@/lib/photo-resize";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
@@ -57,6 +57,7 @@ type PropertyForm = {
   title: string;
   type: "Casa" | "Departamento" | "Monoambiente" | "Local";
   zone: string;
+  businessKind: string;
   frontage: string;
   businessUse: string;
   businessFeatures: string[];
@@ -102,6 +103,7 @@ const initialForm: PropertyForm = {
   title: "",
   type: "Departamento",
   zone: "",
+  businessKind: "",
   frontage: "",
   businessUse: "",
   businessFeatures: [],
@@ -140,6 +142,7 @@ const serviceValues = new Set<string>([...includedServiceOptions.map(([key]) => 
 // The server accepts older forms without the expenses question; this form always asks it.
 function wizardStepErrors(step: number, form: PropertyForm): PublicationFieldErrors {
   const errors = getPublicationStepErrors(step, form, form.ownerName, form.phone);
+  if (step === 1 && form.type === "Local" && !form.businessKind) return { ...errors, businessKind: "Elige qué tipo de local es: tienda, oficina, galpón…" };
   if (step === 2 && !form.expensesMode) return { ...errors, commonExpenses: "Elige si las expensas están incluidas, no se cobran o se pagan aparte." };
   return errors;
 }
@@ -158,6 +161,7 @@ function restoreForm(saved: Record<string, unknown>, base: PropertyForm): Proper
     restored.businessFeatures = saved.businessFeatures.filter((item): item is string => typeof item === "string" && (businessFeatureChoices as readonly string[]).includes(item));
   }
   if (!["Casa", "Departamento", "Monoambiente", "Local"].includes(restored.type)) restored.type = "Departamento";
+  if (!isBusinessKind(restored.businessKind)) restored.businessKind = "";
   if (!["BOB", "USD"].includes(restored.currency)) restored.currency = "BOB";
   // Drafts saved before the pets and expenses questions keep what the owner had answered.
   if (!(petsPolicies as readonly string[]).includes(restored.petsPolicy) || typeof saved.petsPolicy !== "string") restored.petsPolicy = restored.pets ? "allowed" : "consult";
@@ -723,7 +727,7 @@ function ListingKindChooser({
           <Home size={20} aria-hidden="true" /><span><strong>Vivienda</strong><small>Casa, departamento o monoambiente</small></span>
         </button>
         <button type="button" aria-pressed={isLocal} onClick={() => updateField("type", "Local")}>
-          <Store size={20} aria-hidden="true" /><span><strong>Local o tienda <em>Nuevo</em></strong><small>Para un negocio, oficina o depósito</small></span>
+          <Store size={20} aria-hidden="true" /><span><strong>Local o tienda <em>Nuevo</em></strong><small>Tienda, oficina, galpón, depósito y más</small></span>
         </button>
       </div>
     </fieldset>
@@ -959,7 +963,13 @@ function LocalInformationStep({
     <section>
       <StepHeading title="Describe el local" copy="Lo que un comerciante pregunta primero: metros, frente a la calle y qué negocio se permite." />
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
-        <Field label="Título" className="sm:col-span-2" icon={<Store className="h-4 w-4" />}>
+        <Field label="¿Qué tipo de local es?" className="sm:col-span-2" icon={<Store className="h-4 w-4" />}>
+          <select value={form.businessKind} onChange={(event) => updateField("businessKind", event.target.value)} className={inputClassName}>
+            <option value="">Elige una opción</option>
+            {businessKindChoices.map((kind) => <option key={kind}>{kind}</option>)}
+          </select>
+        </Field>
+        <Field label="Título" className="sm:col-span-2">
           <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Ej. Local a calle con vitrina en Av. Banzer" className={inputClassName} />
         </Field>
         <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
@@ -1107,7 +1117,7 @@ function ConfirmationStep({
       {form.type === "Local" ? <ReviewSection title="El local" onEdit={() => onEdit(1)}>
         <dl className="review-summary">
           <SummaryRow label="Título" value={form.title || "Sin título"} />
-          <SummaryRow label="Tipo" value="Local o tienda" />
+          <SummaryRow label="Tipo" value={form.businessKind || "Sin elegir"} />
           <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
           <SummaryRow label="Superficie" value={[form.area ? `${form.area} m²` : "Sin indicar", form.frontage ? `frente ${form.frontage} m` : ""].filter(Boolean).join(" · ")} />
           <SummaryRow label="Baños y parqueo" value={`${form.bathrooms || "?"} baños · ${form.garage || 0} parqueos para clientes`} />
