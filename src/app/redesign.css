@@ -1116,6 +1116,18 @@ button, a { -webkit-tap-highlight-color: transparent; }
   .region-welcome .region-options label:first-child { grid-column: 1 / -1; }
 }
 @media (max-width: 540px) { .header-contact { display: none; }.region-chip { height: 34px; padding-inline: 9px; font-size: 12px; } }
+/* Tablets and half-screen windows (769-1100 px, e.g. iPad portrait at 810-834 px): the currency and
+   theme buttons move into the menu (both are already there) and Contáctanos keeps only its icon, so
+   the Publicar button and the menu stay on screen. */
+@media (min-width: 769px) and (max-width: 1100px) { .header-currency, .header-theme, .header-contact span { display: none; }.menu-theme { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }.account-dropdown .menu-theme .zu-icon-button { width: 38px; justify-content: center; padding: 0; } }
+/* Small phones (360 px and less, or long names like Cochabamba): the city chip gives up room first,
+   cutting its name with "…" and, if needed, keeping only the flag, so the menu button never leaves the screen. */
+.region-menu { min-width: 0; flex-shrink: 1; }
+.region-chip { max-width: 100%; }
+.region-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.header-inner .zu-logo { flex-shrink: 0; }
+@media (max-width: 374px) { .header-inner { gap: 6px; }.header-inner .zu-logo { font-size: 16px; gap: 5px; }.header-inner .logo-mark { width: 26px; height: 26px; }.region-chip { gap: 5px; padding-inline: 8px; } }
+@media (max-width: 330px) { .region-chip > span { display: none; } }
 .publish-kind { margin: 0 0 22px; border: 0; padding: 0; }
 .publish-kind legend { margin-bottom: 10px; font-size: 15px; font-weight: 650; color: var(--foreground); }
 .publish-kind-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }

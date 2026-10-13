@@ -95,7 +95,8 @@ body:has(.svc .mbar) .mobile-navigation{display:none}
 .svc .opts{display:grid;gap:8px;margin-top:16px}
 .svc .opt{display:flex;justify-content:space-between;align-items:center;border:1px solid var(--s-line);border-radius:10px;padding:11px 13px;font-size:14px;cursor:pointer}
 .svc .opt.on{border-color:var(--s-brand);background:var(--s-soft);box-shadow:inset 0 0 0 1px var(--s-brand)}
-.svc .opt strong{font-size:14px}
+.svc .opt strong{font-size:14px;white-space:nowrap;flex-shrink:0}
+.svc .opt{gap:12px}
 .svc .facts{list-style:none;padding:0;margin:18px 0;display:grid;gap:10px;font-size:14px}
 .svc .facts li{display:flex;gap:10px;align-items:center;color:var(--s-fg)}
 .svc .facts svg{color:var(--s-brand)}
@@ -158,7 +159,7 @@ body:has(.svc .mbar) .mobile-navigation{display:none}
 .svc .phh-tx li svg{color:#b7dfc9;width:17px;height:17px}
 .svc .phh-ft{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .svc .phh-pr{display:flex;align-items:baseline;gap:8px}
-.svc .phh-pr strong{font-size:36px;letter-spacing:-.02em}
+.svc .phh-pr strong{font-size:36px;letter-spacing:-.02em;white-space:nowrap}
 .svc .phh-pr span{color:#b7dfc9;font-size:13px}
 .svc .phh-pr s{opacity:.5;font-size:15px}
 .svc .pcgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
