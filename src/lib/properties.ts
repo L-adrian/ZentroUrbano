@@ -1,5 +1,5 @@
 export type Operation = "Compra" | "Alquiler" | "Anticrético";
-export type PropertyType = "Casa" | "Departamento" | "Terreno";
+export type PropertyType = "Casa" | "Departamento" | "Terreno" | "Local";
 export type ListingPlan = "standard" | "featured";
 export type PublisherKind = "owner" | "agency";
 

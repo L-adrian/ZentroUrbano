@@ -1,7 +1,7 @@
 import { isExternalContactUrl } from "@/lib/property-contact";
 import type { Property } from "@/lib/properties";
 
-export const rentalPropertyTypes = ["Casa", "Departamento"] as const;
+export const rentalPropertyTypes = ["Casa", "Departamento", "Local"] as const;
 
 export function isRentalPropertyType(value: unknown) {
   return rentalPropertyTypes.some((type) => type === value);

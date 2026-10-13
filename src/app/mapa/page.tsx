@@ -15,13 +15,14 @@ export const metadata: Metadata = buildSeoMetadata({
   path: "/mapa",
 });
 
-export default async function MapPage() {
+export default async function MapPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const isBusiness = [(await searchParams).type].flat().includes("Local");
   const { department, properties } = await inSelectedDepartment(getDirectRentals(await getPublishedPropertiesData()));
 
   return (
     <main id="contenido" className="min-h-screen bg-white text-neutral-950">
       <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-6 sm:px-6 lg:px-8">
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Mapa de alquileres en {department.name}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{isBusiness ? `Mapa de locales en ${department.name}` : `Mapa de alquileres en ${department.name}`}</h1>
         <p className="mt-1 text-sm text-neutral-600">
           Compara ubicaciones y contacta directamente al propietario.
         </p>

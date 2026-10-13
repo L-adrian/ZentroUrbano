@@ -1,4 +1,4 @@
-import { ArrowRight, Building2, Car, Check, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal } from "lucide-react";
+import { ArrowRight, Building2, Car, Check, Home, KeyRound, MapPin, PawPrint, SlidersHorizontal, Store } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { HomeRentalSearch } from "@/components/home-rental-search";
@@ -25,13 +25,16 @@ const categories = [
   { label: "Monoambientes", href: "/propiedades?type=Monoambiente", icon: KeyRound },
   { label: "Aceptan mascotas", href: "/propiedades?amenity=pets", icon: PawPrint },
   { label: "Con parqueo", href: "/propiedades?amenity=garage", icon: Car },
+  { label: "Locales", href: "/propiedades?type=Local", icon: Store, badge: "Nuevo" },
 ];
 
 // Only real listings reach this page (example listings are filtered out in getPublishedPropertiesData).
 const homeListingLimit = 8;
 
 export default async function HomePage() {
-  const { department, properties: rentals } = await inSelectedDepartment(getDirectRentals(await getPublishedPropertiesData()));
+  const { department, properties: allRentals } = await inSelectedDepartment(getDirectRentals(await getPublishedPropertiesData()));
+  // Locales live in their own sector (the "Locales" category), not in the homes list.
+  const rentals = allRentals.filter((property) => property.type !== "Local");
   return <main id="contenido" className="home-page">
     <section className="rental-heading home-hero">
       <div className="zu-container">
@@ -52,7 +55,7 @@ export default async function HomePage() {
     </section>
     <section className="zu-container rental-catalog">
       {rentals.length > 0 && <>
-        <nav className="rental-categories" aria-label="Tipos de alquiler">{categories.map(({label,href,icon: Icon},index) => <Link href={href} key={label} className={index === 0 ? "is-active" : ""}><Icon size={22} strokeWidth={1.6} /><span>{label}</span></Link>)}</nav>
+        <nav className="rental-categories" aria-label="Tipos de alquiler">{categories.map(({label,href,icon: Icon,badge},index) => <Link href={href} key={label} className={index === 0 ? "is-active" : ""}><Icon size={22} strokeWidth={1.6} /><span>{label}</span>{badge ? <span className="catalog-check-badge">{badge}</span> : null}</Link>)}</nav>
         <RecentlyViewed properties={toRentalSummaries(rentals)} />
         <div className="catalog-heading"><div><h2>Tu próximo alquiler</h2><p>{rentals.length === 1 ? "1 vivienda publicada" : `${rentals.length} viviendas publicadas`}</p></div><Link href="/mapa" className="zu-button zu-button-secondary"><MapPin size={17} /><span>Ver mapa</span></Link></div>
       </>}
