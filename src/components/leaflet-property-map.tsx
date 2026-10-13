@@ -33,6 +33,7 @@ import {
   MAP_WHEEL_PX_PER_ZOOM_LEVEL,
   SANTA_CRUZ_CENTER,
 } from "@/lib/map-config";
+import { departmentOfCity } from "@/lib/regions";
 import type { Property } from "@/lib/properties";
 import { getDirectRentals } from "@/lib/rentals";
 
@@ -180,7 +181,7 @@ export function LeafletPropertyMap({
         <div className={`${mapClassName} isolate z-0`}>
           <div className="absolute left-4 top-4 z-[500] flex items-center gap-2 rounded-full bg-white/95 px-4 py-2 text-sm font-semibold text-neutral-800 shadow-sm backdrop-blur sm:left-6 sm:top-6">
             <Navigation className="h-4 w-4 text-[#58745f]" aria-hidden="true" />
-            Santa Cruz, Bolivia
+            {departmentOfCity(properties[0]?.city).name}, Bolivia
           </div>
 
           {onSearchArea && movedByPerson ? (

@@ -28,6 +28,7 @@ import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/befor
 import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
 import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
 import { ZoneSuggestions } from "@/components/zone-suggestions";
+import { bolivia, defaultDepartment, findDepartment } from "@/lib/regions";
 import { businessFeatureChoices, businessKindChoices, isBusinessKind, expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { maxSelectedPhotoBytes, uploadMaxSide } from "@/lib/photo-resize";
@@ -57,6 +58,7 @@ type PropertyForm = {
   phone: string;
   title: string;
   type: "Casa" | "Departamento" | "Monoambiente" | "Local";
+  department: string;
   zone: string;
   businessKind: string;
   frontage: string;
@@ -103,6 +105,7 @@ const initialForm: PropertyForm = {
   phone: "",
   title: "",
   type: "Departamento",
+  department: defaultDepartment.slug,
   zone: "",
   businessKind: "",
   frontage: "",
@@ -192,13 +195,14 @@ function sendPublication(body: FormData, key: string, onProgress: (fraction: num
   });
 }
 
-export function PublishWizard({ account, prefill }: { account: { id: string; name: string; phone: string }; prefill?: PublishPrefill }) {
+// department: the one the visitor picked in the header, preselected for a new listing.
+export function PublishWizard({ account, prefill, department = defaultDepartment.slug }: { account: { id: string; name: string; phone: string }; prefill?: PublishPrefill; department?: string }) {
   // A form opened from Mi cuenta has its own draft, so it never overwrites the regular one.
   const draftKey = `zu-publication-draft-v2:${account.id}${prefill ? `:${prefill.id}` : ""}`;
   const [step, setStep] = useState(0);
   // The furthest step the owner has opened, so they can jump back to it after fixing an earlier one.
   const [furthestStep, setFurthestStep] = useState(0);
-  const [form, setForm] = useState<PropertyForm>(() => ({ ...initialForm, ownerName: account.name, phone: account.phone }));
+  const [form, setForm] = useState<PropertyForm>(() => ({ ...initialForm, department, ownerName: account.name, phone: account.phone }));
   const [sessionExpired, setSessionExpired] = useState(false);
   const [photos, setPhotos] = useState<UploadPhoto[]>([]);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -889,7 +893,7 @@ function InformationStep({
       <StepHeading title="Describe la vivienda" copy="Solo pedimos los datos necesarios para filtrar y decidir." />
       <div className="mt-6 grid gap-4 sm:grid-cols-2">
         <Field label="Título" className="sm:col-span-2" icon={<Home className="h-4 w-4" />}>
-          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Ej. Departamento de 2 dormitorios en Urbari" className={inputClassName} />
+          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder={`Ej. Departamento de 2 dormitorios en ${(findDepartment(form.department) ?? defaultDepartment).zoneExample}`} className={inputClassName} />
         </Field>
         <Field label="Tipo de vivienda">
           <select
@@ -908,11 +912,9 @@ function InformationStep({
             <option value="Casa">Casa</option>
           </select>
         </Field>
-        <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
-          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Urbari" list="publish-zone-suggestions" autoComplete="off" className={inputClassName} />
-          <ZoneSuggestions id="publish-zone-suggestions" />
-        </Field>
-        <Field label="Dirección aproximada" className="sm:col-span-2">
+        <DepartmentField form={form} updateField={updateField} />
+        <ZoneField form={form} updateField={updateField} />
+        <Field label="Dirección aproximada">
           <input value={form.address} onChange={(event) => updateField("address", event.target.value)} placeholder="Avenida, calle o referencia" className={inputClassName} />
         </Field>
         <Field label="Dormitorios">
@@ -954,6 +956,28 @@ function InformationStep({
   );
 }
 
+// Where the home is. Santa Cruz has a list of barrios to suggest; elsewhere the owner types the zone.
+function DepartmentField({ form, updateField }: { form: PropertyForm; updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void }) {
+  return (
+    <Field label="¿En qué departamento está?">
+      <select value={form.department} onChange={(event) => updateField("department", event.target.value)} className={inputClassName}>
+        {bolivia.departments.map((item) => <option key={item.slug} value={item.slug}>{departmentLabel(item.slug)}</option>)}
+      </select>
+    </Field>
+  );
+}
+
+function ZoneField({ form, updateField, example }: { form: PropertyForm; updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void; example?: string }) {
+  const department = findDepartment(form.department) ?? defaultDepartment;
+  const inSantaCruz = department.slug === defaultDepartment.slug;
+  return (
+    <Field label="Zona o barrio" icon={<MapPin className="h-4 w-4" />}>
+      <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder={`Ej. ${inSantaCruz && example ? example : department.zoneExample}`} list={inSantaCruz ? "publish-zone-suggestions" : undefined} autoComplete="off" className={inputClassName} />
+      {inSantaCruz ? <ZoneSuggestions id="publish-zone-suggestions" /> : null}
+    </Field>
+  );
+}
+
 function LocalInformationStep({
   form,
   updateField,
@@ -972,13 +996,11 @@ function LocalInformationStep({
           </select>
         </Field>
         <Field label="Título" className="sm:col-span-2">
-          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Ej. Local a calle con vitrina en Av. Banzer" className={inputClassName} />
+          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder={form.department === defaultDepartment.slug ? "Ej. Local a calle con vitrina en Av. Banzer" : "Ej. Local a calle con vitrina en avenida principal"} className={inputClassName} />
         </Field>
-        <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
-          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Equipetrol" list="publish-zone-suggestions" autoComplete="off" className={inputClassName} />
-          <ZoneSuggestions id="publish-zone-suggestions" />
-        </Field>
-        <Field label="Dirección aproximada">
+        <DepartmentField form={form} updateField={updateField} />
+        <ZoneField form={form} updateField={updateField} example="Equipetrol" />
+        <Field label="Dirección aproximada" className="sm:col-span-2">
           <input value={form.address} onChange={(event) => updateField("address", event.target.value)} placeholder="Avenida, calle o galería" className={inputClassName} />
         </Field>
         <Field label="Superficie (m²)" icon={<Ruler className="h-4 w-4" />}>
@@ -1122,6 +1144,7 @@ function ConfirmationStep({
           <SummaryRow label="Título" value={form.title || "Sin título"} />
           <SummaryRow label="Tipo" value={form.businessKind || "Sin elegir"} />
           <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
+          <SummaryRow label="Departamento" value={departmentLabel(form.department)} />
           <SummaryRow label="Superficie" value={[form.area ? `${form.area} m²` : "Sin indicar", form.frontage ? `frente ${form.frontage} m` : ""].filter(Boolean).join(" · ")} />
           <SummaryRow label="Baños y parqueo" value={`${form.bathrooms || "?"} baños · ${form.garage || 0} parqueos para clientes`} />
           <SummaryRow label="Rubro permitido" value={form.businessUse.trim() || "Cualquier rubro"} />
@@ -1133,6 +1156,7 @@ function ConfirmationStep({
           <SummaryRow label="Título" value={form.title || "Sin título"} />
           <SummaryRow label="Tipo" value={form.type} />
           <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
+          <SummaryRow label="Departamento" value={departmentLabel(form.department)} />
           <SummaryRow label="Ambientes" value={`${form.bedrooms || 0} dorm. · ${form.bathrooms || "?"} baños · ${form.garage || 0} parqueos`} />
           <SummaryRow label="Superficie" value={form.area ? `${form.area} m²` : "Sin indicar"} />
           <SummaryRow label="Mascotas" value={petsLabels[form.petsPolicy]} />
@@ -1298,6 +1322,12 @@ function canAdvanceStep(step: number, form: PropertyForm, photos: UploadPhoto[])
   return true;
 }
 
+// "Santa Cruz", "La Paz", "Chuquisaca · Sucre": the city is added only when its name differs.
+function departmentLabel(slug: string) {
+  const department = findDepartment(slug) ?? defaultDepartment;
+  return department.city.startsWith(department.name) ? department.name : `${department.name} · ${department.city}`;
+}
+
 function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
   const beforeVisit = beforeVisitRows(parseBeforeVisitInput(form).values) ?? [];
   return [
@@ -1306,6 +1336,7 @@ function buildSubmissionText(form: PropertyForm, photos: UploadPhoto[]) {
     `WhatsApp: ${form.phone}`,
     `Título: ${form.title}`,
     `Tipo: ${form.type}`,
+    `Departamento: ${departmentLabel(form.department)}`,
     `Zona: ${form.zone}`,
     `Dirección: ${form.address}`,
     `Dormitorios: ${form.bedrooms}`,

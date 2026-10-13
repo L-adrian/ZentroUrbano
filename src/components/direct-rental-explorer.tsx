@@ -74,6 +74,7 @@ import {
 import type { Property } from "@/lib/properties";
 import { businessKindChoices } from "@/lib/publication-input";
 import { canonicalZone, getZoneSector, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
+import { defaultDepartment, isInDepartment } from "@/lib/regions";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
 
@@ -165,7 +166,9 @@ export function DirectRentalExplorer({
   // Zona Norte, Sur, Este… each with its neighborhoods and avenues; places outside the list last.
   const zoneGroups = useMemo<ZoneGroup[]>(() => {
     const countOf = (name: string) => optionCounts.byZone.get(name) ?? 0;
-    const groups: ZoneGroup[] = santaCruzSectors.map((sector) => ({
+    // Santa Cruz's zones and barrios only make sense when its homes are on the page.
+    const sectors = properties.some((property) => isInDepartment(property.city, defaultDepartment)) ? santaCruzSectors : [];
+    const groups: ZoneGroup[] = sectors.map((sector) => ({
       name: sector.name,
       selectable: true,
       count: countOf(sector.name),
@@ -180,10 +183,10 @@ export function DirectRentalExplorer({
       .map((name) => ({ name, count: countOf(name) }))
       .sort((first, second) => first.name.localeCompare(second.name, "es"));
     if (others.length) {
-      groups.push({ name: otherZonesLabel, selectable: false, count: countOf(otherZonesLabel), unnamed: 0, places: others });
+      groups.push({ name: sectors.length ? otherZonesLabel : "Zonas y barrios", selectable: false, count: countOf(otherZonesLabel), unnamed: 0, places: others });
     }
     return groups;
-  }, [optionCounts, selectedZones]);
+  }, [optionCounts, properties, selectedZones]);
   const matches = useMemo(
     () => searchRentals(properties, appliedFilters, displayCurrency, { zoneAverages }),
     [appliedFilters, displayCurrency, properties, zoneAverages],

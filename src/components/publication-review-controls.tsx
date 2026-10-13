@@ -4,9 +4,13 @@ import { useRouter } from "next/navigation";
 import { Check, X, LoaderCircle, MapPin, MessageSquareWarning } from "lucide-react";
 import { ZoneSuggestions } from "@/components/zone-suggestions";
 import { describeFilterPlace, zoneConflict } from "@/lib/santa-cruz-zones";
+import { defaultDepartment, findDepartment } from "@/lib/regions";
 
-export function PublicationReviewControls({id,address,zone:ownerZone="",canApprove,republish=false}:{id:string;address:string;zone?:string;canApprove:boolean;republish?:boolean}) {
+export function PublicationReviewControls({id,address,zone:ownerZone="",department:departmentSlug,canApprove,republish=false}:{id:string;address:string;zone?:string;department?:string;canApprove:boolean;republish?:boolean}) {
   const router=useRouter();
+  // Santa Cruz's barrio list and map sectors only apply there; elsewhere the zone stays as typed.
+  const department=findDepartment(departmentSlug) ?? defaultDepartment;
+  const inSantaCruz=department.slug === defaultDepartment.slug;
   const [zone,setZone]=useState(ownerZone);
   const [latitude,setLatitude]=useState("");
   const [longitude,setLongitude]=useState("");
@@ -17,7 +21,7 @@ export function PublicationReviewControls({id,address,zone:ownerZone="",canAppro
   const [done,setDone]=useState("");
   const lat=Number(latitude),lng=Number(longitude);
   const coordinates=latitude.trim() && longitude.trim() && Number.isFinite(lat) && Number.isFinite(lng) ? {lat,lng} : null;
-  const conflict=zoneConflict(zone,coordinates);
+  const conflict=inSantaCruz ? zoneConflict(zone,coordinates) : null;
   async function review(decision:"approve"|"reject"|"changes") {
     if (busy) return;
     if (decision === "reject" && reason.trim().length < 5) {setError("Escribe el motivo del rechazo (mínimo 5 caracteres).");return;}
@@ -39,10 +43,13 @@ export function PublicationReviewControls({id,address,zone:ownerZone="",canAppro
   if (done) return <p role="status" className="review-result">{done}</p>;
   return <div className="review-controls">
     {!republish && <>
-      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address + ", Santa Cruz, Bolivia")}`} target="_blank" rel="noopener noreferrer" className="request-back-link"><MapPin size={17}/>Comprobar ubicación</a>
-      <label>Zona o barrio<input value={zone} onChange={e=>setZone(e.target.value)} list={`review-zone-${id}`} autoComplete="off" maxLength={160} disabled={busy}/></label>
-      <ZoneSuggestions id={`review-zone-${id}`}/>
-      <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro saldrá en: <strong>{describeFilterPlace(zone,coordinates)}</strong>{coordinates ? "" : " (completa las coordenadas para ubicarlo por el mapa)"}.</p>
+      <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${address}, ${department.city}, Bolivia`)}`} target="_blank" rel="noopener noreferrer" className="request-back-link"><MapPin size={17}/>Comprobar ubicación</a>
+      <p className="review-hint">Departamento: <strong>{department.name}</strong>{department.city === department.name ? "" : ` (${department.city})`}.</p>
+      <label>Zona o barrio<input value={zone} onChange={e=>setZone(e.target.value)} list={inSantaCruz ? `review-zone-${id}` : undefined} autoComplete="off" maxLength={160} disabled={busy}/></label>
+      {inSantaCruz && <ZoneSuggestions id={`review-zone-${id}`}/>}
+      {inSantaCruz
+        ? <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro saldrá en: <strong>{describeFilterPlace(zone,coordinates)}</strong>{coordinates ? "" : " (completa las coordenadas para ubicarlo por el mapa)"}.</p>
+        : <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro de {department.name} saldrá tal cual.</p>}
       {conflict && <p className="review-hint"><strong>Ojo:</strong> dice {conflict.named} pero el punto está en {conflict.byPoint}. Revisa la zona o las coordenadas.</p>}
       <div className="review-coordinates">
         <label>Latitud<input type="number" step="any" min="-23" max="-9" value={latitude} onChange={e=>setLatitude(e.target.value)} placeholder="-17.7833" disabled={busy}/></label>
