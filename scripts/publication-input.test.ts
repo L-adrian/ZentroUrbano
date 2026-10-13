@@ -80,3 +80,23 @@ test("expenses the ad did not state stay pending instead of reading as zero", ()
   assert.equal(details.commonExpenses, 0);
   assert.ok(publicationRequirements(details).includes("Expensas: pendiente de consulta"));
 });
+
+test("an owner can publish in any department; older requests stay in Santa Cruz", async () => {
+  const { departmentOfCity, findDepartment, isInDepartment } = await import("../src/lib/regions");
+  const { describeFilterPlace, zoneMatches } = await import("../src/lib/santa-cruz-zones");
+  assert.equal(parsePublicationDetails(valid)?.department, undefined);
+  assert.equal(parsePublicationDetails({ ...valid, department: "la-paz" })?.department, "la-paz");
+  assert.equal(parsePublicationDetails({ ...valid, department: "lima" }), null);
+  assert.ok(validatePublicationDetails({ ...valid, department: "lima" }).fieldErrors.department);
+  // The city stored on approval puts the listing in its department's catalog.
+  for (const slug of ["santa-cruz", "la-paz", "cochabamba", "chuquisaca", "tarija", "oruro", "potosi", "beni", "pando"]) {
+    const department = findDepartment(slug)!;
+    assert.ok(isInDepartment(department.city, department), slug);
+    assert.equal(departmentOfCity(department.city).slug, slug);
+  }
+  // La Paz's "Zona Sur" is a place of its own, not Santa Cruz's Zona Sur.
+  const laPaz = { zone: "Zona Sur", coordinates: { lat: -16.54, lng: -68.08 }, city: "La Paz" };
+  assert.equal(describeFilterPlace(laPaz.zone, laPaz.coordinates, laPaz.city), "Zona Sur");
+  assert.ok(zoneMatches(laPaz, ["Zona Sur"]));
+  assert.ok(!zoneMatches({ ...laPaz, zone: "Sopocachi" }, ["Zona Sur"]));
+});

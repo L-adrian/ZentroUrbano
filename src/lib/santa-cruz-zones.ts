@@ -1,4 +1,5 @@
 import { distanceKm, isValidCoordinates, type LatLng } from "@/lib/catalog-geo";
+import { defaultDepartment, isInDepartment } from "@/lib/regions";
 
 // Zones of Santa Cruz de la Sierra, each with the neighborhoods and avenues people search for.
 // Picking a zone ("Zona Norte") picks every place inside it; a place can also be picked alone.
@@ -161,8 +162,11 @@ function isPlaceName(zone: string) {
 
 // Where a home goes in the filter: a known neighborhood keeps its own name and zone; a bare zone
 // ("Norte") or a name outside the list goes by its map point, and keeps its text as the place.
-export function locateHome(home: { zone: string; coordinates?: LatLng | null }) {
+// Outside Santa Cruz (city given and not Santa Cruz) the zone is just the owner's text: the list and
+// the map sectors above are Santa Cruz's, and La Paz's "Zona Sur" is not Santa Cruz's.
+export function locateHome(home: { zone: string; coordinates?: LatLng | null; city?: string | null }) {
   const zone = canonicalZone(home.zone);
+  if (home.city && !isInDepartment(home.city, defaultDepartment)) return { place: zone || null, sector: null };
   if (isPlaceName(zone)) return { place: zone, sector: sectorByZone.get(zone) ?? null };
   const sector = sectorFromCoordinates(home.coordinates) ?? sectorByZone.get(zone) ?? null;
   return { place: isSectorName(zone) ? null : zone || null, sector };
@@ -178,7 +182,7 @@ export function joinZones(zones: string[]) {
 }
 
 // A chosen zone covers every home located in it; a chosen place covers only homes with that name.
-export function zoneMatches(home: { zone: string; coordinates?: LatLng | null }, selected: string[]) {
+export function zoneMatches(home: { zone: string; coordinates?: LatLng | null; city?: string | null }, selected: string[]) {
   if (selected.length === 0) return true;
   const { place, sector } = locateHome(home);
   return (place !== null && selected.includes(place)) || (sector !== null && selected.includes(sector));
@@ -196,14 +200,16 @@ export const zoneSuggestions = santaCruzSectors
   .sort((first, second) => first.name.localeCompare(second.name, "es"));
 
 // "Zona Norte · Equipetrol": where a home shows up in the catalog filter with this zone and point.
-export function describeFilterPlace(zone: string, coordinates?: LatLng | null) {
-  const { place, sector } = locateHome({ zone, coordinates });
+export function describeFilterPlace(zone: string, coordinates?: LatLng | null, city?: string | null) {
+  const { place, sector } = locateHome({ zone, coordinates, city });
+  if (city && !isInDepartment(city, defaultDepartment)) return place ?? zone;
   return [sector ?? otherZonesLabel, place].filter(Boolean).join(" · ");
 }
 
 // The zone the text names ("Zona Norte", or Equipetrol's zone) when the map point falls in another
 // one: either the text or the point is probably wrong. Null when they agree or one is unknown.
-export function zoneConflict(zone: string, coordinates?: LatLng | null) {
+export function zoneConflict(zone: string, coordinates?: LatLng | null, city?: string | null) {
+  if (city && !isInDepartment(city, defaultDepartment)) return null;
   const named = getZoneSector(zone);
   const byPoint = sectorFromCoordinates(coordinates);
   return named && byPoint && named !== byPoint ? { named, byPoint } : null;

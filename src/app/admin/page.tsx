@@ -40,7 +40,7 @@ export default async function AdminPage() {
   const curated = new Set(curatedRentalProperties.map((property) => property.slug));
   const places = properties
     .filter((property) => !curated.has(property.slug))
-    .map((property) => ({ slug: property.slug, title: property.title, zone: property.zone, lat: property.coordinates.lat, lng: property.coordinates.lng, ownerConfirmed: Boolean(property.rentalDetails?.locationConfirmedAt) }));
+    .map((property) => ({ slug: property.slug, title: property.title, city: property.city, zone: property.zone, lat: property.coordinates.lat, lng: property.coordinates.lng, ownerConfirmed: Boolean(property.rentalDetails?.locationConfirmedAt) }));
   const funnelRows = funnel ? buildListingFunnel(funnel.counts, funnel.sources, titles, 60, hidden) : null;
 
   return (

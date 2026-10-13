@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 import { ZoneSuggestions } from "@/components/zone-suggestions";
 import { describeFilterPlace, zoneConflict } from "@/lib/santa-cruz-zones";
 
-export type AdminListingPlace = { slug: string; title: string; zone: string; lat: number; lng: number; ownerConfirmed: boolean };
+export type AdminListingPlace = { slug: string; title: string; city: string; zone: string; lat: number; lng: number; ownerConfirmed: boolean };
 
 // Fix the zone an owner typed, or move a listing's map point, after it was published.
 export function AdminListingPlaces({ listings }: { listings: AdminListingPlace[] }) {
@@ -52,7 +52,7 @@ function PlaceRow({ item }: { item: AdminListingPlace }) {
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const lat = Number(latitude), lng = Number(longitude);
   const point = latitude.trim() && longitude.trim() && Number.isFinite(lat) && Number.isFinite(lng) ? { lat, lng } : null;
-  const conflict = zoneConflict(zone, point);
+  const conflict = zoneConflict(zone, point, item.city);
   const changed = zone.trim() !== item.zone || lat !== item.lat || lng !== item.lng;
 
   async function save() {
@@ -75,7 +75,7 @@ function PlaceRow({ item }: { item: AdminListingPlace }) {
   return (
     <li className="rounded-[22px] border border-black/10 bg-neutral-50 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <Link href={`/propiedades/${item.slug}`} target="_blank" className="font-semibold text-neutral-950 underline-offset-4 hover:underline">{item.title}</Link>
+        <Link href={`/propiedades/${item.slug}`} target="_blank" className="font-semibold text-neutral-950 underline-offset-4 hover:underline">{item.title}<span className="ml-2 text-xs font-normal text-neutral-500">{item.city}</span></Link>
         <a href={`https://www.google.com/maps/search/?api=1&query=${lat},${lng}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-semibold text-[#0b6b52]">
           Ver en Google Maps <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
@@ -95,7 +95,7 @@ function PlaceRow({ item }: { item: AdminListingPlace }) {
         </button>
       </div>
       <p className="mt-2 text-xs text-neutral-600">
-        En el filtro: <strong className="text-neutral-900">{describeFilterPlace(zone, point)}</strong>
+        En el filtro: <strong className="text-neutral-900">{describeFilterPlace(zone, point, item.city)}</strong>
         {conflict ? <span className="ml-1 font-semibold text-[#9a4a12]">· Ojo: dice {conflict.named} pero el punto está en {conflict.byPoint}.</span> : null}
         {item.ownerConfirmed && point && (lat !== item.lat || lng !== item.lng) ? " · Si mueves el punto, deja de decir «Ubicación confirmada por el dueño»." : ""}
       </p>

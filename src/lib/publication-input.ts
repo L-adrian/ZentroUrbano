@@ -1,5 +1,6 @@
 import { beforeVisitFields, parseBeforeVisitInput, readBeforeVisit, type BeforeVisit } from "@/lib/before-visit";
 import { parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
+import { findDepartment } from "@/lib/regions";
 
 export const petsPolicies = ["allowed", "not_allowed", "consult"] as const;
 export type PetsPolicy = (typeof petsPolicies)[number];
@@ -13,6 +14,8 @@ export type PublicationDetails = {
   expensesMode?: ExpensesMode;
   parkingNote?:string; mediaNote?:string;
   title:string; type:"Casa"|"Departamento"|"Monoambiente"|"Local"; zone:string; address:string;
+  // Department slug (regions.ts). Requests sent before departments existed are all in Santa Cruz.
+  department?:string;
   // Only for locales: meters of street front, allowed business use and what the space has.
   frontage?:number; businessUse?:string; businessFeatures?:string[];
   // Only for locales: what kind of commercial space it is (tienda, oficina, galpón…).
@@ -88,6 +91,8 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   const guaranteeAmount=number("guaranteeAmount",100_000_000);
   const exchangeRate=input.currency === "USD" ? parsePropertyExchangeRate(input.exchangeRate) : null;
   if (title.length < 8) fieldErrors.title = "Escribe un título de entre 8 y 220 caracteres.";
+  const department=input.department == null || input.department === "" ? undefined : findDepartment(String(input.department))?.slug;
+  if (input.department != null && input.department !== "" && !department) fieldErrors.department = "Elige el departamento donde está la vivienda.";
   if (!zone) fieldErrors.zone = "Indica la zona (máximo 160 caracteres).";
   if (!address) fieldErrors.address = "Indica una dirección aproximada (máximo 255 caracteres).";
   if (description.length < 30) fieldErrors.description = "La descripción debe tener entre 30 y 10.000 caracteres.";
@@ -121,7 +126,7 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   if (flags.some(key=>typeof input[key] !== "boolean")) fieldErrors.details = "Revisa las características de la vivienda en el paso Información.";
   if (Object.keys(fieldErrors).length || price === null || commonExpenses === null || garage === null) return { details: null, fieldErrors };
   const petsPolicy=input.petsPolicy != null ? input.petsPolicy as PetsPolicy : undefined;
-  return {fieldErrors,details:{title,type:input.type as PublicationDetails["type"],zone,address,description,price,currency:input.currency as "BOB"|"USD",exchangeRate,
+  return {fieldErrors,details:{title,type:input.type as PublicationDetails["type"],zone,...(department ? {department} : {}),address,description,price,currency:input.currency as "BOB"|"USD",exchangeRate,
     ...(petsPolicy ? {petsPolicy} : {}),
     ...(expensesMode ? {expensesMode: expensesMode as ExpensesMode} : {}),
     ...(text("parkingNote",120) ? {parkingNote:text("parkingNote",120)} : {}),

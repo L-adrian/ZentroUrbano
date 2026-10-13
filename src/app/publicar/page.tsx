@@ -7,6 +7,7 @@ import { PublishWizard } from "@/components/publish-wizard";
 import { SupportWhatsAppButton } from "@/components/support-whatsapp-button";
 import { getCurrentAccount } from "@/lib/mysql-auth";
 import { loadPublishPrefill } from "@/lib/publish-prefill-server";
+import { getSelectedDepartment } from "@/lib/region-server";
 import { buildSeoMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = buildSeoMetadata({
@@ -30,6 +31,7 @@ export default async function PublishPage({ searchParams }: { searchParams: Prom
   }
   if (account.kind !== "owner") redirect("/propiedades");
   const { prefill, problem } = await loadPublishPrefill(account.id, query);
+  const department = await getSelectedDepartment();
   return (
     <main id="contenido" className="min-h-screen bg-white text-neutral-950">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10 lg:px-8">
@@ -43,7 +45,7 @@ export default async function PublishPage({ searchParams }: { searchParams: Prom
         <div className="publication-account-bar"><span>Publicando como <strong>{account.display_name}</strong></span><SupportWhatsAppButton /></div>
         <Link href="/requisitos" target="_blank" rel="noopener noreferrer" className="zu-button zu-button-secondary mb-5"><ClipboardCheck size={16} aria-hidden="true" />Qué necesito para publicar</Link>
         {problem ? <p role="status" className="publish-draft-notice mb-5"><span>{problem}</span></p> : null}
-        <PublishWizard key={`${account.id}:${prefill?.id ?? ""}`} account={{ id: account.id, name: account.display_name, phone: account.phone ?? "" }} prefill={prefill} />
+        <PublishWizard key={`${account.id}:${prefill?.id ?? ""}`} account={{ id: account.id, name: account.display_name, phone: account.phone ?? "" }} prefill={prefill} department={department.slug} />
         <OwnerServicesNote className="mt-8 max-w-2xl rounded-[10px]" />
       </div>
     </main>

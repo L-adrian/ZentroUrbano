@@ -2,6 +2,7 @@ import { beforeVisitFormValues } from "@/lib/before-visit";
 import { photoCategories } from "@/lib/photo-quality";
 import type { Property } from "@/lib/properties";
 import type { PetsPolicy, PublicationDetails } from "@/lib/publication-input";
+import { defaultDepartment, departmentOfCity } from "@/lib/regions";
 
 // /publicar opened from Mi cuenta with data already loaded:
 // - "Corregir y reenviar" (P8): everything the owner sent, photos included, to fix and send again.
@@ -63,6 +64,7 @@ export function correctionFormValues(details: PublicationDetails, contact: { nam
     phone: localPhone(contact.whatsapp),
     title: details.title,
     type: details.type,
+    department: details.department ?? defaultDepartment.slug,
     zone: details.zone,
     address: details.address,
     bedrooms: optionalCount(details.bedrooms),
@@ -88,6 +90,7 @@ export function correctionFormValues(details: PublicationDetails, contact: { nam
 export function similarUnitFormValues(property: Property): PrefillFormValues {
   const details = property.rentalDetails;
   return {
+    department: departmentOfCity(property.city).slug,
     zone: property.zone,
     address: property.address,
     ...petsFields(details?.petsPolicy, property.pets),
