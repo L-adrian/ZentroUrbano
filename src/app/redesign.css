@@ -1130,6 +1130,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .header-inner .zu-logo { flex-shrink: 0; }
 @media (max-width: 374px) { .header-inner { gap: 6px; }.header-inner .zu-logo { font-size: 16px; gap: 5px; }.header-inner .logo-mark { width: 26px; height: 26px; }.region-chip { gap: 5px; padding-inline: 8px; } }
 @media (max-width: 330px) { .region-chip > span { display: none; } }
+/* Account menu: Moneda and Apariencia line up with the links above, and on short screens (phone
+   lying down) the menu and the city list scroll inside themselves instead of hiding behind the bottom bar. */
+.menu-currency .currency-control { position: relative; width: auto; justify-items: end; }
+.menu-currency .currency-reference { position: absolute; top: 100%; right: 0; white-space: nowrap; }
+.account-dropdown .menu-theme { padding-inline: 10px; }
+.account-dropdown, .region-dropdown { max-height: calc(100dvh - 92px); overflow-y: auto; overscroll-behavior: contain; }
+@media (max-width: 768px) { .account-dropdown { max-height: calc(100dvh - 64px - 74px - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; }.region-dropdown { max-height: calc(100dvh - 64px - 74px - env(safe-area-inset-bottom)); overflow-y: auto; overscroll-behavior: contain; } }
+/* Photo gallery with the phone lying down: a slimmer top and bottom bar and no thumbnail strip, so the photo gets the height. */
+@media (orientation: landscape) and (max-height: 520px) { .gallery-toolbar { height: 48px; padding-block: 4px; }.gallery-toolbar button { width: 40px; height: 40px; }.gallery-full-image { padding: 6px 64px; }.gallery-full-image button { top: 50%; bottom: auto; margin-top: -20px; width: 40px; height: 40px; }.gallery-thumbs { display: none; }.gallery-contact-bar { padding-block: 4px; }.gallery-contact-button { min-height: 40px; } }
 .publish-kind { margin: 0 0 22px; border: 0; padding: 0; }
 .publish-kind legend { margin-bottom: 10px; font-size: 15px; font-weight: 650; color: var(--foreground); }
 .publish-kind-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
