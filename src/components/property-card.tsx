@@ -30,7 +30,7 @@ export function PropertyCard({ property, compact = false, eagerImage = false, pe
     ...(property.bathrooms > 0 ? [{ icon: Bath, label: `${property.bathrooms} ${property.bathrooms === 1 ? "baño" : "baños"}` }] : []),
     ...(property.area > 0 ? [{ icon: Ruler, label: `${property.area} m²` }] : []),
     ...(property.garage > 0 ? [{ icon: Car, label: `${property.garage} parqueo` }] : []),
-  ].slice(0, compact ? 3 : 4);
+  ].sort((first, second) => (property.type === "Local" ? Number(second.icon === Ruler) - Number(first.icon === Ruler) : 0)).slice(0, compact ? 3 : 4);
   const availability = getAvailabilityState(property);
   const highlights = getListingHighlights(property, compact ? 2 : 3);
   const entry = getEntryCost(property);

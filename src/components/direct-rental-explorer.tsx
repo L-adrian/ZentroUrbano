@@ -12,6 +12,7 @@ import {
   PawPrint,
   Receipt,
   Search,
+  Store,
   Share2,
   SlidersHorizontal,
   Sofa,
@@ -55,7 +56,9 @@ import {
   roomOptionLabel,
   rentalSearchParamKeys,
   rentalSortOptions,
-  rentalTypeOptions,
+  businessFeatureOptions,
+  homeTypeOptions,
+  splitBusiness,
   searchRentals,
   toRentalTypeFilter,
   understandRentalQuery,
@@ -196,6 +199,7 @@ export function DirectRentalExplorer({
 
   const activeFilters = getActiveRentalFilters(filters);
   const selectedTypes = getRentalTypes(filters.type);
+  const isBusinessSearch = selectedTypes.includes("Local");
   const relaxations = useMemo(() => {
     if (matches.length > 0) return [];
     return getActiveRentalFilters(appliedFilters)
@@ -365,10 +369,13 @@ export function DirectRentalExplorer({
 
   function toggleType(type: RentalType, checked: boolean) {
     setFilters((current) => {
-      const types = new Set<string>(getRentalTypes(current.type));
+      // Locales are a separate sector: picking one side clears the other.
+      const isBusiness = type === "Local";
+      const types = new Set<string>(getRentalTypes(current.type).filter((item) => (item === "Local") === isBusiness));
       if (checked) types.add(type);
       else types.delete(type);
-      return { ...current, type: toRentalTypeFilter(types) };
+      const next = { ...current, type: toRentalTypeFilter(types) };
+      return isBusiness && checked ? { ...next, bedrooms: "", bathrooms: "" } : { ...next, business: isBusiness ? current.business : "" };
     });
   }
 
@@ -409,7 +416,9 @@ export function DirectRentalExplorer({
     ? `Hola, busco alquiler en Zentro Urbano y todavía no encuentro lo que necesito: ${searchSummary}. ¿Me avisan si aparece uno así? ${shareUrl}`
     : "Hola, busco alquiler en Zentro Urbano. ¿Me avisan cuando haya nuevos alquileres?";
 
-  const countLabel = `${results.length} ${results.length === 1 ? "alquiler" : "alquileres"}`;
+  const countLabel = isBusinessSearch
+    ? `${results.length} ${results.length === 1 ? "local" : "locales"}`
+    : `${results.length} ${results.length === 1 ? "alquiler" : "alquileres"}`;
   const subline =
     pendingMatches.length > 0
       ? onlyPetsPending
@@ -442,7 +451,7 @@ export function DirectRentalExplorer({
 
           <div className="catalog-sidebar-body">
             <FilterGroup title="¿Qué estás buscando?">
-              {rentalTypeOptions.map((option) => (
+              {homeTypeOptions.map((option) => (
                 <FilterCheckbox
                   key={option}
                   label={option}
@@ -450,12 +459,39 @@ export function DirectRentalExplorer({
                   onChange={(checked) => toggleType(option, checked)}
                 />
               ))}
+              <p className="catalog-check-group">Para tu negocio</p>
+              <FilterCheckbox
+                label="Local o tienda"
+                icon={<Store size={17} />}
+                badge="Nuevo"
+                checked={selectedTypes.includes("Local")}
+                onChange={(checked) => toggleType("Local", checked)}
+              />
             </FilterGroup>
 
             <FilterGroup title="Zonas">
               <ZonePicker groups={zoneGroups} selected={selectedZones} onToggle={toggleZone} onClear={() => updateFilter("zone", "")} />
             </FilterGroup>
 
+            {isBusinessSearch ? (
+              <FilterGroup title="Debe tener">
+                {businessFeatureOptions.map((feature) => (
+                  <FilterCheckbox
+                    key={feature}
+                    label={feature}
+                    checked={splitBusiness(filters.business).includes(feature)}
+                    onChange={(checked) =>
+                      setFilters((current) => {
+                        const rest = splitBusiness(current.business).filter((item) => item !== feature);
+                        return { ...current, business: (checked ? [...rest, feature] : rest).join(",") };
+                      })
+                    }
+                  />
+                ))}
+              </FilterGroup>
+            ) : null}
+
+            {isBusinessSearch ? null : <>
             <FilterGroup title="Dormitorios">
               <RoomPicker
                 label="Dormitorios"
@@ -475,6 +511,8 @@ export function DirectRentalExplorer({
                 onChange={(value) => updateFilter("bathrooms", value)}
               />
             </FilterGroup>
+
+            </>}
 
             <FilterGroup title="Precio por mes">
               <div className="catalog-filter-pair">
@@ -537,11 +575,11 @@ export function DirectRentalExplorer({
               />
             </FilterGroup>
 
-            <FilterGroup title="Comodidades">
+            {isBusinessSearch ? null : <FilterGroup title="Comodidades">
               <FilterCheckbox label="Acepta mascotas" icon={<PawPrint />} checked={filters.pets} onChange={(checked) => updateFilter("pets", checked)} />
               <FilterCheckbox label="Con parqueo" icon={<Car />} checked={filters.garage} onChange={(checked) => updateFilter("garage", checked)} />
               <FilterCheckbox label="Amoblado" icon={<Sofa />} checked={filters.furnished} onChange={(checked) => updateFilter("furnished", checked)} />
-            </FilterGroup>
+            </FilterGroup>}
 
             <FilterGroup title="Para entrar">
               <FilterSelect label="Garantía" value={filters.guarantee} onChange={(value) => updateFilter("guarantee", value as GuaranteeFilter)}>
@@ -1148,11 +1186,13 @@ function FilterGroup({ title, children }: { title: string; children: React.React
 function FilterCheckbox({
   label,
   icon,
+  badge,
   checked,
   onChange,
 }: {
   label: string;
   icon?: React.ReactNode;
+  badge?: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
@@ -1161,6 +1201,7 @@ function FilterCheckbox({
       <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
       {icon ? <span aria-hidden="true" className="catalog-check-icon">{icon}</span> : null}
       <span>{label}</span>
+      {badge ? <span className="catalog-check-badge">{badge}</span> : null}
     </label>
   );
 }

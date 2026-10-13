@@ -838,7 +838,12 @@ function levenshteinDistance(source: string, target: string, maxDistance: number
 
 // Catalog filters: shared by the catalog, the home search and the links people share.
 
-export const rentalTypeOptions = ["Casa", "Departamento", "Monoambiente"] as const;
+export const rentalTypeOptions = ["Casa", "Departamento", "Monoambiente", "Local"] as const;
+// Commercial spaces are their own sector: they only show up when "Local" is picked.
+export const businessTypeOptions = ["Local"] as const;
+export const homeTypeOptions = ["Casa", "Departamento", "Monoambiente"] as const;
+// Business features a local must have (matched against the listing tags).
+export const businessFeatureOptions = ["Vitrina a la calle", "Baño propio", "Depósito", "Parqueo para clientes", "Luz trifásica"] as const;
 export type RentalType = (typeof rentalTypeOptions)[number];
 // "" means any type; several types travel joined by commas ("Casa,Departamento"), always in this order.
 export type RentalTypeFilter = string;
@@ -882,6 +887,8 @@ export type RentalSearchFilters = {
   near: string;
   // Visible map area chosen with "Buscar en esta zona del mapa".
   area: MapArea | null;
+  // Business features for locales, joined by commas.
+  business: string;
   sort: RentalSort;
 };
 
@@ -923,6 +930,7 @@ export const emptyRentalSearchFilters: RentalSearchFilters = {
   belowZoneAverage: false,
   near: "",
   area: null,
+  business: "",
   sort: "",
 };
 
@@ -966,6 +974,7 @@ export const rentalSearchParamKeys = [
   "promedio",
   "cerca",
   "area",
+  "negocio",
   "orden",
 ];
 
@@ -986,6 +995,7 @@ const rentalFilterKeys: RentalFilterKey[] = [
   "belowZoneAverage",
   "near",
   "area",
+  "business",
 ];
 
 const rentalSorts = new Set<string>(["recientes", "menor-precio", "mayor-precio", "menor-entrada", "cercania"]);
@@ -1098,6 +1108,7 @@ export function readRentalSearchParams(
     belowZoneAverage: averageParam === null ? base.belowZoneAverage : averageParam === "bajo",
     near: nearParam === null ? base.near : getKnownPlace(nearParam, places) ? nearParam : "",
     area: areaParam === null ? base.area : parseMapArea(areaParam),
+    business: params.get("negocio") === null ? base.business : params.getAll("negocio").join(",").slice(0, 200),
     sort: sortParam === null ? base.sort : isRentalSort(sortParam) ? sortParam : "",
   };
 }
@@ -1139,6 +1150,7 @@ export function buildRentalSearchParams(
   if (filters.belowZoneAverage) params.set("promedio", "bajo");
   if (filters.near) params.set("cerca", filters.near);
   if (filters.area) params.set("area", formatMapArea(filters.area));
+  for (const feature of splitBusiness(filters.business)) params.append("negocio", feature);
   if (filters.sort) params.set("orden", filters.sort);
   return params;
 }
@@ -1207,7 +1219,10 @@ export function searchRentals(
 
     if (hasQuery && !evaluation.matches) return [];
     if (!zoneMatches(property, zones)) return [];
+    if (!types.length && property.type === "Local") return [];
     if (types.length && !types.some((type) => (type === "Monoambiente" ? isMonoambiente(property) : property.type === type))) return [];
+    const wanted = splitBusiness(filters.business);
+    if (wanted.length && !wanted.every((feature) => property.tags.some((tag) => tag.toLocaleLowerCase("es") === feature.toLocaleLowerCase("es")))) return [];
 
     const monthly = filters.includeExpenses ? getMonthlyCost(property) : property.price;
     if (min || max) {
@@ -1305,7 +1320,7 @@ export function describeRentalFilter(
     case "zone":
       return `Zona: ${formatZoneList(splitZones(filters.zone))}`;
     case "type":
-      return getRentalTypes(filters.type).join(" o ");
+      return getRentalTypes(filters.type).map((type) => (type === "Local" ? "Local o tienda" : type)).join(" o ");
     case "minPrice":
       return min ? `Desde ${formatPriceBound(min)}` : `Mín.: “${shortenText(filters.minPrice.trim(), 16)}”`;
     case "maxPrice":
@@ -1332,6 +1347,8 @@ export function describeRentalFilter(
       return `Cerca de ${getKnownPlace(filters.near, places)?.name ?? filters.near}`;
     case "area":
       return "Zona del mapa";
+    case "business":
+      return splitBusiness(filters.business).join(", ");
   }
 }
 
@@ -1490,4 +1507,8 @@ function confirmationRank(property: Property) {
 
 function shortenText(value: string, max: number) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+export function splitBusiness(value: string) {
+  return value.split(",").map((item) => item.trim()).filter(Boolean);
 }

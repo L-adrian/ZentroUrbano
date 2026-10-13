@@ -121,6 +121,8 @@ export function getMonthlyCost(property: Pick<Property, "price" | "rentalDetails
 
 // Confirmed amenities only; "unknown" is never shown as a tag.
 export function getListingHighlights(property: Property, limit = 3) {
+  // A local shows what a business looks for (vitrina, depósito, trifásica…), taken from its tags.
+  if (property.type === "Local") return property.tags.slice(0, limit);
   return [
     property.pets ? "Acepta mascotas" : null,
     property.garage > 0 ? "Parqueo" : null,

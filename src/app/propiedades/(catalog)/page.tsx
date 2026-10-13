@@ -23,7 +23,9 @@ export const metadata: Metadata = buildSeoMetadata({
 
 // The explorer reads its filters from the URL itself (q, zone, type, minPrice, maxPrice, currency,
 // bedrooms, bathrooms, amenity), so they survive going back from a listing and can be shared.
-export default async function PropertiesPage() {
+export default async function PropertiesPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const typeParam = (await searchParams).type;
+  const isBusiness = [typeParam].flat().includes("Local");
   const publishedProperties = await getPublishedPropertiesData();
   const { department, properties: directRentals } = await inSelectedDepartment(getDirectRentals(publishedProperties));
 
@@ -31,10 +33,10 @@ export default async function PropertiesPage() {
     <main id="contenido" className="min-h-screen bg-white text-neutral-950">
       <div className="mx-auto max-w-[1500px] px-4 pb-4 pt-6 sm:px-6 lg:px-8">
         <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-          Alquileres directos en {department.name}
+          {isBusiness ? `Locales en alquiler en ${department.name}` : `Alquileres directos en ${department.name}`}
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Contacta al propietario sin intermediarios ni comisión inmobiliaria.
+          {isBusiness ? "Locales, tiendas y oficinas para tu negocio, directo con el dueño y sin comisión." : "Contacta al propietario sin intermediarios ni comisión inmobiliaria."}
         </p>
       </div>
 

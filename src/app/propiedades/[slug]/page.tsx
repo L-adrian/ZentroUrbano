@@ -11,6 +11,8 @@ import {
   MessageCircle,
   PawPrint,
   Ruler,
+  Store,
+  Check,
   ShieldCheck,
   Sofa,
   Trees,
@@ -396,6 +398,15 @@ function QuickFact({
 
 function propertyQuickFacts(property: Property) {
   const details = property.rentalDetails;
+  // A local has no bedrooms or pets: it shows what a business asks first.
+  if (property.type === "Local") {
+    return [
+      { label: "Tipo", value: "Local o tienda", icon: <Store className="h-4 w-4" /> },
+      ...(property.area > 0 ? [{ label: "Superficie", value: `${property.area} m²`, icon: <Ruler className="h-4 w-4" /> }] : []),
+      { label: "Baños", value: property.bathrooms > 0 ? property.bathrooms : "Consultar", icon: <Bath className="h-4 w-4" /> },
+      { label: "Parqueo para clientes", value: property.garage > 0 ? getPropertyParkingLabel(property) : "No tiene", icon: <Car className="h-4 w-4" /> },
+    ];
+  }
   const facts = [
     {
       label: details?.type === "Monoambiente" ? "Distribución" : "Dormitorios",
@@ -498,6 +509,7 @@ function ContentSection({ title, children, className = "" }: { title: string; ch
 }
 
 function featureList(property: Property) {
+  if (property.type === "Local") return property.tags.map((tag) => ({ label: tag, icon: <Check className="h-5 w-5" /> }));
   const features = [
     { label: "Mascotas", enabled: property.pets, icon: <PawPrint className="h-5 w-5" /> },
     { label: "Amoblado", enabled: property.furnished, icon: <Sofa className="h-5 w-5" /> },
