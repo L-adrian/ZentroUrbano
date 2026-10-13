@@ -122,6 +122,33 @@ export async function getPropertyTeam(propertySlug: string): Promise<(PropertyTe
   }
 }
 
+// The aliado signed in with their own account (team_members.account_id, from 011_team_accounts)
+// and the homes they work on. null while that column or the tables are missing, or when the
+// account is not linked to anyone on the team.
+export async function getTeamMemberByAccount(accountId: string): Promise<{ member: TeamMember; assignments: TeamAssignment[] } | null> {
+  if (!hasDatabaseConfig()) return null;
+  try {
+    const row = await withDepartmentColumn((columns) => queryOne<MemberRow>(
+      `select ${columns} from team_members where account_id = :accountId and status = 'active' limit 1`,
+      { accountId },
+    ));
+    if (!row) return null;
+    const assignments = (await queryRows<{ property_slug: string; role: string; handles_visits: number }>(
+      "select property_slug, role, handles_visits from property_team where member_id = :id order by role = 'embajador' desc, created_at",
+      { id: row.id },
+    )) ?? [];
+    return {
+      member: toMember(row),
+      assignments: assignments
+        .filter((assignment) => isTeamRole(assignment.role))
+        .map((assignment) => ({ propertySlug: assignment.property_slug, memberId: row.id, role: assignment.role as TeamRole, handlesVisits: Boolean(assignment.handles_visits) })),
+    };
+  } catch (error) {
+    if (isMissingTable(error) || isMissingDepartment(error)) return null;
+    throw error;
+  }
+}
+
 export type MemberInput = { name: string; level: TeamRole; department: string; whatsapp: string | null; zone: string | null; bio: string | null };
 
 export function readMemberInput(body: Record<string, unknown>): MemberInput | string {
