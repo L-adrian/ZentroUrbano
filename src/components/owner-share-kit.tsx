@@ -8,7 +8,7 @@ import { ownerShareText, shareImagePath } from "@/lib/share-kit";
 
 // Mi cuenta: text and image the owner shares by hand in Facebook groups or WhatsApp.
 // Nothing is posted or sent automatically; each button only copies, downloads or opens WhatsApp.
-export function OwnerShareKit({ property }: { property: Property }) {
+export function OwnerShareKit({ property, defaultOpen = false }: { property: Property; defaultOpen?: boolean }) {
   const text = ownerShareText(property);
   const area = useRef<HTMLTextAreaElement>(null);
   const [copied, setCopied] = useState<"ok" | "manual" | null>(null);
@@ -26,7 +26,7 @@ export function OwnerShareKit({ property }: { property: Property }) {
   }
 
   return (
-    <details className="owner-share-kit">
+    <details className="owner-share-kit" open={defaultOpen || undefined}>
       <summary>
         <Share2 className="h-4 w-4" aria-hidden="true" />
         Comparte tu anuncio

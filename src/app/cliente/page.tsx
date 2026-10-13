@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ClientDashboard } from "@/components/client-dashboard";
-import { getCurrentAccount, getCurrentDashboardAccount } from "@/lib/mysql-auth";
+import { getCurrentAccount, getCurrentDashboardAccount, getCurrentLogin } from "@/lib/mysql-auth";
 import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { buildSeoMetadata } from "@/lib/seo";
 
@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Mi cuenta",
-  description: "Tus anuncios de alquiler en Zentro Urbano: visitas, contactos, disponibilidad y solicitudes.",
+  description: "Tus anuncios de alquiler en Zentro Urbano: visitas, contactos, disponibilidad, solicitudes y tu perfil.",
   path: "/cliente",
   noIndex: true,
 });
@@ -29,15 +29,20 @@ export default async function ClientPage() {
 
   // Visits booked on the owner's listings; null while the visit tables are missing.
   const slugs = (dashboard.properties ?? []).map((property) => property.slug);
-  const [bookings, settings] = await Promise.all([
+  const [bookings, settings, login] = await Promise.all([
     listBookingsFor(slugs).catch(() => null),
     getVisitSettingsFor(slugs).catch(() => null),
+    getCurrentLogin(),
   ]);
   const visits = bookings && settings ? { bookings, settings } : null;
 
   return (
     <Suspense fallback={<DashboardFallback />}>
-      <ClientDashboard account={dashboard} visits={visits} />
+      <ClientDashboard
+        account={dashboard}
+        visits={visits}
+        login={login && login.account_id === dashboard.id ? { hasPassword: Boolean(Number(login.has_password)) } : null}
+      />
     </Suspense>
   );
 }

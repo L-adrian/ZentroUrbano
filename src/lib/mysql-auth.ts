@@ -287,6 +287,25 @@ export async function getCurrentAccount() {
   }
 }
 
+// The signed-in login behind the current session (MySQL only): who can change the password and
+// whether the account has one (Google-only accounts do not).
+export async function getCurrentLogin() {
+  const sessionToken = (await cookies()).get(authSessionCookie)?.value;
+  if (!sessionToken || !hasDatabaseConfig()) return null;
+  try {
+    return await queryOne<{ user_id: string; account_id: string; auth_provider: string; has_password: number }>(
+      `select u.id as user_id, u.account_id, u.auth_provider, (u.password_hash is not null) as has_password
+         from morada_sessions s
+         join morada_users u on u.id = s.user_id and u.status = 'active'
+        where s.token_hash = :sessionHash and s.expires_at > current_timestamp
+        limit 1`,
+      { sessionHash: hashToken(sessionToken) },
+    );
+  } catch {
+    return null;
+  }
+}
+
 export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> {
   const account = await getCurrentAccount();
 
@@ -556,7 +575,7 @@ function sanitizeProfileImageUrl(value: string | undefined) {
   }
 }
 
-function getInitials(value: string) {
+export function getInitials(value: string) {
   const words = value
     .replace(/[^\p{L}\p{N}\s]/gu, " ")
     .split(/\s+/)

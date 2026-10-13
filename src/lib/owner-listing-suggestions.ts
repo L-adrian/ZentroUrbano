@@ -1,5 +1,8 @@
 import type { Property } from "@/lib/properties";
 
+// One check per suggestion below; "Anuncio completo %" in Mi cuenta counts the ones already done.
+export const ownerListingChecks = 5;
+
 export function getOwnerListingSuggestions(property: Property): string[] {
   const suggestions: string[] = [];
   const photos = new Set(property.images).size;
