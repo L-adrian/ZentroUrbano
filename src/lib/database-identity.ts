@@ -73,7 +73,8 @@ export async function loginDatabaseGoogle(input: GoogleProfileInput) {
       const userId: string = users[0]?.id || id("user");
       if (users.length) await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=? WHERE id=?",[subject,userId]);
       else await connection.execute("INSERT INTO morada_users (id,account_id,email,auth_provider,provider_subject) VALUES (?,?,?,'google',?)",[userId,accountId,email,subject]);
-      if (avatar) await connection.execute("UPDATE client_accounts SET avatar_url=? WHERE id=?",[avatar,accountId]);
+      // A photo uploaded in "Mi cuenta" wins over the Google picture.
+      if (avatar) await connection.execute("UPDATE client_accounts SET avatar_url=? WHERE id=? AND (avatar_url IS NULL OR avatar_url NOT LIKE '/media/cuentas/%')",[avatar,accountId]);
       return {ok:true as const,accountId,session:await session(connection,userId,accountId)};
     });
   } catch { return databaseAuthUnavailable(); }
