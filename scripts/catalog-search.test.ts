@@ -15,6 +15,7 @@ import {
 } from "../src/lib/catalog-geo";
 import { getMonthlyCost } from "../src/lib/listing-summary";
 import { withoutOwnerContact } from "../src/lib/rentals";
+import { describeFilterPlace, zoneConflict } from "../src/lib/santa-cruz-zones";
 import { normalizeAlertEmail, normalizeAlertWhatsapp } from "../src/lib/search-alert-input";
 import {
   addRecentListing,
@@ -429,4 +430,13 @@ test("kinds of local: the owner's choice or a tag decides, and the filter travel
   const params = buildRentalSearchParams(filters({ type: "Local", businessKind: "Oficina" }), "BOB");
   assert.deepEqual(params.getAll("tipo_local"), ["Oficina"]);
   assert.equal(readRentalSearchParams(new URLSearchParams("type=Local&tipo_local=Galpón&tipo_local=Inventado")).businessKind, "Galpón");
+});
+
+test("admin zone check: the filter place and a zone that disagrees with the map point", () => {
+  const south = { lat: -17.8554, lng: -63.1901 };
+  assert.equal(describeFilterPlace("equipetrol norte", south).startsWith("Zona"), true);
+  assert.equal(describeFilterPlace("Equipetrol", south), "Zona Norte · Equipetrol");
+  assert.deepEqual(zoneConflict("Zona Norte", south), { named: "Zona Norte", byPoint: "Zona Sur" });
+  assert.equal(zoneConflict("Zona Sur", south), null);
+  assert.equal(zoneConflict("Un barrio nuevo", south), null);
 });

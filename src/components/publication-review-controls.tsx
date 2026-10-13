@@ -2,9 +2,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, X, LoaderCircle, MapPin, MessageSquareWarning } from "lucide-react";
+import { ZoneSuggestions } from "@/components/zone-suggestions";
+import { describeFilterPlace, zoneConflict } from "@/lib/santa-cruz-zones";
 
-export function PublicationReviewControls({id,address,canApprove,republish=false}:{id:string;address:string;canApprove:boolean;republish?:boolean}) {
+export function PublicationReviewControls({id,address,zone:ownerZone="",canApprove,republish=false}:{id:string;address:string;zone?:string;canApprove:boolean;republish?:boolean}) {
   const router=useRouter();
+  const [zone,setZone]=useState(ownerZone);
   const [latitude,setLatitude]=useState("");
   const [longitude,setLongitude]=useState("");
   const [reason,setReason]=useState("");
@@ -12,6 +15,9 @@ export function PublicationReviewControls({id,address,canApprove,republish=false
   const [busy,setBusy]=useState(false);
   const [error,setError]=useState("");
   const [done,setDone]=useState("");
+  const lat=Number(latitude),lng=Number(longitude);
+  const coordinates=latitude.trim() && longitude.trim() && Number.isFinite(lat) && Number.isFinite(lng) ? {lat,lng} : null;
+  const conflict=zoneConflict(zone,coordinates);
   async function review(decision:"approve"|"reject"|"changes") {
     if (busy) return;
     if (decision === "reject" && reason.trim().length < 5) {setError("Escribe el motivo del rechazo (mínimo 5 caracteres).");return;}
@@ -19,7 +25,7 @@ export function PublicationReviewControls({id,address,canApprove,republish=false
     if (decision === "approve" && (!confirmed || (!republish && (!latitude.trim() || !longitude.trim())))) {setError(republish ? "Confirma que revisaste el anuncio antes de aprobar." : "Confirma los datos y completa las coordenadas antes de aprobar.");return;}
     setBusy(true);setError("");
     try {
-      const response=await fetch(`/admin/solicitudes/${id}/decision`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({decision,reason,confirmed,latitude,longitude})});
+      const response=await fetch(`/admin/solicitudes/${id}/decision`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({decision,reason,confirmed,latitude,longitude,zone})});
       const data=await response.json();
       if (!response.ok || !data.ok) throw new Error(data.message || "No pudimos guardar la decisión.");
       setDone(decision === "approve"
@@ -34,6 +40,10 @@ export function PublicationReviewControls({id,address,canApprove,republish=false
   return <div className="review-controls">
     {!republish && <>
       <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address + ", Santa Cruz, Bolivia")}`} target="_blank" rel="noopener noreferrer" className="request-back-link"><MapPin size={17}/>Comprobar ubicación</a>
+      <label>Zona o barrio<input value={zone} onChange={e=>setZone(e.target.value)} list={`review-zone-${id}`} autoComplete="off" maxLength={160} disabled={busy}/></label>
+      <ZoneSuggestions id={`review-zone-${id}`}/>
+      <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro saldrá en: <strong>{describeFilterPlace(zone,coordinates)}</strong>{coordinates ? "" : " (completa las coordenadas para ubicarlo por el mapa)"}.</p>
+      {conflict && <p className="review-hint"><strong>Ojo:</strong> dice {conflict.named} pero el punto está en {conflict.byPoint}. Revisa la zona o las coordenadas.</p>}
       <div className="review-coordinates">
         <label>Latitud<input type="number" step="any" min="-23" max="-9" value={latitude} onChange={e=>setLatitude(e.target.value)} placeholder="-17.7833" disabled={busy}/></label>
         <label>Longitud<input type="number" step="any" min="-70" max="-57" value={longitude} onChange={e=>setLongitude(e.target.value)} placeholder="-63.1821" disabled={busy}/></label>

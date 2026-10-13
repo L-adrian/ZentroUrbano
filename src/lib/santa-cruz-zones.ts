@@ -188,3 +188,23 @@ export function formatZoneList(zones: string[]) {
   if (zones.length <= 1) return zones[0] ?? "";
   return `${zones.slice(0, -1).join(", ")} o ${zones[zones.length - 1]}`;
 }
+
+// Neighborhoods of the list above, for the zone field's suggestions ("Equipetrol" → "Zona Norte").
+// The person can still type a name that is not here.
+export const zoneSuggestions = santaCruzSectors
+  .flatMap((sector) => sector.places.map((place) => ({ name: place.name, sector: sector.name })))
+  .sort((first, second) => first.name.localeCompare(second.name, "es"));
+
+// "Zona Norte · Equipetrol": where a home shows up in the catalog filter with this zone and point.
+export function describeFilterPlace(zone: string, coordinates?: LatLng | null) {
+  const { place, sector } = locateHome({ zone, coordinates });
+  return [sector ?? otherZonesLabel, place].filter(Boolean).join(" · ");
+}
+
+// The zone the text names ("Zona Norte", or Equipetrol's zone) when the map point falls in another
+// one: either the text or the point is probably wrong. Null when they agree or one is unknown.
+export function zoneConflict(zone: string, coordinates?: LatLng | null) {
+  const named = getZoneSector(zone);
+  const byPoint = sectorFromCoordinates(coordinates);
+  return named && byPoint && named !== byPoint ? { named, byPoint } : null;
+}

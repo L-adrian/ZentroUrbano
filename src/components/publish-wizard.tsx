@@ -27,6 +27,7 @@ import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState }
 import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
 import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
 import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
+import { ZoneSuggestions } from "@/components/zone-suggestions";
 import { businessFeatureChoices, businessKindChoices, isBusinessKind, expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { maxSelectedPhotoBytes, uploadMaxSide } from "@/lib/photo-resize";
@@ -908,7 +909,8 @@ function InformationStep({
           </select>
         </Field>
         <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
-          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Urbari" className={inputClassName} />
+          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Urbari" list="publish-zone-suggestions" autoComplete="off" className={inputClassName} />
+          <ZoneSuggestions id="publish-zone-suggestions" />
         </Field>
         <Field label="Dirección aproximada" className="sm:col-span-2">
           <input value={form.address} onChange={(event) => updateField("address", event.target.value)} placeholder="Avenida, calle o referencia" className={inputClassName} />
@@ -973,7 +975,8 @@ function LocalInformationStep({
           <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Ej. Local a calle con vitrina en Av. Banzer" className={inputClassName} />
         </Field>
         <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
-          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Equipetrol" className={inputClassName} />
+          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Equipetrol" list="publish-zone-suggestions" autoComplete="off" className={inputClassName} />
+          <ZoneSuggestions id="publish-zone-suggestions" />
         </Field>
         <Field label="Dirección aproximada">
           <input value={form.address} onChange={(event) => updateField("address", event.target.value)} placeholder="Avenida, calle o galería" className={inputClassName} />
