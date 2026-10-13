@@ -623,6 +623,8 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (min-width: 640px) and (max-width: 1023px) { .catalog-results-bar { margin-inline: -24px; padding-inline: 24px; } }
 @media (min-width: 769px) and (max-width: 1023px) { .catalog-results-bar { top: 76px; } }
 @media (max-width: 768px) { .catalog-sort select { font-size: 16px; } }
+/* Phones: the word "Ordenar" stays for screen readers only, so the chosen order fits without being cut. */
+@media (max-width: 420px) { .catalog-sort > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } }
 /* Very narrow phones: Lista/Mapa keep their names for screen readers but show only the icon. */
 @media (max-width: 374px) {
   .catalog-view-button { padding-inline: 11px; }

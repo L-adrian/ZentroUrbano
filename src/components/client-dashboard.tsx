@@ -416,7 +416,7 @@ const accountTabs: Array<[AccountTab, string]> = [
 const isAccountTab = (value: string): value is AccountTab => accountTabs.some(([id]) => id === value);
 
 const secondaryButton =
-  "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950";
+  "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 text-sm whitespace-nowrap sm:px-4 font-semibold text-neutral-800 transition hover:border-neutral-950";
 
 function MiniStat({ value, label }: { value: number | null; label: string }) {
   return (
