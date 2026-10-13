@@ -6,6 +6,7 @@ import { isExternalContactUrl } from "@/lib/property-contact";
 import { getPropertyTeam, isMissingTable } from "@/lib/team";
 import type { PropertyTeamEntry, PublicTeamMember } from "@/lib/team-roles";
 import { unsetVisitSettings, visitBookingDays, type VisitSettings } from "@/lib/visit-slots";
+import { normalizePublicationPhone } from "@/lib/publication-input";
 
 // Visits booked from the listing page. Until 008_team_and_visits runs, booking is "unavailable"
 // and the page keeps only the WhatsApp button.
@@ -237,7 +238,7 @@ export async function getVisitPlan(property: Pick<Property, "slug" | "operation"
   if (embajador?.whatsapp) {
     return { settings, team, host: { kind: "embajador", name: embajador.member.name, whatsapp: embajador.whatsapp, member: embajador.member } };
   }
-  const ownerWhatsapp = (property.agent.whatsapp ?? "").replace(/\D/g, "");
-  const reachable = !isExternalContactUrl(property.whatsapp) && ownerWhatsapp.length >= 8 && ownerWhatsapp !== "59170000000";
+  const ownerWhatsapp = normalizePublicationPhone(property.agent.whatsapp ?? "") ?? "";
+  const reachable = !isExternalContactUrl(property.whatsapp) && ownerWhatsapp !== "" && ownerWhatsapp !== "59170000000";
   return { settings, team, host: reachable ? { kind: "owner", name: property.agent.name, whatsapp: ownerWhatsapp, member: null } : null };
 }

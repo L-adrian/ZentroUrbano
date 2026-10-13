@@ -65,9 +65,15 @@ export function checkSignup(input: { displayName?: unknown; email?: unknown; pas
   if (password.length < signupLimits.passwordMin || new TextEncoder().encode(password).length > signupLimits.passwordBytes) {
     return { ok: false, field: "password", message: "La contraseña debe tener entre 8 y 72 caracteres." };
   }
-  const lowered = password.toLowerCase();
-  if (commonPasswords.has(lowered) || lowered === email || lowered === email.split("@")[0] || /^(.)\1+$/.test(password)) {
+  if (isWeakPassword(password, email)) {
     return { ok: false, field: "password", message: "Esa contraseña es muy fácil de adivinar. Elige otra." };
   }
   return { ok: true, name, email };
+}
+
+// Common passwords, the email itself or one repeated character. Shared by sign-up and Mi cuenta.
+export function isWeakPassword(password: string, email: string) {
+  const lowered = password.toLowerCase();
+  const address = email.toLowerCase();
+  return commonPasswords.has(lowered) || lowered === address || lowered === address.split("@")[0] || /^(.)\1+$/.test(password);
 }

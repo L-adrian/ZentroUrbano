@@ -405,7 +405,7 @@ function propertyQuickFacts(property: Property) {
       { label: "Tipo", value: getBusinessKind(property) ?? "Local o tienda", icon: <Store className="h-4 w-4" /> },
       ...(property.area > 0 ? [{ label: "Superficie", value: `${property.area} m²`, icon: <Ruler className="h-4 w-4" /> }] : []),
       { label: "Baños", value: property.bathrooms > 0 ? property.bathrooms : "Consultar", icon: <Bath className="h-4 w-4" /> },
-      { label: "Parqueo para clientes", value: property.garage > 0 ? getPropertyParkingLabel(property) : "No tiene", icon: <Car className="h-4 w-4" /> },
+      { label: "Parqueo para clientes", value: property.garage > 0 ? getPropertyParkingLabel(property) : property.rentalDetails?.businessFeatures?.includes("Parqueo para clientes") ? "Sí" : "Consultar", icon: <Car className="h-4 w-4" /> },
     ];
   }
   const facts = [
@@ -540,11 +540,13 @@ function CostsBlock({ property }: { property: Property }) {
         <div><dt>Alquiler mensual</dt><dd>{price(property.price)}</dd></div>
         <div><dt>Expensas al mes</dt><dd>{expenses}</dd></div>
         <div><dt>Garantía</dt><dd>{deposit}</dd></div>
-        <div className="total"><dt>Para entrar</dt><dd>{entry ? price(entry.total) : pending}</dd></div>
+        <div className="total"><dt>Para entrar</dt><dd>{entry ? <>{price(entry.total)}{entry.expensesPending ? " + expensas" : ""}</> : pending}</dd></div>
       </dl>
       {entry ? (
         <p className="entry-cost-note">
-          {details
+          {details?.expensesMode === "consult"
+            ? `${entry.advanceMonths ? `${entry.advanceMonths} meses de adelanto` : "Primer mes"} y garantía. Las expensas, si hay, se consultan con el dueño y no están sumadas.`
+            : details
             ? `${entry.advanceMonths ? `${entry.advanceMonths} meses de adelanto` : "Primer mes"}${details.commonExpenses > 0 ? ", expensas" : ""} y garantía.`
             : "Primer mes y garantía. Las expensas, si hay, se consultan con el dueño."}
         </p>

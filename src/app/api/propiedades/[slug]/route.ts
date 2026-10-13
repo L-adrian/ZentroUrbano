@@ -59,7 +59,9 @@ export async function PATCH(
   const coordinates=payload.coordinates as {lat?:unknown;lng?:unknown}|undefined;
   if (!text(payload.title).trim() || text(payload.title).length>220 || price===null || price<=0 || price>100_000_000 ||
     counts.some(value=>!Number.isInteger(value) || value<0 || value>1_000_000) ||
-    typeof coordinates?.lat !== "number" || typeof coordinates.lng !== "number" || !Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng) || Math.abs(coordinates.lat)>90 || Math.abs(coordinates.lng)>180 ||
+    typeof coordinates?.lat !== "number" || typeof coordinates.lng !== "number" || !Number.isFinite(coordinates.lat) || !Number.isFinite(coordinates.lng) ||
+    // Inside Bolivia, the same box as "Verificar ubicación".
+    coordinates.lat<-23 || coordinates.lat>-9 || coordinates.lng<-70 || coordinates.lng>-57 ||
     !Array.isArray(payload.images) || !payload.images.length || payload.images.length>15 || payload.images.some(value=>typeof value !== "string" || !/^(\/images\/|\/media\/propiedades\/|https:\/\/)/.test(value)) ||
     (payload.video != null && payload.video !== "" && !getPropertyVideoUrl(payload.video))) {
     return NextResponse.json({ok:false,stored:false,message:"Revisa precio, medidas y ubicación. Las fotos o videos deben tener una URL permanente; los archivos nuevos requieren una nueva solicitud."},{status:400});
@@ -90,8 +92,13 @@ export async function PATCH(
   let whatsapp: string | null | undefined;
   let mapUrl: string | null | undefined;
   try {
-    const current=await queryOne<{currency:string;requirements:unknown;rental_details:unknown;images:unknown;whatsapp:string|null;map_url:string|null}>("SELECT currency,requirements,rental_details,images,whatsapp,map_url FROM properties WHERE slug=:slug",{slug});
+    const current=await queryOne<{type:string;city:string;currency:string;requirements:unknown;rental_details:unknown;images:unknown;whatsapp:string|null;map_url:string|null}>("SELECT type,city,currency,requirements,rental_details,images,whatsapp,map_url FROM properties WHERE slug=:slug",{slug});
     if (!current) return NextResponse.json({ok:false,stored:false,message:"Ficha no encontrada."},{status:404});
+    // A home cannot become a local (or the reverse) and cannot move to another city here: those
+    // change where it is listed and go through a new request. Casa and Departamento can swap.
+    if ((text(payload.type) === "Local") !== (current.type === "Local") || text(payload.city) !== current.city) {
+      return NextResponse.json({ok:false,stored:false,message:"El tipo de propiedad y la ciudad no se cambian aquí. Envía una nueva solicitud para revisión."},{status:400});
+    }
     const currentImages=parseJsonArray(current.images);
     if ((payload.images as string[]).some(image=>!allowedOwnerImage(image,currentImages))) {
       return NextResponse.json({ok:false,stored:false,message:"Las fotos nuevas deben subirse con una nueva solicitud para revisión."},{status:400});

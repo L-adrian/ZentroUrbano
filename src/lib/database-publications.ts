@@ -18,7 +18,7 @@ export const correctableRequestStatuses = ["changes_requested", "rejected"];
 export type UploadedPhoto = StoredUploadPhoto & { originalName: string; category: string };
 
 export class PublicationError extends Error {
-  constructor(public status:number,message:string) { super(message); }
+  constructor(public status:number,message:string,public code?:string) { super(message); }
 }
 export function parseDbJson<T>(value:unknown): T {
   return (typeof value === "string" ? JSON.parse(value) : value) as T;
@@ -33,7 +33,10 @@ export async function databaseRequest(id:string) {
   return row ? mapRequest(row) : null;
 }
 export async function databaseRequests(accountId?:string) {
-  const rows=await queryRows<RequestRow>(`SELECT * FROM publication_requests ${accountId ? "WHERE account_id=:accountId" : ""} ORDER BY created_at DESC LIMIT 200`,accountId ? {accountId} : {});
+  // Every request still waiting for review, plus the latest 200 others, so a busy week never hides one.
+  const rows=await queryRows<RequestRow>(accountId
+    ? "SELECT * FROM publication_requests WHERE account_id=:accountId ORDER BY created_at DESC LIMIT 200"
+    : "(SELECT * FROM publication_requests WHERE status='pending_review') UNION (SELECT * FROM publication_requests ORDER BY created_at DESC LIMIT 200) ORDER BY created_at DESC",accountId ? {accountId} : {});
   return (rows || []).map(mapRequest);
 }
 export async function storeDatabaseRequest(record:{id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null;correctionOf?:string},photos:UploadedPhoto[],key:string) {
@@ -43,8 +46,18 @@ export async function storeDatabaseRequest(record:{id:string;accountId:string;ac
     if (!accounts.length) throw new PublicationError(403,"Tu cuenta no puede publicar.");
     const [existing]=await connection.execute<RowDataPacket[]>("SELECT id,status,payload FROM publication_requests WHERE account_id=? AND idempotency_key=?",[record.accountId,key]);
     if (existing.length) {
-      const payload=parseDbJson<{photos:unknown[]}>(existing[0].payload);
+      const payload=parseDbJson<{details?:unknown;price?:number;currency?:string;photos:{size?:number}[]}>(existing[0].payload);
+      // A retry of the same envío gets the same answer. If the owner changed the data or photos after
+      // a lost answer, saying "recibido" would silently drop the changes: the browser starts a new envío.
+      const same=JSON.stringify(payload.details) === JSON.stringify(record.details) && payload.price === record.price && payload.currency === record.currency
+        && payload.photos.map(photo=>photo.size).join(",") === photos.map(photo=>photo.size).join(",");
+      if (!same) throw new PublicationError(409,`Ya habíamos recibido una versión anterior (referencia ${existing[0].id}). Toca «Enviar para revisión» otra vez para mandar esta versión con tus cambios.`,"REQUEST_KEY_USED");
       return {requestId:existing[0].id as string,status:existing[0].status as string,photosStored:payload.photos.length};
+    }
+    // One correction per request: a second tab or device would otherwise queue a duplicate listing.
+    if (record.correctionOf) {
+      const [corrections]=await connection.execute<RowDataPacket[]>("SELECT id FROM publication_requests WHERE account_id=? AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.correctionOf'))=? LIMIT 1",[record.accountId,record.correctionOf]);
+      if (corrections.length) throw new PublicationError(409,"Ya enviaste la corrección de esta solicitud. Revisa su estado en Mi cuenta.");
     }
     // Photos arrive already shrunk (shrinkUploadPhoto); the room label travels with each one.
     const storedPhotos=photos.map((photo,index)=>({originalName:photo.originalName.slice(0,255),storedName:`${String(index+1).padStart(2,"0")}.${photo.extension}`,size:photo.size,type:photo.type,...(photo.category ? {category:photo.category} : {})}));

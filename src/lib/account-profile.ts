@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { executeQuery, queryOne, withTransaction } from "@/lib/mysql";
 import { getCurrentAccount, getCurrentLogin, getInitials } from "@/lib/mysql-auth";
 import { formatAlertWhatsapp, normalizeAlertWhatsapp } from "@/lib/search-alert-input";
-import { normalizeSignupName, signupLimits } from "@/lib/signup-rules";
+import { isWeakPassword, normalizeSignupName, signupLimits } from "@/lib/signup-rules";
 
 // Owners edit their own account in "Mi cuenta": name, WhatsApp, profile photo and password.
 // The photo table comes with 010_account_photos; until it runs, uploads say what is missing.
@@ -84,6 +84,9 @@ export async function changeAccountPassword(current: unknown, next: unknown): Pr
   if (typeof next !== "string" || next.length < signupLimits.passwordMin || Buffer.byteLength(next) > signupLimits.passwordBytes) {
     return { ok: false, status: 400, field: "next", message: "La contraseña nueva necesita al menos 8 caracteres." };
   }
+  if (isWeakPassword(next, login.email)) {
+    return { ok: false, status: 400, field: "next", message: "Esa contraseña es muy fácil de adivinar. Elige otra." };
+  }
   const user = await queryOne<{ password_hash: string | null }>("select password_hash from morada_users where id = :id", { id: login.user_id });
   if (user?.password_hash) {
     if (typeof current !== "string" || !(await bcrypt.compare(current, user.password_hash))) {
@@ -93,6 +96,8 @@ export async function changeAccountPassword(current: unknown, next: unknown): Pr
   const passwordHash = await bcrypt.hash(next, 12);
   await withTransaction(async (connection) => {
     await connection.execute("update morada_users set password_hash = ? where id = ?", [passwordHash, login.user_id]);
+    // Anyone who signed in with the old password is signed out; this device stays in.
+    await connection.execute("delete from morada_sessions where user_id = ? and id <> ?", [login.user_id, login.session_id]);
   });
   return { ok: true };
 }

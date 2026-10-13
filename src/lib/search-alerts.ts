@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { executeQuery, hasDatabaseConfig, queryRows } from "@/lib/mysql";
 import { rentalSearchParamKeys } from "@/lib/property-search";
 import { searchAlertConsentText, searchAlertLimits, type SearchAlertStatus } from "@/lib/search-alert-input";
+import { departmentParam } from "@/lib/regions";
 
 export type SearchAlert = {
   id: string;
@@ -39,7 +40,7 @@ function isMissingTable(error: unknown) {
 export function cleanAlertParams(raw: string) {
   const source = new URLSearchParams(raw.replace(/^\?/, ""));
   const clean = new URLSearchParams();
-  for (const key of rentalSearchParamKeys as readonly string[]) {
+  for (const key of [...(rentalSearchParamKeys as readonly string[]), departmentParam]) {
     for (const value of source.getAll(key)) {
       if (value.trim()) clean.append(key, value.trim().slice(0, 120));
     }

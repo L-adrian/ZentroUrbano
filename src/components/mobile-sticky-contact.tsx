@@ -27,7 +27,7 @@ export function MobileStickyContact({ property, visitHref = null }: MobileSticky
           />
           <p className="truncate text-xs font-medium text-neutral-500" suppressHydrationWarning>
             {entry && entry.total > property.price ? (
-              <>Para entrar: <PriceDisplay property={{ ...property, price: entry.total }} showPeriod={false} showExchangeRate={false} /></>
+              <>Para entrar: <PriceDisplay property={{ ...property, price: entry.total }} showPeriod={false} showExchangeRate={false} />{entry.expensesPending ? " + expensas" : ""}</>
             ) : (
               availability.shortLabel
             )}

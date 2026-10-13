@@ -82,6 +82,13 @@ export function correctionFormValues(details: PublicationDetails, contact: { nam
     ...costFields(details),
     description: details.description,
     ...beforeVisitFormValues(details),
+    // A local keeps its kind, street front, allowed business and features.
+    ...(details.type === "Local" ? {
+      businessKind: details.businessKind ?? "",
+      frontage: details.frontage ? String(details.frontage) : "",
+      businessUse: details.businessUse ?? "",
+      businessFeatures: details.businessFeatures ?? [],
+    } : {}),
   };
 }
 

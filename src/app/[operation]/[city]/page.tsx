@@ -58,7 +58,7 @@ export default async function OperationCityPage({ params }: { params: Params }) 
   }
 
   const name = cityLabel(properties[0].city);
-  const zones = getRentalZones(properties);
+  const zones = getRentalZones(properties.filter((property) => property.type !== "Local"));
   // Need pages with at least one real listing (they become indexable from 3).
   const needs = rentalNeedRoutes
     .map((route) => ({ route, count: countRentalNeedListings(route, properties) }))

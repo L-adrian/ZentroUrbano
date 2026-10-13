@@ -6,6 +6,9 @@ import { reportNoteMaxLength, type ReportReason } from "@/lib/property-reports";
 // existed count once per browser and day, so old page loads are not counted as people.
 const personKey =
   "coalesce(json_unquote(json_extract(metadata, '$.visitor_id')), concat('legacy:', md5(coalesce(user_agent, '')), ':', date(created_at)))";
+// Reports count once per network address when the server knows it, so clearing cookies does not
+// make one person count as many.
+const reportPersonKey = `coalesce(json_unquote(json_extract(metadata, '$.client')), ${personKey})`;
 // Crawlers, link previews and scripts are not people.
 const humansOnly =
   "coalesce(user_agent, '') <> '' and lower(user_agent) not regexp 'bot|crawl|spider|slurp|headless|lighthouse|facebookexternalhit|^whatsapp/|curl/|wget/|python-requests|node-fetch|axios/'";
@@ -173,7 +176,7 @@ export const getUnavailableReportTimes = cached(
         where event_type = 'property_report'
           and json_unquote(json_extract(metadata, '$.reason')) = 'ya_alquilada'
           and property_slug is not null
-        group by property_slug, ${personKey}`,
+        group by property_slug, ${reportPersonKey}`,
     );
     const times = new Map<string, number[]>();
     for (const row of rows ?? []) {
@@ -191,25 +194,30 @@ export async function recordPropertyReport(input: {
   reason: ReportReason;
   note: string;
   visitorId: string;
+  clientKey: string | null;
   userAgent: string | null;
 }) {
-  // One report per person, listing and reason a day; repeats are accepted but not stored again.
+  // One report per person (device or network address), listing and reason a day; repeats are
+  // accepted but not stored again.
+  const samePerson = input.clientKey
+    ? "(json_unquote(json_extract(metadata, '$.visitor_id')) = :visitorId or json_unquote(json_extract(metadata, '$.client')) = :clientKey)"
+    : "json_unquote(json_extract(metadata, '$.visitor_id')) = :visitorId";
   const existing = await queryRows<{ id: number }>(
     `select id from tracking_events
       where event_type = 'property_report' and property_slug = :slug
-        and json_unquote(json_extract(metadata, '$.visitor_id')) = :visitorId
+        and ${samePerson}
         and json_unquote(json_extract(metadata, '$.reason')) = :reason
         and created_at >= now() - interval 1 day
       limit 1`,
-    { slug: input.slug, visitorId: input.visitorId, reason: input.reason },
+    { slug: input.slug, visitorId: input.visitorId, clientKey: input.clientKey, reason: input.reason },
   );
   if (existing?.length) return { stored: false, duplicate: true };
   const recent = await queryRows<{ total: number | string }>(
     `select count(*) as total from tracking_events
       where event_type = 'property_report'
-        and json_unquote(json_extract(metadata, '$.visitor_id')) = :visitorId
+        and ${samePerson}
         and created_at >= now() - interval 1 day`,
-    { visitorId: input.visitorId },
+    { visitorId: input.visitorId, clientKey: input.clientKey },
   );
   if (Number(recent?.[0]?.total ?? 0) >= 10) return { stored: false, limited: true };
   await executeQuery(
@@ -223,6 +231,7 @@ export async function recordPropertyReport(input: {
         reason: input.reason,
         note: input.note.slice(0, reportNoteMaxLength),
         visitor_id: input.visitorId,
+        ...(input.clientKey ? { client: input.clientKey } : {}),
       }),
     },
   );

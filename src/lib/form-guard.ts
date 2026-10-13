@@ -86,10 +86,15 @@ export function filledHoneypot(body: Record<string, unknown> | null) {
 // The address the request came from. X-Real-IP or the last X-Forwarded-For entry is the one written
 // by the server's own proxy; earlier entries are whatever the browser sent and can be invented.
 export function requestClientKey(headers: Headers) {
+  return requestClientAddressKey(headers) ?? createHash("sha256").update("zentro-client|local").digest("hex").slice(0, 32);
+}
+
+// Same key, but null when the server's proxy did not say where the request came from.
+export function requestClientAddressKey(headers: Headers) {
   const real = headers.get("x-real-ip")?.trim();
   const forwarded = headers.get("x-forwarded-for")?.split(",").map((part) => part.trim()).filter(Boolean);
-  const address = real || forwarded?.at(-1) || "local";
-  return createHash("sha256").update(`zentro-client|${address}`).digest("hex").slice(0, 32);
+  const address = real || forwarded?.at(-1);
+  return address ? createHash("sha256").update(`zentro-client|${address}`).digest("hex").slice(0, 32) : null;
 }
 
 export type RateLimit = { max: number; windowMs: number };

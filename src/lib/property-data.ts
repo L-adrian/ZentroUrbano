@@ -226,7 +226,7 @@ export function mapPropertyRow(row: PropertyRow): Property {
         brandTextColor: "#ffffff",
       },
     agent:
-      owner ? {name:owner.name,role:"Propietario",email:owner.email,phone:row.whatsapp || owner.phone,whatsapp:row.whatsapp || owner.phone,photo:owner.avatar || "",areas:[row.zone],verified:owner.verified === true,responseTime:"Contacta directamente con el propietario"} : fallback?.agent ?? {
+      owner ? {name:owner.name,role:"Propietario",email:"",phone:row.whatsapp || owner.phone,whatsapp:row.whatsapp || owner.phone,photo:owner.avatar || "",areas:[row.zone],verified:owner.verified === true,responseTime:"Contacta directamente con el propietario"} : fallback?.agent ?? {
         name: "Equipo Zentro Urbano",
         role: "Asesor inmobiliario",
         email: "hola@zentrourbano.com",

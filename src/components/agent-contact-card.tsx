@@ -44,6 +44,7 @@ export function AgentContactCard({ property, availability, visitHref = null }: A
           {entry ? (
             <strong className="font-semibold text-neutral-900">
               <PriceDisplay property={{ ...property, price: entry.total }} showPeriod={false} showExchangeRate={false} />
+              {entry.expensesPending ? " + expensas" : ""}
             </strong>
           ) : (
             "pendiente de consulta"
@@ -115,11 +116,11 @@ export function AgentContactCard({ property, availability, visitHref = null }: A
               <span className="truncate">{agent.email}</span>
             </a>}
             <a
-              href={`tel:${agent.phone.replace(/\s/g, "")}`}
+              href={`tel:${telNumber(agent.phone)}`}
               className="flex items-center gap-2 border border-neutral-200 bg-white px-3 py-2 transition-colors hover:border-neutral-400 hover:text-neutral-950"
             >
               <Phone className="h-4 w-4 shrink-0 text-[#58745f]" aria-hidden="true" />
-              <span>{agent.phone}</span>
+              <span>{readablePhone(agent.phone)}</span>
             </a>
           </div>
         )}
@@ -151,4 +152,15 @@ export function AgentContactCard({ property, availability, visitHref = null }: A
       </div>
     </div>
   );
+}
+
+// Stored as 59171234567: dial +59171234567 and show +591 7123 4567.
+function telNumber(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return /^591\d{8}$/.test(digits) ? `+${digits}` : phone.replace(/\s/g, "");
+}
+
+function readablePhone(phone: string) {
+  const digits = phone.replace(/\D/g, "");
+  return /^591\d{8}$/.test(digits) ? `+591 ${digits.slice(3, 7)} ${digits.slice(7)}` : phone;
 }

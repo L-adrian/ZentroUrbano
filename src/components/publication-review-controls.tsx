@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { Check, X, LoaderCircle, MapPin, MessageSquareWarning } from "lucide-react";
 import { ZoneSuggestions } from "@/components/zone-suggestions";
 import { describeFilterPlace, zoneConflict } from "@/lib/santa-cruz-zones";
-import { defaultDepartment, findDepartment } from "@/lib/regions";
+import { defaultDepartment, findDepartment, nearestDepartment } from "@/lib/regions";
 
 export function PublicationReviewControls({id,address,zone:ownerZone="",department:departmentSlug,canApprove,republish=false}:{id:string;address:string;zone?:string;department?:string;canApprove:boolean;republish?:boolean}) {
   const router=useRouter();
@@ -22,6 +22,7 @@ export function PublicationReviewControls({id,address,zone:ownerZone="",departme
   const lat=Number(latitude),lng=Number(longitude);
   const coordinates=latitude.trim() && longitude.trim() && Number.isFinite(lat) && Number.isFinite(lng) ? {lat,lng} : null;
   const conflict=inSantaCruz ? zoneConflict(zone,coordinates) : null;
+  const pointDepartment=coordinates ? nearestDepartment(coordinates) : null;
   async function review(decision:"approve"|"reject"|"changes") {
     if (busy) return;
     if (decision === "reject" && reason.trim().length < 5) {setError("Escribe el motivo del rechazo (mínimo 5 caracteres).");return;}
@@ -50,10 +51,11 @@ export function PublicationReviewControls({id,address,zone:ownerZone="",departme
       {inSantaCruz
         ? <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro saldrá en: <strong>{describeFilterPlace(zone,coordinates)}</strong>{coordinates ? "" : " (completa las coordenadas para ubicarlo por el mapa)"}.</p>
         : <p className="review-hint">El propietario escribió «{ownerZone || "sin zona"}». En el filtro de {department.name} saldrá tal cual.</p>}
+      {pointDepartment && pointDepartment.slug !== department.slug && <p className="review-hint"><strong>Ojo:</strong> el anuncio es de {department.name}, pero el punto está cerca de {pointDepartment.capital}. Revisa las coordenadas.</p>}
       {conflict && <p className="review-hint"><strong>Ojo:</strong> dice {conflict.named} pero el punto está en {conflict.byPoint}. Revisa la zona o las coordenadas.</p>}
       <div className="review-coordinates">
-        <label>Latitud<input type="number" step="any" min="-23" max="-9" value={latitude} onChange={e=>setLatitude(e.target.value)} placeholder="-17.7833" disabled={busy}/></label>
-        <label>Longitud<input type="number" step="any" min="-70" max="-57" value={longitude} onChange={e=>setLongitude(e.target.value)} placeholder="-63.1821" disabled={busy}/></label>
+        <label>Latitud<input type="number" step="any" min="-23" max="-9" value={latitude} onChange={e=>setLatitude(e.target.value)} placeholder={String(department.center.lat)} disabled={busy}/></label>
+        <label>Longitud<input type="number" step="any" min="-70" max="-57" value={longitude} onChange={e=>setLongitude(e.target.value)} placeholder={String(department.center.lng)} disabled={busy}/></label>
       </div>
     </>}
     {/* Identity is not verified for now; the checkbox only states what a person actually reviewed. */}

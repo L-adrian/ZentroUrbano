@@ -293,8 +293,8 @@ export async function getCurrentLogin() {
   const sessionToken = (await cookies()).get(authSessionCookie)?.value;
   if (!sessionToken || !hasDatabaseConfig()) return null;
   try {
-    return await queryOne<{ user_id: string; account_id: string; auth_provider: string; has_password: number }>(
-      `select u.id as user_id, u.account_id, u.auth_provider, (u.password_hash is not null) as has_password
+    return await queryOne<{ session_id: string; user_id: string; account_id: string; email: string; auth_provider: string; has_password: number }>(
+      `select s.id as session_id, u.id as user_id, u.account_id, u.email, u.auth_provider, (u.password_hash is not null) as has_password
          from morada_sessions s
          join morada_users u on u.id = s.user_id and u.status = 'active'
         where s.token_hash = :sessionHash and s.expires_at > current_timestamp
@@ -341,7 +341,7 @@ export async function getCurrentDashboardAccount(): Promise<DemoAccount | null> 
          from client_account_properties cap
          join properties p on p.slug = cap.property_slug
         where cap.account_id = :accountId and cap.status <> 'closed'
-          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')`,
+          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento', 'Local')`,
       { accountId: account.id },
     )) ?? [];
   const slugs = propertyRows.map((row) => row.property_slug);
@@ -447,7 +447,7 @@ export async function getListingOwner(propertySlug: string) {
       `select cap.id from client_account_properties cap
          join properties p on p.slug = cap.property_slug
         where cap.account_id = :accountId and cap.property_slug = :propertySlug and cap.status <> 'closed'
-          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')
+          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento', 'Local')
         limit 1`,
       { accountId: account.id, propertySlug },
     );

@@ -122,8 +122,8 @@ export function ClientDashboard({
   const pendingCount = requests.filter((request) => request.status === "pending_review").length;
 
   async function logout() {
-    const response=await fetch("/api/auth/signout", { method: "POST" });
-    if (!response.ok) {window.alert("No se pudo cerrar la sesión. Intenta nuevamente.");return;}
+    const response=await fetch("/api/auth/signout", { method: "POST" }).catch(() => null);
+    if (!response?.ok) {window.alert("No se pudo cerrar la sesión. Revisa tu conexión e intenta nuevamente.");return;}
     window.dispatchEvent(new Event(sessionEventName));
     router.push("/login");
   }
@@ -1283,13 +1283,15 @@ function PropertyEditModal({
                 required
               />
             </EditorField>
-            <EditorField label="Tipo de vivienda">
+            <EditorField label={draft.type === "Local" ? "Tipo" : "Tipo de vivienda"}>
               <select
                 value={draft.type}
                 onChange={(event) => update("type", event.target.value as PropertyType)}
+                disabled={draft.type === "Local"}
                 className={inputClassName}
               >
-                {propertyTypeOptions.map((option) => (
+                {/* A local stays a local and a home stays a home; Casa and Departamento can swap. */}
+                {propertyTypeOptions.filter((option) => (option === "Local") === (draft.type === "Local")).map((option) => (
                   <option key={option} value={option}>
                     {option}
                   </option>
