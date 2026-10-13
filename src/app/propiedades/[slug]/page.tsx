@@ -404,7 +404,7 @@ function propertyQuickFacts(property: Property) {
       { label: "Tipo", value: "Local o tienda", icon: <Store className="h-4 w-4" /> },
       ...(property.area > 0 ? [{ label: "Superficie", value: `${property.area} m²`, icon: <Ruler className="h-4 w-4" /> }] : []),
       { label: "Baños", value: property.bathrooms > 0 ? property.bathrooms : "Consultar", icon: <Bath className="h-4 w-4" /> },
-      { label: "Parqueo para clientes", value: getPropertyParkingLabel(property), icon: <Car className="h-4 w-4" /> },
+      { label: "Parqueo para clientes", value: property.garage > 0 ? getPropertyParkingLabel(property) : "No tiene", icon: <Car className="h-4 w-4" /> },
     ];
   }
   const facts = [

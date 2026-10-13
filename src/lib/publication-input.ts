@@ -12,7 +12,9 @@ export type PublicationDetails = {
   petsPolicy?: PetsPolicy;
   expensesMode?: ExpensesMode;
   parkingNote?:string; mediaNote?:string;
-  title:string; type:"Casa"|"Departamento"|"Monoambiente"; zone:string; address:string;
+  title:string; type:"Casa"|"Departamento"|"Monoambiente"|"Local"; zone:string; address:string;
+  // Only for locales: meters of street front, allowed business use and what the space has.
+  frontage?:number; businessUse?:string; businessFeatures?:string[];
   bedrooms:number|null; bathrooms:number|null; garage:number; area:number|null;
   pets:boolean; furnished:boolean; security:boolean; pool:boolean; patio:boolean; grill:boolean; elevator:boolean;
   price:number; currency:"BOB"|"USD"; exchangeRate:number|null; commonExpenses:number;
@@ -20,6 +22,9 @@ export type PublicationDetails = {
   // Set only by the owner's "Verificar ubicación" in Mi cuenta, never from a request or a review.
   locationConfirmedAt?: string;
 } & BeforeVisit;
+
+// What an owner can mark for a local. The first five are also catalog filters ("Debe tener").
+export const businessFeatureChoices = ["Vitrina a la calle", "Baño propio", "Depósito", "Parqueo para clientes", "Luz trifásica", "Se permite letrero", "Sin derecho de llave"] as const;
 
 export type PublicationFieldErrors = Partial<Record<keyof PublicationDetails | "contactName" | "whatsapp" | "details", string>>;
 
@@ -72,7 +77,11 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
   else if (expensesMode === "separate" && !commonExpenses) fieldErrors.commonExpenses = "Indica el monto de las expensas por mes (mayor a 0 y hasta 1.000.000).";
   else if (commonExpenses === null) fieldErrors.commonExpenses = "Indica las expensas mensuales. Escribe 0 si están incluidas o no se cobran (máximo 1.000.000).";
   if (garage === null) fieldErrors.garage = "Indica entre 0 y 100 parqueos, sin decimales. Escribe 0 si no tiene.";
-  if (!["Casa","Departamento","Monoambiente"].includes(String(input.type))) fieldErrors.type = "Selecciona un tipo de vivienda válido.";
+  if (!["Casa","Departamento","Monoambiente","Local"].includes(String(input.type))) fieldErrors.type = "Selecciona un tipo de vivienda o local válido.";
+  const isLocal=input.type === "Local";
+  const frontage=isLocal ? number("frontage",1000) : null;
+  if (isLocal && input.frontage !== "" && input.frontage != null && frontage === null) fieldErrors.frontage = "Frente: indica los metros a la calle (hasta 1.000), o deja el campo vacío.";
+  const businessFeatures=isLocal && Array.isArray(input.businessFeatures) ? input.businessFeatures.filter((item):item is string=>typeof item === "string" && (businessFeatureChoices as readonly string[]).includes(item)) : [];
   if (!["BOB","USD"].includes(String(input.currency))) fieldErrors.currency = "Selecciona bolivianos o dólares.";
   if (input.currency === "USD" && exchangeRate === null) fieldErrors.exchangeRate = "Indica un tipo de cambio mayor a 0 y de hasta 1.000 Bs por USD.";
   if (!["Sin garantía","1 mes de alquiler","2 meses de alquiler","Otro monto","Consultar con el propietario"].includes(guarantee)) fieldErrors.guarantee = "Selecciona la garantía del alquiler.";
@@ -97,6 +106,7 @@ export function validatePublicationDetails(value: unknown): { details: Publicati
     ...(text("parkingNote",120) ? {parkingNote:text("parkingNote",120)} : {}),
     ...(text("mediaNote",500) ? {mediaNote:text("mediaNote",500)} : {}),
     ...beforeVisit.values,
+    ...(isLocal ? {...(frontage ? {frontage} : {}),...(text("businessUse",160) ? {businessUse:text("businessUse",160)} : {}),businessFeatures} : {}),
     bedrooms:number("bedrooms",100,true),bathrooms:number("bathrooms",100,true),area:number("area",1_000_000,true),garage,commonExpenses,guarantee,guaranteeAmount,
     pets:petsPolicy ? petsPolicy === "allowed" : input.pets as boolean,furnished:input.furnished as boolean,security:input.security as boolean,pool:input.pool as boolean,patio:input.patio as boolean,grill:input.grill as boolean,elevator:input.elevator as boolean}};
 }

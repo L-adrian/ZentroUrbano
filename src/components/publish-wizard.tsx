@@ -17,6 +17,7 @@ import {
   Phone,
   Ruler,
   ShieldCheck,
+  Store,
   X,
 } from "lucide-react";
 import NextImage from "next/image";
@@ -26,7 +27,7 @@ import { startTransition, useEffect, useEffectEvent, useMemo, useRef, useState }
 import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/before-visit-fields";
 import { beforeVisitRows, includedServiceOptions, noServicesValue, parseBeforeVisitInput } from "@/lib/before-visit";
 import { advanceRentMonths, getPublicationCosts } from "@/lib/publication-costs";
-import { expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
+import { businessFeatureChoices, expensesModes, getPublicationStepErrors, normalizePublicationPhone, petsPolicies, publicationFieldStep, type ExpensesMode, type PetsPolicy, type PublicationFieldErrors } from "@/lib/publication-input";
 import { minUploadPhotos, maxUploadPhotos, maxTotalPhotoBytes } from "@/lib/photo-upload-limits";
 import { maxSelectedPhotoBytes, uploadMaxSide } from "@/lib/photo-resize";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
@@ -54,8 +55,11 @@ type PropertyForm = {
   ownerName: string;
   phone: string;
   title: string;
-  type: "Casa" | "Departamento" | "Monoambiente";
+  type: "Casa" | "Departamento" | "Monoambiente" | "Local";
   zone: string;
+  frontage: string;
+  businessUse: string;
+  businessFeatures: string[];
   address: string;
   bedrooms: string;
   bathrooms: string;
@@ -98,6 +102,9 @@ const initialForm: PropertyForm = {
   title: "",
   type: "Departamento",
   zone: "",
+  frontage: "",
+  businessUse: "",
+  businessFeatures: [],
   address: "",
   bedrooms: "",
   bathrooms: "",
@@ -141,13 +148,16 @@ function wizardStepErrors(step: number, form: PropertyForm): PublicationFieldErr
 function restoreForm(saved: Record<string, unknown>, base: PropertyForm): PropertyForm {
   const restored = { ...base };
   for (const key of Object.keys(initialForm) as (keyof PropertyForm)[]) {
-    if (key === "includedServices") continue;
+    if (key === "includedServices" || key === "businessFeatures") continue;
     if (typeof saved[key] === typeof initialForm[key]) Object.assign(restored, { [key]: saved[key] });
   }
   if (Array.isArray(saved.includedServices)) {
     restored.includedServices = saved.includedServices.filter((item): item is string => typeof item === "string" && serviceValues.has(item));
   }
-  if (!["Casa", "Departamento", "Monoambiente"].includes(restored.type)) restored.type = "Departamento";
+  if (Array.isArray(saved.businessFeatures)) {
+    restored.businessFeatures = saved.businessFeatures.filter((item): item is string => typeof item === "string" && (businessFeatureChoices as readonly string[]).includes(item));
+  }
+  if (!["Casa", "Departamento", "Monoambiente", "Local"].includes(restored.type)) restored.type = "Departamento";
   if (!["BOB", "USD"].includes(restored.currency)) restored.currency = "BOB";
   // Drafts saved before the pets and expenses questions keep what the owner had answered.
   if (!(petsPolicies as readonly string[]).includes(restored.petsPolicy) || typeof saved.petsPolicy !== "string") restored.petsPolicy = restored.pets ? "allowed" : "consult";
@@ -508,8 +518,8 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
       try { localStorage.removeItem(draftKey); } catch { /* Submission already succeeded. */ }
       void clearDraftPhotos(draftKey);
       setMessage(prefill?.kind === "correction"
-        ? "Recibimos tu corrección. La revisaremos antes de publicar la vivienda."
-        : "Solicitud recibida. Revisaremos los datos antes de publicar la vivienda.");
+        ? `Recibimos tu corrección. La revisaremos antes de publicar ${form.type === "Local" ? "el local" : "la vivienda"}.`
+        : `Solicitud recibida. Revisaremos los datos antes de publicar ${form.type === "Local" ? "el local" : "la vivienda"}.`);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error && error.name === "TimeoutError" ? "El envío tardó demasiado. Conservamos tus datos y fotos. Antes de reenviar, consulta a soporte si recibimos la solicitud." : error instanceof Error ? error.message : "No se pudo enviar la solicitud.");
@@ -569,8 +579,10 @@ export function PublishWizard({ account, prefill }: { account: { id: string; nam
           {prefill ? <PrefillNotice prefill={prefill} /> : null}
           {sessionExpired && <div role="alert" className="publish-draft-notice"><span>{photoStorage ? "Tu sesión venció. Tus datos y fotos quedan guardados en este dispositivo." : "Tu sesión venció. Los datos quedan guardados; tendrás que adjuntar las fotos nuevamente."}</span><Link href={`/login?next=${encodeURIComponent(currentPublishPath(prefill))}`}>Volver a iniciar sesión</Link></div>}
           {(draftSaved || (photoStorage && photos.length > 0)) && <div className="publish-draft-notice"><span className="flex items-center gap-2"><Save size={14} />{photoStorage ? "Datos y fotos guardados en este dispositivo." : "Datos guardados en este dispositivo. Las fotos deben volver a adjuntarse al recargar."}</span><button type="button" onClick={clearDraft} disabled={processingPhotos || status === "sending"}>Borrar datos</button></div>}
+          {step === 0 ? <ListingKindChooser form={form} updateField={updateField} /> : null}
           {step === 0 ? (
             <PhotoStep
+              isLocal={form.type === "Local"}
               photos={photos}
               onPhotos={handlePhotos}
               onRemove={removePhoto}
@@ -695,6 +707,29 @@ function PrefillNotice({ prefill }: { prefill: PublishPrefill }) {
   );
 }
 
+function ListingKindChooser({
+  form,
+  updateField,
+}: {
+  form: PropertyForm;
+  updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void;
+}) {
+  const isLocal = form.type === "Local";
+  return (
+    <fieldset className="publish-kind">
+      <legend>¿Qué vas a publicar?</legend>
+      <div className="publish-kind-options">
+        <button type="button" aria-pressed={!isLocal} onClick={() => updateField("type", "Departamento")}>
+          <Home size={20} aria-hidden="true" /><span><strong>Vivienda</strong><small>Casa, departamento o monoambiente</small></span>
+        </button>
+        <button type="button" aria-pressed={isLocal} onClick={() => updateField("type", "Local")}>
+          <Store size={20} aria-hidden="true" /><span><strong>Local o tienda <em>Nuevo</em></strong><small>Para un negocio, oficina o depósito</small></span>
+        </button>
+      </div>
+    </fieldset>
+  );
+}
+
 function PhotoStep({
   photos,
   onPhotos,
@@ -703,7 +738,9 @@ function PhotoStep({
   processing,
   progress,
   onCover,
+  isLocal = false,
 }: {
+  isLocal?: boolean;
   photos: UploadPhoto[];
   onPhotos: (event: ChangeEvent<HTMLInputElement>) => void;
   onRemove: (index: number) => void;
@@ -723,7 +760,7 @@ function PhotoStep({
     <section>
       <StepHeading
         title="Agrega fotos claras"
-        copy="Muestra los ambientes principales. Elige una foto de portada y clasifica cada ambiente."
+        copy={isLocal ? "Muestra la fachada o vitrina, el interior, el baño y el depósito. Elige una foto de portada." : "Muestra los ambientes principales. Elige una foto de portada y clasifica cada ambiente."}
       />
 
       <label className="mt-6 flex min-h-40 cursor-pointer flex-col items-center justify-center border border-dashed border-neutral-400 bg-neutral-50 p-5 text-center hover:border-[#176b4d]">
@@ -771,8 +808,8 @@ function PhotoStep({
                 aria-label={`Ambiente de la foto ${index + 1}`}
               >
                 <option value="">¿Qué ambiente muestra?</option>
-                {photoCategories.map((category) => (
-                  <option key={category.value} value={category.value}>{category.label}</option>
+                {photoCategories.filter((category) => !isLocal || !localHiddenCategories.has(category.value)).map((category) => (
+                  <option key={category.value} value={category.value}>{(isLocal && localCategoryLabels[category.value]) || category.label}</option>
                 ))}
               </select>
               <PhotoAnalysisStatus photo={photo} />
@@ -793,6 +830,10 @@ function PhotoStep({
     </section>
   );
 }
+
+// A local has no bedrooms or patio: the same categories, named the way a business owner would.
+const localHiddenCategories = new Set<string>(["bedroom", "patio"]);
+const localCategoryLabels: Partial<Record<string, string>> = { exterior: "Fachada / vitrina", living: "Interior del local", kitchen: "Cocina / kitchenette", garage: "Parqueo para clientes", amenity: "Depósito", other: "Otro espacio" };
 
 function formatMegabytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toLocaleString("es-BO", { maximumFractionDigits: 1, minimumFractionDigits: 1 })} MB`;
@@ -837,6 +878,7 @@ function InformationStep({
   form: PropertyForm;
   updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void;
 }) {
+  if (form.type === "Local") return <LocalInformationStep form={form} updateField={updateField} />;
   return (
     <section>
       <StepHeading title="Describe la vivienda" copy="Solo pedimos los datos necesarios para filtrar y decidir." />
@@ -900,6 +942,62 @@ function InformationStep({
         </div>
         <Field label="Descripción" className="sm:col-span-2">
           <textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} rows={5} placeholder="Distribución, estado, servicios y condiciones relevantes." className={`${inputClassName} h-auto resize-y py-3`} />
+        </Field>
+      </div>
+    </section>
+  );
+}
+
+function LocalInformationStep({
+  form,
+  updateField,
+}: {
+  form: PropertyForm;
+  updateField: <TKey extends keyof PropertyForm>(key: TKey, value: PropertyForm[TKey]) => void;
+}) {
+  return (
+    <section>
+      <StepHeading title="Describe el local" copy="Lo que un comerciante pregunta primero: metros, frente a la calle y qué negocio se permite." />
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <Field label="Título" className="sm:col-span-2" icon={<Store className="h-4 w-4" />}>
+          <input value={form.title} onChange={(event) => updateField("title", event.target.value)} placeholder="Ej. Local a calle con vitrina en Av. Banzer" className={inputClassName} />
+        </Field>
+        <Field label="Zona" icon={<MapPin className="h-4 w-4" />}>
+          <input value={form.zone} onChange={(event) => updateField("zone", event.target.value)} placeholder="Ej. Equipetrol" className={inputClassName} />
+        </Field>
+        <Field label="Dirección aproximada">
+          <input value={form.address} onChange={(event) => updateField("address", event.target.value)} placeholder="Avenida, calle o galería" className={inputClassName} />
+        </Field>
+        <Field label="Superficie (m²)" icon={<Ruler className="h-4 w-4" />}>
+          <input value={form.area} onChange={(event) => updateField("area", event.target.value)} type="number" min="0" inputMode="numeric" placeholder="Ej. 85" className={inputClassName} />
+        </Field>
+        <Field label="Frente a la calle (m, opcional)">
+          <input value={form.frontage} onChange={(event) => updateField("frontage", event.target.value)} type="number" min="0" inputMode="decimal" placeholder="Ej. 7" className={inputClassName} />
+        </Field>
+        <Field label="Baños (opcional)" icon={<Bath className="h-4 w-4" />}>
+          <input value={form.bathrooms} onChange={(event) => updateField("bathrooms", event.target.value)} type="number" min="0" inputMode="numeric" placeholder="Consultar" className={inputClassName} />
+        </Field>
+        <Field label="Parqueo para clientes">
+          <input value={form.garage} onChange={(event) => updateField("garage", event.target.value)} type="number" min="0" inputMode="numeric" className={inputClassName} />
+        </Field>
+        <Field label="Rubro permitido (opcional)" className="sm:col-span-2">
+          <input value={form.businessUse} onChange={(event) => updateField("businessUse", event.target.value)} placeholder="Ej. comida, ropa, oficina. Vacío si se permite cualquier rubro" className={inputClassName} />
+        </Field>
+        <fieldset className="grid gap-2 sm:col-span-2">
+          <legend className="text-sm font-semibold text-neutral-800">¿Qué tiene el local?</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-3 border-y border-neutral-200 py-4">
+            {businessFeatureChoices.map((feature) => (
+              <SimpleCheckbox
+                key={feature}
+                checked={form.businessFeatures.includes(feature)}
+                onChange={(value) => updateField("businessFeatures", value ? [...form.businessFeatures.filter((item) => item !== feature), feature] : form.businessFeatures.filter((item) => item !== feature))}
+                label={feature}
+              />
+            ))}
+          </div>
+        </fieldset>
+        <Field label="Descripción" className="sm:col-span-2">
+          <textarea value={form.description} onChange={(event) => updateField("description", event.target.value)} rows={5} placeholder="Estado del local, para qué negocio sirve, horarios de carga, si se permite letrero y lo que el inquilino debe saber." className={`${inputClassName} h-auto resize-y py-3`} />
         </Field>
       </div>
     </section>
@@ -1006,7 +1104,18 @@ function ConfirmationStep({
         </ul>
       </ReviewSection>
 
-      <ReviewSection title="La vivienda" onEdit={() => onEdit(1)}>
+      {form.type === "Local" ? <ReviewSection title="El local" onEdit={() => onEdit(1)}>
+        <dl className="review-summary">
+          <SummaryRow label="Título" value={form.title || "Sin título"} />
+          <SummaryRow label="Tipo" value="Local o tienda" />
+          <SummaryRow label="Ubicación" value={[form.zone, form.address].filter(Boolean).join(" · ") || "Sin ubicación"} />
+          <SummaryRow label="Superficie" value={[form.area ? `${form.area} m²` : "Sin indicar", form.frontage ? `frente ${form.frontage} m` : ""].filter(Boolean).join(" · ")} />
+          <SummaryRow label="Baños y parqueo" value={`${form.bathrooms || "?"} baños · ${form.garage || 0} parqueos para clientes`} />
+          <SummaryRow label="Rubro permitido" value={form.businessUse.trim() || "Cualquier rubro"} />
+          <SummaryRow label="Tiene" value={form.businessFeatures.join(", ") || "Nada marcado"} />
+          {form.description.trim() ? <SummaryRow label="Descripción" value={form.description.trim()} /> : null}
+        </dl>
+      </ReviewSection> : <ReviewSection title="La vivienda" onEdit={() => onEdit(1)}>
         <dl className="review-summary">
           <SummaryRow label="Título" value={form.title || "Sin título"} />
           <SummaryRow label="Tipo" value={form.type} />
@@ -1017,7 +1126,7 @@ function ConfirmationStep({
           <SummaryRow label="Comodidades" value={extras.join(", ") || "Ninguna marcada"} />
           {form.description.trim() ? <SummaryRow label="Descripción" value={form.description.trim()} /> : null}
         </dl>
-      </ReviewSection>
+      </ReviewSection>}
 
       <ReviewSection title="Precio y contacto" onEdit={() => onEdit(2)}>
         <dl className="review-summary">
@@ -1135,7 +1244,7 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
   );
   const hasBathroomPhoto = photos.some((photo) => photo.category === "bathroom");
   const hasBedroomPhoto =
-    form.type === "Monoambiente" || photos.some((photo) => photo.category === "bedroom");
+    form.type === "Monoambiente" || form.type === "Local" || photos.some((photo) => photo.category === "bedroom");
   const rules = [
     { complete: photos.length >= minUploadPhotos, points: 15, missing: `Agregar al menos ${minUploadPhotos} fotos` },
     { complete: photos.length > 0 && categorizedPhotos.length === photos.length, points: 10, missing: "Clasificar todas las fotos" },
@@ -1144,7 +1253,9 @@ function calculateQuality(form: PropertyForm, photos: UploadPhoto[]) {
     { complete: photos.length > 0 && technicallyValidPhotos.length / photos.length >= 0.8, points: 7, missing: "Reemplazar fotos oscuras, borrosas o pequeñas" },
     { complete: form.title.trim().length >= 15, points: 7, missing: "Escribir un título claro" },
     { complete: Boolean(form.zone.trim() && form.address.trim()), points: 8, missing: "Completar zona y referencia" },
-    { complete: Number(form.bedrooms) > 0 && Number(form.bathrooms) > 0, points: 8, missing: "Indicar dormitorios y baños" },
+    form.type === "Local"
+      ? { complete: Number(form.bathrooms) > 0 && form.businessFeatures.length > 0, points: 8, missing: "Indicar baños y lo que tiene el local" }
+      : { complete: Number(form.bedrooms) > 0 && Number(form.bathrooms) > 0, points: 8, missing: "Indicar dormitorios y baños" },
     { complete: Number(form.area) > 0, points: 5, missing: "Agregar superficie" },
     { complete: form.description.trim().length >= 60, points: 7, missing: "Describir distribución y servicios" },
     { complete: (parseCurrencyAmount(form.price) ?? 0) > 0, points: 10, missing: "Indicar precio mensual" },
