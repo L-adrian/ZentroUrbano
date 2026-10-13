@@ -2,7 +2,6 @@
 
 import { Camera, Check, KeyRound, LoaderCircle, LogOut, Save, Trash2, UserRound } from "lucide-react";
 import Image from "next/image";
-import Link from "next/link";
 import { type FormEvent, useState } from "react";
 
 export type AccountProfile = { displayName: string; phone: string; avatarUrl: string | null; avatarInitials: string };
@@ -96,7 +95,8 @@ export function OwnerProfilePanel({
         <section className="rounded-[28px] border border-black/10 bg-white p-5">
           <p className="text-lg font-semibold text-neutral-950">Cuenta</p>
           <div className="mt-3 flex flex-wrap gap-2">
-            <Link href="/login" className={buttonClassName}>Cambiar de cuenta</Link>
+            {/* Closes this session first: the login page alone would keep the current account signed in. */}
+            <button type="button" onClick={onLogout} className={buttonClassName}>Cambiar de cuenta</button>
             <button type="button" onClick={onLogout} className={buttonClassName}>
               <LogOut className="h-4 w-4" aria-hidden="true" />
               Salir
