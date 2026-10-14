@@ -226,7 +226,7 @@ export async function getAdminAccountsOverview() {
           from client_account_properties cap
           join properties p on p.slug = cap.property_slug
           where cap.status <> 'closed'
-            and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')
+            and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento', 'Local')
           group by cap.account_id
         ) m on m.account_id = ca.id
         where ca.kind = 'owner'
@@ -252,7 +252,7 @@ export async function getAdminAccountsOverview() {
         join client_accounts ca on ca.id = cap.account_id and ca.kind = 'owner'
         left join properties p on p.slug = cap.property_slug
         where cap.status <> 'closed'
-          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento')
+          and p.operation = 'Alquiler' and p.type in ('Casa', 'Departamento', 'Local')
         order by cap.created_at desc`,
     ),
   ]);

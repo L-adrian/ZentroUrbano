@@ -82,7 +82,8 @@ export function getGuaranteeLabel(property: Pick<Property, "requirements">) {
 }
 
 // advanceMonths is set only when the owner asked for more than the first month in advance.
-export type EntryCost = { rent: number; expenses: number; deposit: number; total: number; advanceMonths?: number };
+// expensesPending: the owner did not say the expenses, so the total leaves them out.
+export type EntryCost = { rent: number; expenses: number; deposit: number; total: number; advanceMonths?: number; expensesPending?: true };
 
 // What a tenant pays at signing: first month (with expenses) plus the guarantee. Null when unknown.
 export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" | "requirements">): EntryCost | null {
@@ -97,7 +98,7 @@ export function getEntryCost(property: Pick<Property, "price" | "rentalDetails" 
     });
     if (costs.deposit === null || costs.entry === null) return null;
     const months = advanceRentMonths(details.advanceMonths);
-    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry, ...(months > 1 ? { advanceMonths: months } : {}) };
+    return { rent: property.price, expenses: costs.monthly - property.price, deposit: costs.deposit, total: costs.entry, ...(months > 1 ? { advanceMonths: months } : {}), ...(details.expensesMode === "consult" ? { expensesPending: true as const } : {}) };
   }
   const guarantee = getGuaranteeLabel(property);
   const months = guarantee === "Sin garantía" ? 0 : guarantee === "1 mes" ? 1 : guarantee === "2 meses" ? 2 : null;

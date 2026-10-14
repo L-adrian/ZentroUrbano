@@ -109,6 +109,11 @@ export async function upsertLocalGoogleAccount(input: {
       if (existingUser.status !== "active" || (existingUser.providerSubject && existingUser.providerSubject !== input.user.providerSubject)) {
         throw new Error("Google account is disabled or has a different provider identity");
       }
+      if (!existingUser.providerSubject) {
+        // Same rule as the database: a first Google sign-in drops a password nobody verified.
+        existingUser.passwordHash = null;
+        database.sessions = database.sessions.filter((session) => session.userId !== existingUser.id);
+      }
       existingUser.authProvider = "google";
       existingUser.providerSubject = input.user.providerSubject;
       const existingAccount = database.accounts.find(

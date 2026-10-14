@@ -34,7 +34,9 @@ export function operationSlug(operation: Operation) {
 export function getOperationSeoRoutes(properties: Property[] = publishedProperties) {
   const uniqueRoutes = new Map<string, { operation: string; city: string; zone: string }>();
 
-  properties.filter(isDirectRental).forEach((property) => {
+  // Zone pages list homes (locales show only when that type is chosen), so a zone with only
+  // locales would be an indexed page with "0 alquileres".
+  properties.filter((property) => isDirectRental(property) && property.type !== "Local").forEach((property) => {
     const route = {
       operation: operationSlug(property.operation),
       city: citySlug(property),
@@ -119,7 +121,9 @@ export function filterPropertiesByCity({
 export function getCitySeoRoutes(properties: Property[] = publishedProperties) {
   const uniqueRoutes = new Map<string, { operation: string; city: string }>();
 
-  properties.filter(isDirectRental).forEach((property) => {
+  // Zone pages list homes (locales show only when that type is chosen), so a zone with only
+  // locales would be an indexed page with "0 alquileres".
+  properties.filter((property) => isDirectRental(property) && property.type !== "Local").forEach((property) => {
     const route = { operation: operationSlug(property.operation), city: citySlug(property) };
     uniqueRoutes.set(`${route.operation}/${route.city}`, route);
   });

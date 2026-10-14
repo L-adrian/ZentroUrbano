@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useCurrencyPreference } from "@/components/currency-preference";
 import { PropertyCard } from "@/components/property-card";
 import { PropertyMap } from "@/components/property-map";
@@ -74,7 +74,7 @@ import {
 import type { Property } from "@/lib/properties";
 import { businessKindChoices } from "@/lib/publication-input";
 import { canonicalZone, getZoneSector, joinZones, locateHome, otherZonesLabel, santaCruzSectors, splitZones } from "@/lib/santa-cruz-zones";
-import { defaultDepartment, isInDepartment } from "@/lib/regions";
+import { defaultDepartment, departmentCookieName, departmentParam, findDepartment, isInDepartment } from "@/lib/regions";
 import { absoluteUrl, whatsappUrl } from "@/lib/site";
 import { getZoneAverages, zoneAverageMinListings } from "@/lib/zone-prices";
 
@@ -124,7 +124,8 @@ export function DirectRentalExplorer({
   const filtersButtonRef = useRef<HTMLButtonElement>(null);
   const displayCurrency = useCurrencyPreference();
   const selectedZones = useMemo(() => splitZones(filters.zone), [filters.zone]);
-  const zoneAverages = useMemo(() => getZoneAverages(properties), [properties]);
+  // Home prices only: one warehouse would raise a zone's average for every house in it.
+  const zoneAverages = useMemo(() => getZoneAverages(properties.filter((property) => property.type !== "Local")), [properties]);
   const zoneCenters = useMemo(() => getZoneCenters(properties), [properties]);
 
   const appliedFilters = useMemo(() => ({ ...filters, query: deferredQuery }), [filters, deferredQuery]);
@@ -241,7 +242,11 @@ export function DirectRentalExplorer({
     if (!params.has("currency")) params.set("currency", displayCurrency);
     return params.toString();
   }, [serializedFilters, displayCurrency]);
-  const shareUrl = absoluteUrl(`${pathname}${serializedFilters ? `?${serializedFilters}` : ""}`);
+  // The link carries the department, so it opens with the same listings for whoever receives it.
+  const departmentSlug = useSyncExternalStore(subscribeDepartment, readDepartmentCookie, () => null);
+  const shareParams = new URLSearchParams(serializedFilters);
+  if (departmentSlug && findDepartment(departmentSlug)) shareParams.set(departmentParam, departmentSlug);
+  const shareUrl = absoluteUrl(`${pathname}${shareParams.size ? `?${shareParams}` : ""}`);
   const searchSummary = describeRentalSearch(appliedFilters, displayCurrency).join(", ");
   const unsupportedIntent = getUnsupportedSearchIntent(deferredQuery);
 
@@ -380,7 +385,8 @@ export function DirectRentalExplorer({
       if (checked) types.add(type);
       else types.delete(type);
       const next = { ...current, type: toRentalTypeFilter(types) };
-      return isBusiness && checked ? { ...next, bedrooms: "", bathrooms: "" } : { ...next, business: isBusiness ? current.business : "", businessKind: isBusiness ? current.businessKind : "" };
+      // The home-only filters (rooms, pets, parking, furnished) are hidden for locales, so they are cleared.
+      return isBusiness && checked ? { ...next, bedrooms: "", bathrooms: "", pets: false, garage: false, furnished: false } : { ...next, business: isBusiness ? current.business : "", businessKind: isBusiness ? current.businessKind : "" };
     });
   }
 
@@ -1260,4 +1266,14 @@ function capitalize(value: string) {
 
 function shorten(value: string, max: number) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+
+// The department chosen in the welcome popup or the header (region-picker announces changes).
+function subscribeDepartment(onChange: () => void) {
+  window.addEventListener("zu-departamento", onChange);
+  return () => window.removeEventListener("zu-departamento", onChange);
+}
+
+function readDepartmentCookie() {
+  return document.cookie.match(new RegExp(`(?:^|; )${departmentCookieName}=([^;]*)`))?.[1] ?? null;
 }

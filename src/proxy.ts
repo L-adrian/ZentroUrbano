@@ -1,6 +1,8 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { authenticatedAdmin, configuredAdminPassword } from "@/lib/admin-access";
+import { departmentCookieName, departmentParam, findDepartment } from "@/lib/regions";
+import { visibleOrigin } from "@/lib/request-origin";
 
 export function proxy(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/propiedades/muestra-privada-")) {
@@ -14,7 +16,23 @@ export function proxy(request: NextRequest) {
     return handleAdminAccess(request);
   }
 
+  const department = request.nextUrl.searchParams.get(departmentParam);
+  if (department !== null) return openInDepartment(request, department);
+
   return NextResponse.next();
+}
+
+// A shared search or an alert link says its department, so it opens with the same listings for
+// whoever receives it: the choice is saved like the welcome popup does and the parameter is removed.
+function openInDepartment(request: NextRequest, slug: string) {
+  const origin = visibleOrigin(request);
+  const url = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, origin);
+  url.searchParams.delete(departmentParam);
+  const response = NextResponse.redirect(url);
+  if (findDepartment(slug)) {
+    response.cookies.set(departmentCookieName, slug, { path: "/", sameSite: "lax", secure: origin.startsWith("https:") });
+  }
+  return response;
 }
 
 function handleAdminAccess(request: NextRequest) {
@@ -51,5 +69,5 @@ function noIndex(response: NextResponse) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/contact-leads/:path*", "/propiedades/muestra-privada-:path*"],
+  matcher: ["/admin/:path*", "/api/contact-leads/:path*", "/propiedades/muestra-privada-:path*", "/", "/propiedades", "/mapa"],
 };

@@ -3,6 +3,8 @@ import { isSameSiteRequest } from "@/lib/request-origin";
 import { cleanAlertParams, createSearchAlert } from "@/lib/search-alerts";
 import { normalizeAlertEmail, normalizeAlertWhatsapp, searchAlertLimits } from "@/lib/search-alert-input";
 import { getOrCreateVisitorId } from "@/lib/visitor-id";
+import { departmentParam } from "@/lib/regions";
+import { getSelectedDepartment } from "@/lib/region-server";
 
 // "Avísame cuando haya una así": stores a contact with consent. The team writes by hand when
 // a matching home is published; nothing is sent automatically.
@@ -26,11 +28,17 @@ export async function POST(request: NextRequest) {
   if (!whatsapp && !email) {
     return NextResponse.json({ ok: false, message: "Escribe un WhatsApp de Bolivia (8 dígitos) o un correo." }, { status: 400 });
   }
-  const params = typeof body.params === "string" ? cleanAlertParams(body.params) : "";
+  // The alert keeps the department the person was looking in, so matches and links stay there.
+  const requested = new URLSearchParams(typeof body.params === "string" ? body.params : "");
+  requested.delete(departmentParam);
+  const filters = cleanAlertParams(requested.toString());
   const summary = typeof body.summary === "string" ? body.summary.replace(/\s+/g, " ").trim().slice(0, searchAlertLimits.summary) : "";
-  if (!params || !summary) {
+  if (!filters || !summary) {
     return NextResponse.json({ ok: false, message: "Elige al menos un filtro para tu alerta." }, { status: 400 });
   }
+  const searched = new URLSearchParams(filters);
+  searched.set(departmentParam, (await getSelectedDepartment()).slug);
+  const params = cleanAlertParams(searched.toString());
   const name = typeof body.name === "string" ? body.name.replace(/\s+/g, " ").trim().slice(0, searchAlertLimits.name) || null : null;
   try {
     const result = await createSearchAlert({ name, whatsapp, email, params, summary, visitorId: await getOrCreateVisitorId() });

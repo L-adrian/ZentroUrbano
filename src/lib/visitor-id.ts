@@ -8,6 +8,12 @@ export const visitorCookieName = "zu_vid";
 const visitorIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const oneYearSeconds = 60 * 60 * 24 * 365;
 
+// The id this device already had, or null on a first request (scripts that drop cookies).
+export async function getExistingVisitorId() {
+  const current = (await cookies()).get(visitorCookieName)?.value;
+  return current && visitorIdPattern.test(current) ? current : null;
+}
+
 export async function getOrCreateVisitorId() {
   const store = await cookies();
   const current = store.get(visitorCookieName)?.value;

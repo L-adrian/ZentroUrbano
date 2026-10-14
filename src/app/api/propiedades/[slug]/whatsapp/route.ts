@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { formatPriceInCurrency } from "@/lib/currency";
 import { buildOwnerWhatsappMessage, isExternalContactUrl, whatsappContactSources } from "@/lib/property-contact";
+import { normalizePublicationPhone } from "@/lib/publication-input";
 import { absoluteUrl } from "@/lib/site";
 import { getPropertyBySlugData } from "@/lib/property-data";
 import { visibleOrigin } from "@/lib/request-origin";
@@ -48,5 +49,7 @@ export async function GET(
     extraLines,
   );
 
-  return NextResponse.redirect(`https://wa.me/${property.agent.whatsapp}?text=${encodeURIComponent(message)}`);
+  // wa.me needs digits with the country code; numbers saved as "7123 4567" still reach Bolivia.
+  const number = normalizePublicationPhone(property.agent.whatsapp) ?? property.agent.whatsapp.replace(/\D/g, "");
+  return NextResponse.redirect(`https://wa.me/${number}?text=${encodeURIComponent(message)}`);
 }

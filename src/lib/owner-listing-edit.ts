@@ -1,10 +1,9 @@
 import { normalizePublicationPhone } from "@/lib/publication-input";
 
-// Hosts next/image can render (next.config.mjs remotePatterns); other hosts would break the listing page.
-const remoteImageHost = /^https:\/\/(images\.unsplash\.com|lh[3-6]\.googleusercontent\.com)\//;
-
+// Editing a published listing can reorder or remove its reviewed photos, never add others: new photos
+// (or another listing's photos) go through a new request and review.
 export function allowedOwnerImage(value: string, currentImages: unknown[]) {
-  return value.startsWith("/images/") || value.startsWith("/media/propiedades/") || remoteImageHost.test(value) || currentImages.includes(value);
+  return currentImages.includes(value);
 }
 
 export function parseJsonArray(value: unknown): unknown[] {
@@ -21,10 +20,10 @@ export function parseJsonArray(value: unknown): unknown[] {
 export function ownerWhatsapp(value: unknown, current: string | null) {
   const next = nullableText(value);
   if (next === null || next === current) return next;
-  const phone = normalizePublicationPhone(next);
-  if (phone) return phone;
-  if (/^[+\d\s()-]{6,24}$/.test(next.trim())) return next.trim();
-  return /^https:\/\/wa\.me\/\d{6,20}(\?[^\s]*)?$/.test(next.trim()) ? next.trim() : undefined;
+  // Only Bolivian mobile numbers: a landline or a number without the country code would send
+  // tenants to another country on WhatsApp (33456789 opens a French number).
+  const link = /^https:\/\/wa\.me\/(\d{6,20})(\?[^\s]*)?$/.exec(next.trim());
+  return normalizePublicationPhone(link ? link[1] : next) ?? undefined;
 }
 
 export function ownerMapUrl(value: unknown, current: string | null) {

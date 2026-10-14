@@ -242,7 +242,9 @@ function DetailsSection({ profile, email, onChange }: { profile: AccountProfile;
   );
 }
 
-export function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
+export function PasswordSection({ hasPassword: initialHasPassword }: { hasPassword: boolean }) {
+  // Once a Google-only account creates a password, the next change asks for it.
+  const [hasPassword, setHasPassword] = useState(initialHasPassword);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -265,7 +267,8 @@ export function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
       setCurrent("");
       setNext("");
       setOpen(false);
-      setNotice(hasPassword ? "Listo. Cambiamos tu contraseña." : "Listo. Ya puedes ingresar también con tu correo y esta contraseña.");
+      setNotice(hasPassword ? "Listo. Cambiamos tu contraseña y cerramos la sesión en tus otros dispositivos." : "Listo. Ya puedes ingresar también con tu correo y esta contraseña.");
+      setHasPassword(true);
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "No se pudo guardar.");
     } finally {

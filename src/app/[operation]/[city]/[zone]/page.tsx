@@ -67,9 +67,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const zoneName = properties[0].zone;
   return buildSeoMetadata({
     title: `Alquiler directo en ${zoneName}`,
-    description: `Casas y departamentos en alquiler en ${zoneName}, Santa Cruz de la Sierra, directo con el dueño. Sin inmobiliarias ni comisiones.`,
+    description: `Casas y departamentos en alquiler en ${zoneName}, ${cityLabel(properties[0].city || "Santa Cruz")}, directo con el dueño. Sin inmobiliarias ni comisiones.`,
     path: `/${operation}/${city}/${zone}`,
-    noIndex: properties.every((property) => property.isSeeded),
+    // The page lists homes; a zone with only locales would show "0 alquileres".
+    noIndex: properties.every((property) => property.isSeeded || property.type === "Local"),
     keywords: [
       `alquiler en ${zoneName}`,
       `alquiler directo ${zoneName}`,

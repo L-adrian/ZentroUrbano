@@ -120,7 +120,7 @@ export async function POST(request: NextRequest) {
         price:details.price,currency:details.currency,exchangeRate:details.exchangeRate,...(correctionOf ? {correctionOf} : {})},uploaded,key);
       return NextResponse.json({ok:true,...result},{status:201});
     } catch(error) {
-      return NextResponse.json({ok:false,message:error instanceof PublicationError ? error.message : "No pudimos guardar la solicitud en la base de datos. Conservamos tus datos; intenta nuevamente."},{status:error instanceof PublicationError ? error.status : 503});
+      return NextResponse.json({ok:false,...(error instanceof PublicationError && error.code ? {code:error.code} : {}),message:error instanceof PublicationError ? error.message : "No pudimos guardar la solicitud en la base de datos. Conservamos tus datos; intenta nuevamente."},{status:error instanceof PublicationError ? error.status : 503});
     }
   }
   const requestDirectory = path.join(persistentStorageRoot, "publication-requests", requestId);

@@ -9,6 +9,7 @@ import { formatAlertWhatsapp, normalizeAlertEmail } from "@/lib/search-alert-inp
 import { listSearchAlerts, type SearchAlert } from "@/lib/search-alerts";
 import { buildSeoMetadata } from "@/lib/seo";
 import { absoluteUrl } from "@/lib/site";
+import { defaultDepartment, departmentParam, findDepartment, isInDepartment } from "@/lib/regions";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Alertas de búsqueda",
@@ -39,9 +40,12 @@ export default async function AdminAlertsPage() {
   const rows = (alerts ?? []).map((alert) => {
     const search = new URLSearchParams(alert.params);
     const filters = readRentalSearchParams(search);
+    // Alerts from before departments were saved are all from Santa Cruz.
+    const department = findDepartment(search.get(departmentParam)) ?? defaultDepartment;
+    const inDepartment = rentals.filter((property) => isInDepartment(property.city, department));
     // A price typed in the search text is read in the currency the person was using.
     const currency = search.get("currency") === "USD" ? "USD" : "BOB";
-    const results = searchRentals(rentals, filters, filters.priceCurrency ?? currency);
+    const results = searchRentals(inDepartment, filters, filters.priceCurrency ?? currency);
     const toLink = ({ property }: (typeof results)[number]) => ({ title: property.title, slug: property.slug });
     // Homes that may fit but did not say (pets "a consultar"...) are listed apart and never sent as matches.
     const matches = results.filter((match) => match.pending.length === 0).map(toLink);

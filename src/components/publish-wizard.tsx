@@ -518,12 +518,14 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
       if (responseStatus < 200 || responseStatus >= 300 || !data.ok || !data.requestId || data.photosStored !== photos.length) {
         const invalidField = Object.keys(data.fieldErrors ?? {})[0];
         if (invalidField) setStep(publicationFieldStep(invalidField));
-        if (data.code === "INVALID_REQUEST_KEY") submissionKey.current = crypto.randomUUID();
+        if (data.code === "INVALID_REQUEST_KEY" || data.code === "REQUEST_KEY_USED") submissionKey.current = crypto.randomUUID();
         throw new Error(data.message ?? "No se pudo guardar la solicitud.");
       }
 
       setReceipt({ requestId: data.requestId, photosStored: data.photosStored });
       setStatus("success");
+      // The next publication from this page is a new envío, not a retry of this one.
+      submissionKey.current = crypto.randomUUID();
       try { localStorage.removeItem(draftKey); } catch { /* Submission already succeeded. */ }
       void clearDraftPhotos(draftKey);
       setMessage(prefill?.kind === "correction"

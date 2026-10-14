@@ -4,7 +4,8 @@ import { getPropertyBySlugData } from "@/lib/property-data";
 import { isReportReason, reportNoteMaxLength } from "@/lib/property-reports";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { isSameSiteRequest } from "@/lib/request-origin";
-import { getOrCreateVisitorId } from "@/lib/visitor-id";
+import { requestClientAddressKey, requestClientKey, takeRateLimit } from "@/lib/form-guard";
+import { getExistingVisitorId, getOrCreateVisitorId } from "@/lib/visitor-id";
 
 // Tenant reports ("ya se alquiló", "pidió dinero"...). Five "ya se alquiló" reports since the
 // last confirmation turn the listing to "Disponibilidad por confirmar".
@@ -14,6 +15,17 @@ export async function POST(
 ) {
   if (!isSameSiteRequest(request)) {
     return NextResponse.json({ ok: false, message: "Origen no permitido." }, { status: 403 });
+  }
+  if (!takeRateLimit(`report:${requestClientKey(request.headers)}`, [{ max: 10, windowMs: 60 * 60_000 }, { max: 20, windowMs: 24 * 60 * 60_000 }])) {
+    return NextResponse.json({ ok: false, message: "Ya enviaste varios avisos hoy. Escríbenos por WhatsApp si es urgente." }, { status: 429 });
+  }
+  // A device that opened the listing already has the visitor cookie. Without it (a script that drops
+  // cookies to count as a new person each time) the report is not stored; the cookie is set so a
+  // real visitor's second try goes through.
+  const visitorId = await getExistingVisitorId();
+  if (!visitorId) {
+    await getOrCreateVisitorId();
+    return NextResponse.json({ ok: false, message: "No pudimos enviar el aviso. Toca Enviar otra vez." }, { status: 400 });
   }
   let body: { reason?: unknown; note?: unknown };
   try {
@@ -40,7 +52,8 @@ export async function POST(
       slug: property.slug,
       reason: body.reason,
       note,
-      visitorId: await getOrCreateVisitorId(),
+      visitorId,
+      clientKey: requestClientAddressKey(request.headers),
       userAgent: request.headers.get("user-agent"),
     });
     if (result.limited) {

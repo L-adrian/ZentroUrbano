@@ -6,8 +6,10 @@ import { queryOne, withTransaction } from "@/lib/mysql";
 import type { RegisterInput, GoogleProfileInput } from "@/lib/mysql-auth";
 
 const id = (prefix: string) => `${prefix}_${randomBytes(18).toString("hex")}`;
-const denied = () => ({ ok: false as const, status: 401, message: "Correo o acceso incorrectos." });
-export const databaseAuthUnavailable = () => ({ ok: false as const, status: 503, message: "El acceso no está disponible temporalmente. Intenta nuevamente; no se creó una cuenta alternativa." });
+const denied = () => ({ ok: false as const, status: 401, message: "Correo o contraseña incorrectos." });
+// A Google-only account trying a password: point to the button that works.
+const googleOnly = () => ({ ok: false as const, status: 401, message: "Esta cuenta entra con Google. Toca «Continuar con Google»." });
+export const databaseAuthUnavailable = () => ({ ok: false as const, status: 503, message: "El acceso no está disponible en este momento. Intenta nuevamente en unos minutos." });
 
 async function session(connection: PoolConnection, userId: string, accountId: string) {
   const token = randomBytes(48).toString("hex");
@@ -37,7 +39,7 @@ export async function registerDatabaseOwner(input: RegisterInput) {
       return {ok:true as const,accountId,session:await session(connection,userId,accountId)};
     });
   } catch(error) {
-    if ((error as {code?:string}).code === "ER_DUP_ENTRY") return {ok:false as const,status:409,message:"Ese correo ya tiene una cuenta."};
+    if ((error as {code?:string}).code === "ER_DUP_ENTRY") return {ok:false as const,status:409,message:"Ese correo ya tiene una cuenta. Toca «Ingresar», o «Continuar con Google» si la creaste así."};
     return databaseAuthUnavailable();
   }
 }
@@ -48,6 +50,7 @@ export async function loginDatabasePassword(identifier: string, password: string
   if (!login || login.length > 190 || (!emailLogin && !/^[a-z0-9][a-z0-9._-]{2,79}$/.test(login)) || !password || Buffer.byteLength(password) > 72) return denied();
   try {
     const user = await queryOne<{id:string;account_id:string;password_hash:string|null;status:string}>(`SELECT id,account_id,password_hash,status FROM morada_users WHERE ${emailLogin ? "email" : "username"}=:login`,{login});
+    if (user && user.status === "active" && !user.password_hash) return googleOnly();
     if (!user || user.status !== "active" || !user.password_hash || !await bcrypt.compare(password,user.password_hash)) return denied();
     return await withTransaction(async connection => {
       const [rows] = await connection.execute<RowDataPacket[]>("SELECT u.status FROM morada_users u JOIN client_accounts a ON a.id=u.account_id WHERE u.id=? AND a.status='active' AND u.status='active' FOR UPDATE",[user.id]);
@@ -71,7 +74,14 @@ export async function loginDatabaseGoogle(input: GoogleProfileInput) {
       const name = (input.displayName.trim() || email).slice(0,160);
       const accountId: string = users[0]?.account_id || accounts[0]?.id || await createAccount(connection,email,name,avatar);
       const userId: string = users[0]?.id || id("user");
-      if (users.length) await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=? WHERE id=?",[subject,userId]);
+      if (users.length && !users[0].provider_subject) {
+        // First Google sign-in on an account made with email and password. Sign-up does not verify the
+        // email, so whoever chose that password may not own the address: Google proves it does, so the
+        // old password and every open session stop working. The owner can create a new password in Mi cuenta.
+        await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=?,password_hash=NULL WHERE id=?",[subject,userId]);
+        await connection.execute("DELETE FROM morada_sessions WHERE user_id=?",[userId]);
+      }
+      else if (users.length) await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=? WHERE id=?",[subject,userId]);
       else await connection.execute("INSERT INTO morada_users (id,account_id,email,auth_provider,provider_subject) VALUES (?,?,?,'google',?)",[userId,accountId,email,subject]);
       // A photo uploaded in "Mi cuenta" wins over the Google picture.
       if (avatar) await connection.execute("UPDATE client_accounts SET avatar_url=? WHERE id=? AND (avatar_url IS NULL OR avatar_url NOT LIKE '/media/cuentas/%')",[avatar,accountId]);
