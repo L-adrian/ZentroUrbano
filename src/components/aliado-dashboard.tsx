@@ -3,7 +3,7 @@
 import { CalendarCheck, ExternalLink, Home, LogOut, MessageCircle, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AliadoBoard, normalizeLayout, type BoardCard, type BoardLayout } from "@/components/aliado-board";
 import { MonthCard, ReportCard, TodoCard, savePanel, type Todo } from "@/components/aliado-log";
 import { boliviaToday, type AliadoReport } from "@/lib/aliado-report-input";
@@ -43,6 +43,16 @@ const defaultLayout: BoardLayout = {
   side: ["mes", "pendientes", "reglas", "ayuda", "frase"],
 };
 
+// The panel is split in tabs so the aliado does not see everything at once; inside each tab the
+// cards can still be dragged and ordered.
+type AliadoTab = "registro" | "visitas" | "cuenta";
+const aliadoTabs: Array<{ id: AliadoTab; label: string; cards: string[] }> = [
+  { id: "registro", label: "Mi registro", cards: ["registro", "mes"] },
+  { id: "visitas", label: "Visitas y pendientes", cards: ["visitas", "viviendas", "pendientes"] },
+  { id: "cuenta", label: "Cuenta y reglas", cards: ["contrasena", "reglas", "ayuda", "frase"] },
+];
+const isAliadoTab = (value: string): value is AliadoTab => aliadoTabs.some((tab) => tab.id === value);
+
 const secondaryButton =
   "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950";
 const card = "rounded-[28px] border border-black/10 bg-white p-5 sm:p-6";
@@ -58,6 +68,18 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
   const [month, setMonth] = useState(() => boliviaToday().slice(0, 7));
   const [loadedMonths, setLoadedMonths] = useState<string[]>([]);
   const [loadingMonth, setLoadingMonth] = useState(false);
+  const [tab, setTab] = useState<AliadoTab | null>(null);
+
+  // The tab lives in the address (#visitas, #cuenta) so links and the back button keep it.
+  useEffect(() => {
+    const fromHash = () => {
+      const hash = window.location.hash.slice(1);
+      setTab(isAliadoTab(hash) ? hash : null);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    return () => window.removeEventListener("hashchange", fromHash);
+  }, []);
 
   // The panel arrives with the last weeks; older months load when the aliado opens them.
   async function openMonth(next: string) {
@@ -215,10 +237,20 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
     }] : []),
   ];
 
+  const available = new Set(cards.map((item) => item.key));
+  const tabs = aliadoTabs.filter((item) => item.cards.some((key) => available.has(key)));
+  const activeTab = tab && tabs.some((item) => item.id === tab) ? tab : tabs[0].id;
+  const visibleCards = tabs.find((item) => item.id === activeTab)!.cards;
+
+  function showTab(next: AliadoTab) {
+    setTab(next);
+    window.history.replaceState(null, "", next === tabs[0].id ? window.location.pathname + window.location.search : `#${next}`);
+  }
+
   return (
     <div className="bg-neutral-50">
       <section className="border-b border-black/10 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 pb-5 pt-6 sm:px-6 sm:pt-8 lg:px-8">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-4 pb-3 pt-6 sm:px-6 sm:pt-8 lg:px-8">
           <TeamAvatar name={member?.name ?? data.name} photoUrl={member?.photoUrl ?? null} size={64} />
           <div className="min-w-0 flex-1 basis-56">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#58745f]">Panel de aliado</p>
@@ -241,6 +273,24 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
             </button>
           </div>
         </div>
+        <nav className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4 [scrollbar-width:none] sm:px-6 lg:px-8" aria-label="Secciones de tu panel">
+          {tabs.map((item) => {
+            const active = item.id === activeTab;
+            const count = item.id === "visitas" && upcoming.length ? upcoming.length : null;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => showTab(item.id)}
+                aria-current={active ? "page" : undefined}
+                className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-[3px] px-3 py-3 text-sm font-semibold transition ${active ? "border-[#087c65] text-[#087c65]" : "border-transparent text-neutral-600 hover:text-neutral-950"}`}
+              >
+                {item.label}
+                {count !== null ? <span className={`rounded-full px-2 text-[11px] leading-5 ${active ? "bg-[#087c65] text-white" : "bg-neutral-100 text-neutral-800"}`}>{count}</span> : null}
+              </button>
+            );
+          })}
+        </nav>
       </section>
 
       {!member ? (
@@ -251,7 +301,7 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
           </div>
         </div>
       ) : null}
-      <AliadoBoard cards={cards} layout={normalizeLayout(data.panel?.layout ?? null, defaultLayout, cards.map((item) => item.key))} defaults={defaultLayout} onSave={(next) => void savePanel({ action: "layout", layout: next })} />
+      <AliadoBoard cards={cards} visible={visibleCards} layout={normalizeLayout(data.panel?.layout ?? null, defaultLayout, cards.map((item) => item.key))} defaults={defaultLayout} onSave={(next) => void savePanel({ action: "layout", layout: next })} />
     </div>
   );
 }

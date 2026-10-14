@@ -31,7 +31,11 @@ function shortName(name: string) {
   return code.toUpperCase();
 }
 
-type Search = { mes?: string; dia?: string; aliado?: string; dep?: string };
+type Search = { mes?: string; dia?: string; aliado?: string; dep?: string; tab?: string };
+
+// One thing at a time: the calendar, the month summary or the list of every report.
+type AdminTab = "calendario" | "resumen" | "reportes";
+const adminTabs: Array<[AdminTab, string]> = [["calendario", "Calendario"], ["resumen", "Resumen del mes"], ["reportes", "Todos los reportes"]];
 
 export default async function AdminAliadosPage({ searchParams }: { searchParams: Promise<Search> }) {
   const params = await searchParams;
@@ -84,9 +88,10 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
   const daysInMonth = Number(to.slice(8));
   const offset = (weekday(from) + 6) % 7;
   const shiftMonth = (step: number) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1 + step, 1)).toISOString().slice(0, 7);
+  const tab: AdminTab = adminTabs.some(([id]) => id === params.tab) ? (params.tab as AdminTab) : "calendario";
   const link = (changes: Search) => {
     const query = new URLSearchParams();
-    const next = { mes: month, dia: selected, aliado: params.aliado, dep: params.dep, ...changes };
+    const next = { tab: tab === "calendario" ? undefined : tab, mes: month, dia: selected, aliado: params.aliado, dep: params.dep, ...changes };
     for (const [key, value] of Object.entries(next)) if (value) query.set(key, value);
     return `/admin/aliados?${query.toString()}`;
   };
@@ -129,6 +134,7 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
             </div>
             <form method="get" action="/admin/aliados" className="aliados-cal-filters">
               <input type="hidden" name="mes" value={month} />
+              {tab !== "calendario" ? <input type="hidden" name="tab" value={tab} /> : null}
               <select name="aliado" defaultValue={params.aliado ?? ""} aria-label="Aliado">
                 <option value="">Todos los aliados</option>
                 {everyone.map((member) => <option key={member.id} value={member.slug}>{member.name}</option>)}
@@ -142,6 +148,21 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
             </form>
           </div>
 
+          <nav className="aliados-cal-tabs" aria-label="Secciones">
+            {adminTabs.map(([id, label]) => (
+              <Link key={id} href={link({ tab: id === "calendario" ? undefined : id })} aria-current={id === tab ? "page" : undefined} className={id === tab ? "is-active" : ""}>
+                {label}
+                {id === "reportes" ? <span>{monthReports.length}</span> : null}
+              </Link>
+            ))}
+          </nav>
+
+          {members.length === 0 ? (
+            <p className="admin-team-muted">No hay aliados activos con ese filtro. Agrégalos en <Link href="/admin/equipo">Equipo y visitas</Link>.</p>
+          ) : null}
+
+          {tab === "calendario" && members.length > 0 ? (
+          <>
           <ul className="aliados-cal-legend">
             {members.map((member) => (
               <li key={member.id}><i style={{ background: color.get(member.id) }} />{member.name}</li>
@@ -149,9 +170,6 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
             <li><i className="is-missing" />No registró</li>
           </ul>
 
-          {members.length === 0 ? (
-            <p className="admin-team-muted">No hay aliados activos con ese filtro. Agrégalos en <Link href="/admin/equipo">Equipo y visitas</Link>.</p>
-          ) : (
             <div className="aliados-cal-layout">
               <div className="aliados-cal-grid" role="grid" aria-label="Calendario del mes">
                 {weekdayNames.map((name) => <div key={name} className="aliados-cal-head"><span className="long">{name}</span><span className="short">{name.slice(0, 2)}</span></div>)}
@@ -203,8 +221,10 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
                 {selectedReports.length === 0 && !members.some((member) => expected(member, selected)) ? <p className="admin-team-muted">Nadie registró este día.</p> : null}
               </aside>
             </div>
-          )}
+          </>
+          ) : null}
 
+          {tab === "resumen" && members.length > 0 ? (
           <section className="admin-team-card aliados-cal-summary">
             <h2>Resumen de {monthNames[Number(month.slice(5, 7)) - 1]}</h2>
             <div className="aliados-cal-table">
@@ -233,6 +253,38 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
               </table>
             </div>
           </section>
+          ) : null}
+
+          {tab === "reportes" && members.length > 0 ? (
+          <section className="admin-team-card aliados-cal-summary">
+            <h2>Todos los reportes de {monthNames[Number(month.slice(5, 7)) - 1]}</h2>
+            {monthReports.length === 0 ? <p className="admin-team-muted">Todavía no hay reportes este mes.</p> : (
+              <div className="aliados-cal-table">
+                <table>
+                  <thead>
+                    <tr><th>Día</th><th>Aliado</th><th>Dónde</th><th>Página o lugar</th><th className="num">Personas</th><th className="num">Dueños</th><th>Nota</th></tr>
+                  </thead>
+                  <tbody>
+                    {[...monthReports].reverse().map((report) => {
+                      const member = members.find((item) => item.id === report.memberId);
+                      return (
+                        <tr key={report.id}>
+                          <td>{Number(report.date.slice(8))} {monthNames[Number(report.date.slice(5, 7)) - 1].slice(0, 3)}</td>
+                          <td><i style={{ background: color.get(report.memberId), marginRight: 8 }} />{member?.name ?? ""}</td>
+                          <td>{channelLabel(report.channel)}</td>
+                          <td className="wrap">{report.url ? <a href={report.url} target="_blank" rel="noreferrer">{report.place} <ExternalLink size={12} aria-hidden="true" /></a> : report.place}</td>
+                          <td className="num"><strong>{report.people}</strong></td>
+                          <td className="num">{report.owners}</td>
+                          <td className="wrap">{report.note ?? ""}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+          ) : null}
         </>
       )}
     </main>

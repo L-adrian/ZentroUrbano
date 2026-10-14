@@ -31,11 +31,14 @@ const sameLayout = (a: BoardLayout, b: BoardLayout) => a.main.join() === b.main.
 // any place of either column, or moved with the arrow keys. On phones the two columns stack.
 export function AliadoBoard({
   cards,
+  visible,
   layout: initialLayout,
   defaults,
   onSave,
 }: {
   cards: BoardCard[];
+  // The cards of the open tab; the order of every card is kept in one layout.
+  visible: string[];
   layout: BoardLayout;
   defaults: BoardLayout;
   onSave: (layout: BoardLayout) => void;
@@ -107,10 +110,12 @@ export function AliadoBoard({
 
   function keyMove(event: React.KeyboardEvent<HTMLButtonElement>, key: string, column: Column) {
     const current = layoutRef.current;
-    const index = current[column].indexOf(key);
+    const shown = current[column].filter((item) => visible.includes(item));
+    const index = shown.indexOf(key);
+    const rest = current[column].filter((item) => item !== key);
     let next: BoardLayout | null = null;
-    if (event.key === "ArrowUp" && index > 0) next = moveCard(current, key, column, index - 1);
-    if (event.key === "ArrowDown" && index < current[column].length - 1) next = moveCard(current, key, column, index + 1);
+    if (event.key === "ArrowUp" && index > 0) next = moveCard(current, key, column, rest.indexOf(shown[index - 1]));
+    if (event.key === "ArrowDown" && index < shown.length - 1) next = moveCard(current, key, column, rest.indexOf(shown[index + 1]) + 1);
     if (event.key === "ArrowLeft" && column === "side") next = moveCard(current, key, "main", current.main.length);
     if (event.key === "ArrowRight" && column === "main") next = moveCard(current, key, "side", current.side.length);
     if (!next) return;
@@ -132,7 +137,7 @@ export function AliadoBoard({
     <div data-board-drop={column} className={`grid min-w-0 content-start gap-6 ${column === "main" ? "" : "lg:min-h-40"} ${dragKey ? "rounded-[30px] outline-2 outline-dashed outline-offset-4 outline-[#087c65]/25" : ""}`}>
       {layout[column].map((key) => {
         const card = byKey.get(key);
-        if (!card) return null;
+        if (!card || !visible.includes(key)) return null;
         const dragging = dragKey === key;
         return (
           <div
@@ -164,7 +169,7 @@ export function AliadoBoard({
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-neutral-600">
         <p className="flex items-center gap-1.5">
           <GripVertical className="h-4 w-4 text-neutral-400" aria-hidden="true" />
-          Tu panel: arrastra cada tarjeta desde este ícono y ordénalo a tu gusto.
+          Arrastra cada tarjeta desde este ícono para ordenarla a tu gusto.
         </p>
         <button type="button" onClick={reset} className="inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 font-semibold text-neutral-700 transition hover:bg-white hover:text-neutral-950">
           <RotateCcw className="h-4 w-4" aria-hidden="true" />

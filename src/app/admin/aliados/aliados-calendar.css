@@ -59,3 +59,12 @@ a.aliados-cal-day:hover { background: var(--subtle); }
   .aliados-cal-num em { display: none; }
   .aliados-cal-chips span { padding: 0; width: 8px; height: 8px; border-radius: 50%; font-size: 0; }
 }
+.aliados-cal-tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.aliados-cal-tabs a { display: flex; flex: none; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 3px solid transparent; margin-bottom: -1px; color: var(--muted); font-size: 14px; font-weight: 650; text-decoration: none; }
+.aliados-cal-tabs a:hover { color: var(--foreground); }
+.aliados-cal-tabs a.is-active { border-color: var(--brand); color: var(--brand); }
+.aliados-cal-tabs span { padding: 0 8px; border-radius: 999px; background: var(--subtle); color: var(--foreground); font-size: 11px; line-height: 20px; }
+.aliados-cal-tabs a.is-active span { background: var(--brand); color: #fff; }
+.aliados-cal-summary td.wrap { white-space: normal; min-width: 180px; }
+.aliados-cal-summary td a svg { display: inline; vertical-align: -1px; }
+.aliados-cal-summary td.wrap a { color: var(--brand); font-weight: 600; display: inline; }
