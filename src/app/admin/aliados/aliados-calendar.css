@@ -1,0 +1,70 @@
+/* /admin/aliados: month calendar of the aliado daily log. Uses the site tokens (light and dark). */
+.aliados-cal-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.aliados-cal-nav { display: flex; align-items: center; gap: 8px; }
+.aliados-cal-nav h2 { margin: 0 6px; font-size: 21px; font-weight: 650; color: var(--foreground); }
+.aliados-cal-nav h2::first-letter { text-transform: uppercase; }
+.aliados-cal-nav a { display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 8px; color: var(--foreground); }
+.aliados-cal-nav a.is-off { opacity: .35; pointer-events: none; }
+.aliados-cal-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.aliados-cal-filters select, .aliados-cal-filters button, .aliados-cal-csv { min-height: 38px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--foreground); font-size: 14px; font-weight: 550; }
+.aliados-cal-filters button { cursor: pointer; font-weight: 650; }
+.aliados-cal-csv { display: inline-flex; align-items: center; gap: 6px; font-weight: 650; }
+.aliados-cal-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 14px 0 12px; padding: 0; list-style: none; font-size: 13px; color: var(--foreground); }
+.aliados-cal-legend li { display: flex; align-items: center; gap: 6px; }
+.aliados-cal i { display: inline-block; flex: none; width: 10px; height: 10px; border-radius: 50%; }
+.aliados-cal i.is-missing, .aliados-cal-detail li.is-missing i { border: 1px dashed #f43f5e; background: transparent; }
+.aliados-cal-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
+.aliados-cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.aliados-cal-head { padding: 8px; font-size: 12px; font-weight: 650; color: var(--muted); background: var(--subtle); border-bottom: 1px solid var(--line); }
+.aliados-cal-head .short { display: none; }
+.aliados-cal-day { display: flex; flex-direction: column; gap: 6px; min-height: 104px; padding: 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--foreground); text-decoration: none; transition: background .15s; }
+.aliados-cal-day:nth-child(7n) { border-right: 0; }
+a.aliados-cal-day:hover { background: var(--subtle); }
+.aliados-cal-day.is-empty { background: var(--subtle); opacity: .5; }
+.aliados-cal-day.is-future { color: var(--muted); opacity: .55; }
+.aliados-cal-day.is-selected { background: color-mix(in srgb, var(--brand) 9%, transparent); box-shadow: inset 0 0 0 2px var(--brand); }
+.aliados-cal-day.is-today .aliados-cal-num { color: var(--brand); }
+.aliados-cal-num { display: flex; justify-content: space-between; gap: 4px; font-size: 12px; font-weight: 650; }
+.aliados-cal-num em { font-style: normal; font-size: 11px; color: var(--brand); white-space: nowrap; }
+.aliados-cal-chips { display: flex; flex-wrap: wrap; gap: 3px; }
+.aliados-cal-chips span { padding: 2px 5px; border-radius: 6px; color: #fff; font-size: 10.5px; font-weight: 650; line-height: 1.3; }
+.aliados-cal-chips span.is-missing { border: 1px dashed #fda4af; color: #be123c; background: transparent; }
+.aliados-cal-detail h2 { margin: 0; }
+.aliados-cal-detail ul { display: grid; margin: 0; padding: 0; list-style: none; }
+.aliados-cal-detail li { padding: 10px 0; border-top: 1px solid var(--line); }
+.aliados-cal-detail .who { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 650; color: var(--foreground); }
+.aliados-cal-detail .who em { margin-left: auto; font-style: normal; font-size: 13px; color: var(--brand); white-space: nowrap; }
+.aliados-cal-detail li.is-missing .who, .aliados-cal-detail li.is-missing em { color: #be123c; }
+.aliados-cal-detail .what { margin: 4px 0 0 18px; font-size: 13px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+.aliados-cal-detail .what a { color: var(--brand); font-weight: 600; }
+.aliados-cal-detail .what a svg { display: inline; vertical-align: -1px; }
+.aliados-cal-summary { margin-top: 18px; }
+.aliados-cal-table { overflow-x: auto; }
+.aliados-cal-summary table { width: 100%; border-collapse: collapse; font-size: 14px; color: var(--foreground); }
+.aliados-cal-summary th { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; font-weight: 650; color: var(--muted); white-space: nowrap; }
+.aliados-cal-summary td { padding: 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.aliados-cal-summary .num { text-align: right; }
+.aliados-cal-summary td a { display: inline-flex; align-items: center; gap: 8px; color: var(--foreground); font-weight: 650; }
+.aliados-cal .tag { padding: 3px 9px; border-radius: 999px; background: var(--subtle); color: var(--muted); font-size: 12px; font-weight: 650; }
+.aliados-cal .tag.is-ok { background: #f0fdf4; color: #166534; }
+.aliados-cal .tag.is-bad { background: #fff1f2; color: #be123c; }
+@media (max-width: 1000px) {
+  .aliados-cal-layout { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 640px) {
+  .aliados-cal-head .long { display: none; }
+  .aliados-cal-head .short { display: inline; }
+  .aliados-cal-head { padding: 6px 4px; text-align: center; }
+  .aliados-cal-day { min-height: 64px; padding: 4px; gap: 3px; }
+  .aliados-cal-num em { display: none; }
+  .aliados-cal-chips span { padding: 0; width: 8px; height: 8px; border-radius: 50%; font-size: 0; }
+}
+.aliados-cal-tabs { display: flex; gap: 4px; margin-top: 18px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.aliados-cal-tabs a { display: flex; flex: none; align-items: center; gap: 6px; padding: 10px 12px; border-bottom: 3px solid transparent; margin-bottom: -1px; color: var(--muted); font-size: 14px; font-weight: 650; text-decoration: none; }
+.aliados-cal-tabs a:hover { color: var(--foreground); }
+.aliados-cal-tabs a.is-active { border-color: var(--brand); color: var(--brand); }
+.aliados-cal-tabs span { padding: 0 8px; border-radius: 999px; background: var(--subtle); color: var(--foreground); font-size: 11px; line-height: 20px; }
+.aliados-cal-tabs a.is-active span { background: var(--brand); color: #fff; }
+.aliados-cal-summary td.wrap { white-space: normal; min-width: 180px; }
+.aliados-cal-summary td a svg { display: inline; vertical-align: -1px; }
+.aliados-cal-summary td.wrap a { color: var(--brand); font-weight: 600; display: inline; }

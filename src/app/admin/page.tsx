@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, BellRing, Box, ClipboardList, UsersRound } from "lucide-react";
+import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, UsersRound } from "lucide-react";
 import { AdminAccountsOverview } from "@/components/admin-accounts-overview";
 import { AdminContactLeads } from "@/components/admin-contact-leads";
 import { AdminListingFunnel } from "@/components/admin-listing-funnel";
@@ -68,6 +68,7 @@ export default async function AdminPage() {
             <Link href="/admin/solicitudes" className="zu-button zu-button-primary"><ClipboardList size={18} />Revisar solicitudes y fotos recibidas</Link>
             <Link href="/admin/alertas" className="zu-button zu-button-secondary"><BellRing size={18} />Alertas de búsqueda</Link>
             <Link href="/admin/equipo" className="zu-button zu-button-secondary"><UsersRound size={18} />Equipo y visitas</Link>
+            <Link href="/admin/aliados" className="zu-button zu-button-secondary"><CalendarDays size={18} />Calendario de aliados</Link>
             <Link href="/admin/recorridos" className="zu-button zu-button-secondary"><Box size={18} />Gestionar recorridos 3D</Link>
             <a href="#anuncios-con-avisos" className="zu-button zu-button-secondary">Avisos ({health.reported.length})</a>
             <a href="#disponibilidad-por-confirmar" className="zu-button zu-button-secondary">Por confirmar ({health.checks.length})</a>
