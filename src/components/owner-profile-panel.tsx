@@ -242,7 +242,7 @@ function DetailsSection({ profile, email, onChange }: { profile: AccountProfile;
   );
 }
 
-function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
+export function PasswordSection({ hasPassword }: { hasPassword: boolean }) {
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");

@@ -1,7 +1,8 @@
 import { getPropertyBySlug, type Property } from "@/lib/properties";
 import type { OwnerListingStatus } from "@/lib/listing-moderation";
 
-export type DemoAccountKind = "owner" | "agency";
+// "aliado": a Zentro team member; /cliente shows them the Aliado panel, never the owner tools.
+export type DemoAccountKind = "owner" | "agency" | "aliado";
 export type DemoPlan = "Básico" | "Pro" | "Premium";
 export type PropertyPerformance = {
   propertySlug: string;
