@@ -25,8 +25,11 @@ export async function POST(request: NextRequest) {
 
   const clientKey = requestClientKey(request.headers);
   const failedKey = `login-fail:${clientKey}`;
-  if (!underRateLimit(failedKey, failedLoginLimits) || !takeRateLimit(`login-try:${clientKey}`, attemptLimits)) {
+  if (!underRateLimit(failedKey, failedLoginLimits)) {
     return NextResponse.json({ ok: false, message: "Demasiados intentos con datos incorrectos. Espera 15 minutos o entra con Google." }, { status: 429 });
+  }
+  if (!takeRateLimit(`login-try:${clientKey}`, attemptLimits)) {
+    return NextResponse.json({ ok: false, message: "Demasiados intentos seguidos. Espera unos minutos y vuelve a probar." }, { status: 429 });
   }
 
   const result = await loginWithPassword(

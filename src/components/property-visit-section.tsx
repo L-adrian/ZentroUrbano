@@ -14,6 +14,8 @@ export function PropertyVisitSection({ slug, plan, days }: { slug: string; plan:
   const host = plan.host;
   const hostLabel = host ? ownerFirstName(host.name) ?? (host.kind === "owner" ? "el dueño" : "la persona de Zentro") : "";
   const bookable = Boolean(host && days && plan.settings.enabled);
+  // Nothing to book and nobody from Zentro on it: no empty heading.
+  if (!bookable && plan.team.length === 0) return null;
 
   return (
     <section id="agendar-visita" className="visit-section border-t border-black/10 pt-6 lg:pt-8" aria-labelledby="agendar-visita-title">

@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
 import { changeAccountPassword, checkProfileUpdate, editableOwner, saveAccountProfile } from "@/lib/account-profile";
+import { getCurrentAccount } from "@/lib/mysql-auth";
 import { isSameSiteRequest } from "@/lib/request-origin";
 
 const reply = (status: number, body: Record<string, unknown>) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 
-// "Mi perfil": the owner changes their name and WhatsApp, or their password.
+// "Mi perfil": the owner changes their name and WhatsApp, or their password. An aliado can only
+// change their password (their name and photo are edited by Zentro in /admin/equipo).
 export async function POST(request: Request) {
   if (!isSameSiteRequest(request)) return reply(403, { ok: false, message: "Origen no permitido." });
-  const account = await editableOwner();
-  if (!account) return reply(401, { ok: false, message: "Vuelve a ingresar a tu cuenta." });
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
+  const account = body?.action === "password" ? await passwordAccount() : await editableOwner();
+  if (!account) return reply(401, { ok: false, message: "Vuelve a ingresar a tu cuenta." });
   if (!body) return reply(400, { ok: false, message: "No se pudo leer el pedido." });
   try {
     if (body.action === "profile") {
@@ -27,4 +29,9 @@ export async function POST(request: Request) {
     console.error("profile update failed", error);
     return reply(503, { ok: false, message: "No se pudo guardar. Intenta de nuevo." });
   }
+}
+
+async function passwordAccount() {
+  const account = await getCurrentAccount();
+  return account?.kind === "aliado" && account.storage === "mysql" ? account : editableOwner();
 }

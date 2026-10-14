@@ -1,8 +1,15 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { AliadoDashboard, type AliadoPanelData } from "@/components/aliado-dashboard";
 import { ClientDashboard } from "@/components/client-dashboard";
 import { getCurrentAccount, getCurrentDashboardAccount, getCurrentLogin } from "@/lib/mysql-auth";
+import { getPublishedPropertiesData } from "@/lib/property-data";
+import { findDepartment } from "@/lib/regions";
+import { getDirectRentals } from "@/lib/rentals";
+import { getTeamMemberByAccount } from "@/lib/team";
+import { teamRoleLabels } from "@/lib/team-roles";
+import { visitWhenLabel } from "@/lib/visit-slots";
 import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { buildSeoMetadata } from "@/lib/seo";
 
@@ -17,6 +24,9 @@ export const metadata: Metadata = buildSeoMetadata({
 
 export default async function ClientPage() {
   const account = await getCurrentAccount();
+  if (account?.kind === "aliado" && account.storage === "mysql") {
+    return <AliadoDashboard data={await aliadoPanel(account.id, account.display_name, account.role_label)} />;
+  }
   if (account && account.kind !== "owner") {
     redirect("/propiedades");
   }
@@ -45,6 +55,45 @@ export default async function ClientPage() {
       />
     </Suspense>
   );
+}
+
+// An aliado sees only the visits they host and the homes they work on.
+async function aliadoPanel(accountId: string, name: string, roleLabel: string): Promise<AliadoPanelData> {
+  const [team, login] = await Promise.all([getTeamMemberByAccount(accountId).catch(() => null), getCurrentLogin()]);
+  const hasPassword = Boolean(login && login.account_id === accountId && Number(login.has_password));
+  if (!team) return { name, roleLabel, hasPassword, member: null, homes: [], visits: [] };
+  const { member, assignments } = team;
+  const properties = new Map(getDirectRentals(await getPublishedPropertiesData()).map((property) => [property.slug, property]));
+  const bookings = await listBookingsFor(assignments.map((assignment) => assignment.propertySlug)).catch(() => null);
+  return {
+    name,
+    roleLabel,
+    hasPassword,
+    member: {
+      name: member.name,
+      slug: member.slug,
+      photoUrl: member.photoUrl,
+      department: findDepartment(member.department)?.name ?? "",
+      levelLabel: teamRoleLabels[member.level],
+      bio: member.bio,
+    },
+    homes: assignments.flatMap((assignment) => {
+      const home = properties.get(assignment.propertySlug);
+      return home ? [{ slug: home.slug, title: home.title, zone: home.zone, roleLabel: teamRoleLabels[assignment.role], handlesVisits: assignment.handlesVisits }] : [];
+    }),
+    visits: bookings === null ? null : bookings
+      .filter((booking) => booking.hostMemberId === member.id && !booking.past)
+      .map((booking) => ({
+        id: booking.id,
+        when: visitWhenLabel(booking.startsAt),
+        title: properties.get(booking.propertySlug)?.title ?? "Vivienda",
+        slug: booking.propertySlug,
+        visitorName: booking.visitorName,
+        visitorWhatsapp: booking.visitorWhatsapp,
+        note: booking.note,
+        cancelled: booking.status === "cancelled",
+      })),
+  };
 }
 
 function DashboardFallback() {

@@ -29,13 +29,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, message: "Escribe un WhatsApp de Bolivia (8 dígitos) o un correo." }, { status: 400 });
   }
   // The alert keeps the department the person was looking in, so matches and links stay there.
-  const searched = new URLSearchParams(typeof body.params === "string" ? body.params : "");
-  searched.set(departmentParam, (await getSelectedDepartment()).slug);
-  const params = typeof body.params === "string" ? cleanAlertParams(searched.toString()) : "";
+  const requested = new URLSearchParams(typeof body.params === "string" ? body.params : "");
+  requested.delete(departmentParam);
+  const filters = cleanAlertParams(requested.toString());
   const summary = typeof body.summary === "string" ? body.summary.replace(/\s+/g, " ").trim().slice(0, searchAlertLimits.summary) : "";
-  if (!params || !summary) {
+  if (!filters || !summary) {
     return NextResponse.json({ ok: false, message: "Elige al menos un filtro para tu alerta." }, { status: 400 });
   }
+  const searched = new URLSearchParams(filters);
+  searched.set(departmentParam, (await getSelectedDepartment()).slug);
+  const params = cleanAlertParams(searched.toString());
   const name = typeof body.name === "string" ? body.name.replace(/\s+/g, " ").trim().slice(0, searchAlertLimits.name) || null : null;
   try {
     const result = await createSearchAlert({ name, whatsapp, email, params, summary, visitorId: await getOrCreateVisitorId() });

@@ -242,7 +242,7 @@ function DetailsSection({ profile, email, onChange }: { profile: AccountProfile;
   );
 }
 
-function PasswordSection({ hasPassword: initialHasPassword }: { hasPassword: boolean }) {
+export function PasswordSection({ hasPassword: initialHasPassword }: { hasPassword: boolean }) {
   // Once a Google-only account creates a password, the next change asks for it.
   const [hasPassword, setHasPassword] = useState(initialHasPassword);
   const [open, setOpen] = useState(false);

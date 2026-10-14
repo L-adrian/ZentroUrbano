@@ -12,6 +12,7 @@ export const metadata = buildSeoMetadata({ title: "Mis solicitudes", description
 export default async function RequestsPage() {
   const account = await getCurrentAccount();
   if (!account) redirect("/login?next=/cliente/solicitudes");
+  if (account.kind === "aliado") redirect("/cliente");
   const requests = await listPublicationRequests(account.id);
   return <main id="contenido" className="requests-page zu-container">
     <Link href="/cliente" className="request-back-link"><ArrowLeft size={17} />Mi cuenta</Link>

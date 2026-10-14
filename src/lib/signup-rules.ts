@@ -72,8 +72,10 @@ export function checkSignup(input: { displayName?: unknown; email?: unknown; pas
 }
 
 // Common passwords, the email itself or one repeated character. Shared by sign-up and Mi cuenta.
-export function isWeakPassword(password: string, email: string) {
+export function isWeakPassword(password: string, email: string | null | undefined) {
   const lowered = password.toLowerCase();
-  const address = email.toLowerCase();
-  return commonPasswords.has(lowered) || lowered === address || lowered === address.split("@")[0] || /^(.)\1+$/.test(password);
+  // Accounts made with a username only have no email.
+  const address = (email ?? "").toLowerCase();
+  if (address && (lowered === address || lowered === address.split("@")[0])) return true;
+  return commonPasswords.has(lowered) || /^(.)\1+$/.test(password);
 }
