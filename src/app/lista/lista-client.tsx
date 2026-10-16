@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Backpack, BrickWall, Check, Download, Droplets, FilePen, MessageCircle, MoonStar, PartyPopper, RotateCcw, Share2, TriangleAlert, Zap } from "lucide-react";
+import { Backpack, BrickWall, Check, Download, Droplets, FilePen, Flame, MessageCircle, MoonStar, PartyPopper, RotateCcw, Share2, ShieldAlert, ShieldCheck, TriangleAlert, Zap, type LucideIcon } from "lucide-react";
 import { trackAnalyticsEvent } from "@/lib/analytics-events";
-import { listaKit, listaPdfPath, listaSections, listaTags, listaTotal } from "@/lib/lista";
+import { listaKit, listaPdfPath, listaSections, listaTotal } from "@/lib/lista";
 
 const storageKey = "zu-lista-marcados";
 
@@ -29,14 +29,18 @@ export function ShareButton({ url }: { url: string }) {
 
 const problemsKey = "zu-lista-problemas";
 
-// One look per topic, in the same order as listaSections.
-const sectionLooks = [
-  { icon: Droplets, tone: "agua" },
-  { icon: Zap, tone: "luz" },
-  { icon: BrickWall, tone: "pared" },
-  { icon: MoonStar, tone: "zona" },
-  { icon: FilePen, tone: "firma" },
-];
+// One look per topic; a topic without one falls back to the brand color.
+const sectionLooks: Record<string, { icon: LucideIcon; tone: string }> = {
+  "Agua y lluvia": { icon: Droplets, tone: "agua" },
+  "Luz y servicios": { icon: Zap, tone: "luz" },
+  "Cocina, gas y lavado": { icon: Flame, tone: "gas" },
+  "Paredes, techo y estructura": { icon: BrickWall, tone: "pared" },
+  "Seguridad y edificio": { icon: ShieldCheck, tone: "segu" },
+  "La zona y el clima": { icon: MoonStar, tone: "zona" },
+  "Que no te estafen": { icon: ShieldAlert, tone: "estafa" },
+  "Antes de firmar": { icon: FilePen, tone: "firma" },
+};
+const defaultLook = { icon: FilePen, tone: "firma" };
 
 function readSaved(key: string) {
   const saved = JSON.parse(window.localStorage.getItem(key) ?? "[]");
@@ -108,7 +112,7 @@ export function Checklist() {
       </div>
       <nav className="lst-nav" aria-label="Temas de la lista">
         {listaSections.map((section, sectionIndex) => {
-          const look = sectionLooks[sectionIndex];
+          const look = sectionLooks[section.title] ?? defaultLook;
           const Glyph = look.icon;
           const count = section.items.filter((_, itemIndex) => [...done, ...problems].includes(`${sectionIndex}-${itemIndex}`)).length;
           const complete = count === section.items.length;
@@ -127,7 +131,7 @@ export function Checklist() {
 
     <div className="lst-main">
       {listaSections.map((section, sectionIndex) => {
-        const look = sectionLooks[sectionIndex];
+        const look = sectionLooks[section.title] ?? defaultLook;
         const Glyph = look.icon;
         const count = section.items.filter((_, itemIndex) => [...done, ...problems].includes(`${sectionIndex}-${itemIndex}`)).length;
         return <section key={section.title} id={`tema-${sectionIndex}`} className={`lst-sec t-${look.tone}`}>
@@ -144,18 +148,17 @@ export function Checklist() {
               const id = `${sectionIndex}-${itemIndex}`;
               const checked = done.includes(id);
               const bad = problems.includes(id);
-              const tag = listaTags[item.title] ?? {};
-              return <li key={id} className={checked ? "on" : bad ? "bad" : ""}>
+                            return <li key={id} className={checked ? "on" : bad ? "bad" : ""}>
                 <label>
                   <input type="checkbox" checked={checked} onChange={() => toggle(id)} />
                   <span className="box" aria-hidden="true"><Check size={15} strokeWidth={3} /></span>
                   <span className="txt">
                     <strong>{item.title}</strong>
                     <span>{item.detail}</span>
-                    {(tag.kit || tag.ask || tag.serious) && <span className="tags">
-                      {tag.kit && <span className="tag kit"><Backpack size={13} aria-hidden="true" />Llevá {tag.kit}</span>}
-                      {tag.ask && <span className="tag ask"><MessageCircle size={13} aria-hidden="true" />Preguntale al dueño</span>}
-                      {tag.serious && <span className="tag grave"><TriangleAlert size={13} aria-hidden="true" />Si lo ves, es serio</span>}
+                    {(item.kit || item.ask || item.serious) && <span className="tags">
+                      {item.kit && <span className="tag kit"><Backpack size={13} aria-hidden="true" />Llevá {item.kit}</span>}
+                      {item.ask && <span className="tag ask"><MessageCircle size={13} aria-hidden="true" />Preguntale al dueño</span>}
+                      {item.serious && <span className="tag grave"><TriangleAlert size={13} aria-hidden="true" />Esto es serio</span>}
                     </span>}
                   </span>
                 </label>
