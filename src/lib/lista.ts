@@ -60,3 +60,26 @@ export const listaSections: ListaSection[] = [
 ];
 
 export const listaTotal = listaSections.reduce((sum, section) => sum + section.items.length, 0);
+
+// Extra hints for the web version only (the PDF has none): what to bring, what to ask, what is serious.
+export type ListaTag = { kit?: string; ask?: boolean; serious?: boolean };
+export const listaTags: Record<string, ListaTag> = {
+  "La canica.": { kit: "una canica" },
+  "El café en el inodoro.": { kit: "unas gotas de café" },
+  "El desagüe de la ducha.": { kit: "un balde de agua" },
+  "Cuánto se paga de luz.": { ask: true },
+  "El medidor es tuyo.": { ask: true },
+  "Tu cargador en cada enchufe.": { kit: "tu cargador" },
+  "El tablero de luz.": { serious: true },
+  "La señal.": { kit: "el celular" },
+  "La hoja de papel en la ventana.": { kit: "una hoja de papel" },
+  "Fisuras en diagonal.": { serious: true },
+  "Manchas en la parte baja de la pared.": { serious: true },
+  "Las columnas.": { serious: true },
+  "El sol de la tarde.": { ask: true },
+  "Expensas.": { ask: true },
+  "Por escrito.": { ask: true },
+  "Fotos del día uno.": { kit: "el celular" },
+};
+
+export const listaKit = ["Una canica", "Unas gotas de café", "Una hoja de papel", "Tu cargador", "El celular con batería"];
