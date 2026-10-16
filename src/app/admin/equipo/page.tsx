@@ -30,7 +30,6 @@ export default async function AdminTeamPage() {
       <p className="admin-team-intro">
         Registra a las personas reales de Zentro. En cada vivienda, una persona puede ser <strong>embajador</strong> (la persona a cargo, que puede mostrar la casa) o <strong>colaborador</strong> (ayuda con fotos y difusión). Si el embajador toma las visitas, las reservas le llegan a su WhatsApp; si no, le llegan al dueño. Las personas activas aparecen en <Link href="/nuestro-equipo">/nuestro-equipo</Link>.
       </p>
-      <p><Link href="/admin">Volver al panel</Link></p>
       {team === null ? (
         <p className="guide-note">El equipo y las reservas todavía no están activos: falta aplicar la migración 008_team_and_visits en la base de datos (guía en guias/migracion-008.sql). Mientras tanto, los anuncios siguen solo con WhatsApp.</p>
       ) : (

@@ -120,7 +120,6 @@ export default async function AdminAliadosPage({ searchParams }: { searchParams:
       <p className="admin-team-intro">
         Lo que cada aliado registró en su Panel de aliado: dónde hizo publicidad, cuántas personas trajo y cuántos dueños contactó. Toca un día para ver el detalle con los links. Los aliados pueden editar o borrar sus propios reportes.
       </p>
-      <p><Link href="/admin">Volver al panel</Link> · <Link href="/admin/equipo">Equipo y visitas</Link></p>
 
       {team === null || missingTable ? (
         <p className="guide-note">El registro diario todavía no está activo: falta aplicar la migración 012_aliado_reports en la base de datos (guía en guias/migracion-012.sql).</p>
