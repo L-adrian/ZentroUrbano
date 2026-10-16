@@ -66,14 +66,19 @@ export function SiteHeader() {
   const face: HeaderAccount = account.avatarUrl && account.avatarUrl === brokenAvatar ? { ...account, avatarUrl: null } : account;
   const markBroken = () => setBrokenAvatar(account.avatarUrl ?? null);
   const name = account.label || "Mi cuenta";
-  // /cliente keeps its tab in the address hash; on that page only the hash changes, so it is set
-  // directly (a client-side link would not fire hashchange and the tab would stay the same).
-  function accountTab(hash: string) {
+  // /cliente keeps its tab in the address hash. On that page a client-side link would only change
+  // the hash without firing hashchange, so the tab would stay the same; the tab is switched
+  // directly instead (null = the panel's first tab). Ctrl/Cmd/Shift-clicks keep opening a new tab.
+  function accountTab(hash: string | null) {
     return (event: MouseEvent<HTMLAnchorElement>) => {
-      if (pathname !== "/cliente") return;
+      if (pathname !== "/cliente" || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
       if (menu.current) menu.current.open = false;
-      window.location.hash = hash;
+      if (hash) window.location.hash = hash;
+      else if (window.location.hash) {
+        window.history.pushState(null, "", window.location.pathname + window.location.search);
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      }
     };
   }
   const profileHash = isAliado ? "cuenta" : "perfil";
@@ -112,7 +117,7 @@ export function SiteHeader() {
                 : <p>Bienvenido a Zentro Urbano</p>}
               <div className="menu-section" role="group" aria-labelledby="menu-title-perfil">
                 <span className="menu-section-title" id="menu-title-perfil"><UserRound size={13} aria-hidden="true" />Tu perfil</span>
-                <Link href={accountHref}><LayoutDashboard size={18} />{account.authenticated ? (isAliado ? "Panel de aliado" : "Mi panel") : "Ingresar o crear cuenta"}<ArrowUpRight size={15} /></Link>
+                <Link href={accountHref} onClick={account.authenticated ? accountTab(null) : undefined}><LayoutDashboard size={18} />{account.authenticated ? (isAliado ? "Panel de aliado" : "Mi panel") : "Ingresar o crear cuenta"}<ArrowUpRight size={15} /></Link>
                 {isOwner && <Link href="/cliente#anuncios" onClick={accountTab("anuncios")}><Megaphone size={18} />Mis anuncios</Link>}
                 {isOwner && <Link href="/cliente/solicitudes"><ClipboardList size={18} />Mis solicitudes</Link>}
               </div>
@@ -145,7 +150,9 @@ export function SiteHeader() {
     </header>
     <nav className="mobile-navigation" aria-label="Navegación móvil">
       {[{ href: "/", label: "Inicio", icon: House }, ...links, { href: "/publicar", label: "Publicar", icon: Plus }, { href: accountHref, label: "Mi cuenta", icon: account.authenticated ? LayoutDashboard : UserRound }].map(({ href, label, icon: Icon }) =>
-        <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}>{href === accountHref && account.authenticated ? <span className="mobile-nav-face"><AccountFace account={face} size={24} onBroken={markBroken} /></span> : <Icon size={21} strokeWidth={1.7} />}<span>{label}</span></Link>)}
+        href === accountHref && account.authenticated
+          ? <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined} onClick={accountTab(null)}><span className="mobile-nav-face"><AccountFace account={face} size={21} onBroken={markBroken} /></span><span>{label}</span></Link>
+          : <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}><Icon size={21} strokeWidth={1.7} /><span>{label}</span></Link>)}
     </nav>
   </>;
 }
