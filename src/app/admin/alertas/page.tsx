@@ -62,7 +62,6 @@ export default async function AdminAlertsPage() {
       <p className="admin-alerts-intro">
         Cada alerta guarda una búsqueda y un contacto con permiso. Cuando haya viviendas que coincidan, escríbele a la persona con el botón y marca la alerta como avisada. Nada se envía solo.
       </p>
-      <p><Link href="/admin">Volver al panel</Link></p>
       {alerts === null ? (
         <p className="guide-note">Las alertas todavía no están activas: falta aplicar la migración 007_search_alerts en la base de datos. Mientras tanto, el botón &quot;Avísame&quot; ofrece enviar la búsqueda por WhatsApp.</p>
       ) : rows.length === 0 ? (
