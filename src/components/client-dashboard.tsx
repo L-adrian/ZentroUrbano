@@ -312,7 +312,12 @@ export function ClientDashboard({
             login={login}
             hasListing={properties.length > 0}
             hoursOn={properties.length > 0 && hoursOff.length === 0}
-            onProfileChange={(next) => { setProfile((current) => ({ ...current, ...next })); router.refresh(); }}
+            onProfileChange={(next) => {
+              setProfile((current) => ({ ...current, ...next }));
+              router.refresh();
+              // The header shows the photo and name too; ask it to read the session again.
+              window.dispatchEvent(new Event("morada-session"));
+            }}
             onLogout={logout}
           />
         ) : (
