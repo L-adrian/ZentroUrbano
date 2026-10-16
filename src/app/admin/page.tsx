@@ -1,17 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, UsersRound } from "lucide-react";
-import { AdminAccountsOverview } from "@/components/admin-accounts-overview";
-import { AdminContactLeads } from "@/components/admin-contact-leads";
-import { AdminListingFunnel } from "@/components/admin-listing-funnel";
-import { AdminListingHealth } from "@/components/admin-listing-health";
-import { AdminListingPlaces } from "@/components/admin-listing-places";
-import { curatedRentalProperties } from "@/lib/curated-rentals";
+import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, Contact, MapPinned, UsersRound, type LucideIcon } from "lucide-react";
 import { getAdminAccountsOverview, getAdminListingHealth } from "@/lib/admin-accounts";
-import { buildListingFunnel } from "@/lib/listing-funnel";
-import { getListingFunnel30 } from "@/lib/property-audience";
+import { adminListingPlaces } from "@/lib/admin-listing-places";
 import { getPublishedPropertiesData } from "@/lib/property-data";
+import { listPublicationRequests } from "@/lib/publication-requests";
+import { listSearchAlerts } from "@/lib/search-alerts";
 import { buildSeoMetadata } from "@/lib/seo";
+import { AdminHeading } from "./admin-heading";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Admin interno",
@@ -22,70 +18,44 @@ export const metadata: Metadata = buildSeoMetadata({
 
 export const dynamic = "force-dynamic";
 
+type Card = { href: string; icon: LucideIcon; title: string; count?: number; detail: string; urgent?: boolean };
+
 export default async function AdminPage() {
-  const [properties, accountsOverview, funnel] = await Promise.all([
+  const [properties, accounts, requests, alerts] = await Promise.all([
     getPublishedPropertiesData(),
     getAdminAccountsOverview(),
-    getListingFunnel30().catch((error) => {
-      console.error("listing funnel query failed", error);
-      return null;
-    }),
+    listPublicationRequests().catch(() => null),
+    listSearchAlerts().catch(() => null),
   ]);
   const health = await getAdminListingHealth(properties);
-  // Listings written in the site's code are not in the table of properties; their titles come from here.
-  const titles = new Map([...properties.map((property) => [property.slug, property.title] as const), ...(funnel?.listings ?? []).map((listing) => [listing.slug, listing.title] as const)]);
-  const live = new Set(properties.map((property) => property.slug));
-  const hidden = new Set((funnel?.listings ?? []).filter((listing) => !live.has(listing.slug)).map((listing) => listing.slug));
-  // Listings written in the site's code are fixed there, so only database listings are editable.
-  const curated = new Set(curatedRentalProperties.map((property) => property.slug));
-  const places = properties
-    .filter((property) => !curated.has(property.slug))
-    .map((property) => ({ slug: property.slug, title: property.title, city: property.city, zone: property.zone, lat: property.coordinates.lat, lng: property.coordinates.lng, ownerConfirmed: Boolean(property.rentalDetails?.locationConfirmedAt) }));
-  const funnelRows = funnel ? buildListingFunnel(funnel.counts, funnel.sources, titles, 60, hidden) : null;
+  const places = adminListingPlaces(properties);
+  const pending = requests?.filter((request) => request.status === "pending_review").length;
+  const unconfirmed = places.filter((place) => !place.ownerConfirmed).length;
+  const notices = health.reported.length + health.checks.length;
+
+  const cards: Card[] = [
+    { href: "/admin/solicitudes", icon: ClipboardList, title: "Solicitudes", count: pending, detail: pending === 1 ? "solicitud por revisar" : "solicitudes por revisar", urgent: Boolean(pending) },
+    { href: "/admin/anuncios", icon: MapPinned, title: "Avisos y ubicación", count: notices, detail: `${health.reported.length} avisos · ${health.checks.length} por confirmar · ${unconfirmed} ubicaciones sin confirmar`, urgent: health.reported.length > 0 },
+    { href: "/admin/alertas", icon: BellRing, title: "Alertas de búsqueda", count: alerts?.length, detail: "personas esperando una vivienda" },
+    { href: "/admin/cuentas", icon: Contact, title: "Cuentas y contactos", count: accounts.accounts.length, detail: "cuentas registradas" },
+    { href: "/admin/equipo", icon: UsersRound, title: "Equipo y visitas", detail: "Personas del equipo y visitas reservadas" },
+    { href: "/admin/aliados", icon: CalendarDays, title: "Calendario de aliados", detail: "Lo que cada aliado registró por día" },
+    { href: "/admin/recorridos", icon: Box, title: "Recorridos 3D", detail: "Recreaciones por revisar y publicar" },
+    { href: "/admin/estadisticas", icon: BarChart3, title: "Qué hizo la gente", detail: "Visitas y contactos de los últimos 30 días" },
+  ];
 
   return (
-    <main className="bg-neutral-50">
-      <section className="border-b border-black/10 bg-white py-12 sm:py-16">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#58745f]">
-            Acceso privado
-          </p>
-          <div className="mt-4 grid gap-5 lg:grid-cols-[1fr_0.42fr] lg:items-end">
-            <h1 className="max-w-4xl text-4xl font-semibold tracking-tight text-neutral-950 sm:text-6xl">
-              Panel privado para revisar cuentas, fichas y leads.
-            </h1>
-            <p className="text-base leading-7 text-neutral-600">
-              Revisa cuentas, fichas asignadas, leads y estado operativo sin entrar al panel de
-              cada cliente.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-8 sm:py-12">
-        <div className="mx-auto max-w-7xl space-y-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap gap-3">
-            <Link href="/admin/solicitudes" className="zu-button zu-button-primary"><ClipboardList size={18} />Revisar solicitudes y fotos recibidas</Link>
-            <Link href="/admin/alertas" className="zu-button zu-button-secondary"><BellRing size={18} />Alertas de búsqueda</Link>
-            <Link href="/admin/equipo" className="zu-button zu-button-secondary"><UsersRound size={18} />Equipo y visitas</Link>
-            <Link href="/admin/aliados" className="zu-button zu-button-secondary"><CalendarDays size={18} />Calendario de aliados</Link>
-            <Link href="/admin/recorridos" className="zu-button zu-button-secondary"><Box size={18} />Gestionar recorridos 3D</Link>
-            <a href="#anuncios-con-avisos" className="zu-button zu-button-secondary">Avisos ({health.reported.length})</a>
-            <a href="#disponibilidad-por-confirmar" className="zu-button zu-button-secondary">Por confirmar ({health.checks.length})</a>
-            <a href="#zona-y-ubicacion" className="zu-button zu-button-secondary">Zona y ubicación ({places.length})</a>
-            <a href="#recorrido-de-anuncios" className="zu-button zu-button-secondary"><BarChart3 size={18} />Qué hizo la gente (30 días)</a>
-          </div>
-          <AdminListingHealth checks={health.checks} reported={health.reported} />
-          <AdminListingPlaces listings={places} />
-          <AdminListingFunnel rows={funnelRows} />
-          <AdminAccountsOverview
-            databaseReady={accountsOverview.databaseReady}
-            accounts={accountsOverview.accounts}
-          />
-          <p className="text-sm text-neutral-600">Solo el administrador puede aprobar o rechazar solicitudes. Una ficha aparece en el catálogo después de aprobarla.</p>
-          <AdminContactLeads properties={properties} />
-        </div>
-      </section>
+    <main className="admin-page">
+      <AdminHeading eyebrow="ACCESO PRIVADO" title="Resumen">Lo que necesita tu atención hoy. Toca una tarjeta o usa el menú para ir a cada sección.</AdminHeading>
+      <div className="admin-cards">
+        {cards.map(({ href, icon: Icon, title, count, detail, urgent }) => (
+          <Link key={href} href={href} className={`admin-card${urgent ? " is-urgent" : ""}`}>
+            <span className="admin-card-title"><Icon size={18} aria-hidden="true" />{title}</span>
+            {count !== undefined && <strong>{count}</strong>}
+            <span className="admin-card-detail">{detail}</span>
+          </Link>
+        ))}
+      </div>
     </main>
   );
 }
