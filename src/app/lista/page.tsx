@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, BadgeCheck, ClipboardCheck, Coins, Eye, FileText, KeyRound, MessageCircle, Printer, Search } from "lucide-react";
 import { buildSeoMetadata } from "@/lib/seo";
-import { listaSections, listaTotal } from "@/lib/lista";
+import { listaPdfPages, listaSections, listaTotal } from "@/lib/lista";
 import { absoluteUrl } from "@/lib/site";
 import { Checklist, DownloadButton, ShareButton } from "./lista-client";
 import "./lista.css";
 
 export const metadata: Metadata = buildSeoMetadata({
   title: "Lista gratis para revisar un depa antes de alquilar",
-  description: `${listaTotal} puntos para revisar en la visita: humedad, fugas, luz, ventanas, la zona y lo que tenés que dejar por escrito. Descargá el PDF gratis, sin registrarte.`,
+  description: `${listaTotal} puntos para revisar en la visita: humedad, fugas, luz, gas, seguridad, la zona, cómo evitar estafas y lo que tenés que dejar por escrito. Descargá el PDF gratis, sin registrarte.`,
   path: "/lista",
   image: "/lista/og-lista.jpg",
   imageAlt: "Lista para revisar un depa antes de alquilar, PDF gratis de Zentro Urbano",
@@ -19,8 +19,8 @@ export const metadata: Metadata = buildSeoMetadata({
 });
 
 const steps = [
-  { icon: Printer, title: "Descargala o imprimila", text: "Son 2 páginas. Guardala en el celular o imprimila para marcar con lapicero." },
-  { icon: ClipboardCheck, title: "Llevala a la visita", text: "Revisá cada punto en el depa. Llevá una canica, unas gotas de café, una hoja de papel y tu cargador." },
+  { icon: Printer, title: "Descargala o imprimila", text: `Son ${listaPdfPages} páginas. Guardala en el celular o imprimila para marcar con lapicero.` },
+  { icon: ClipboardCheck, title: "Llevala a la visita", text: "Revisá cada punto en el depa. Llevá una canica, unas gotas de café, una hoja de papel, una botella transparente y tu cargador." },
   { icon: MessageCircle, title: "Preguntá antes de firmar", text: "Si algo falla, preguntale al dueño o pedí que lo arregle. Lo que te prometa, que quede por escrito." },
 ];
 
@@ -29,6 +29,8 @@ const tricks = [
   { name: "El café en el inodoro", text: "te muestra si hay una fuga que vas a pagar vos." },
   { name: "La canica", text: "te dice si el piso está desnivelado y hacia dónde escurre." },
   { name: "La videollamada", text: "en cada cuarto te muestra dónde llega la señal." },
+  { name: "La botella transparente", text: "te dice si el tanque de agua está sucio." },
+  { name: "La brújula del celular", text: "te dice si el dormitorio va a ser helado en invierno." },
 ];
 
 export default function ListaPage() {
@@ -36,9 +38,9 @@ export default function ListaPage() {
   return <main id="contenido" className="zu-container lst">
     <section className="lst-hero">
       <div>
-        <p className="eyebrow"><FileText size={17} />Gratis · PDF de 2 páginas</p>
+        <p className="eyebrow"><FileText size={17} />Gratis · PDF de {listaPdfPages} páginas</p>
         <h1>La lista para revisar un depa antes de alquilar</h1>
-        <p className="lead">Son {listaTotal} cosas que casi nadie revisa en la visita y que después cuestan plata: humedad, fugas, la luz, las ventanas, la zona y lo que tiene que quedar por escrito. Cada punto se revisa en un minuto, sin herramientas ni conocimientos.</p>
+        <p className="lead">Son {listaTotal} cosas que casi nadie revisa en la visita y que después cuestan plata: humedad, fugas, la luz, el gas, la seguridad, la zona, cómo evitar estafas y lo que tiene que quedar por escrito. Casi todos se revisan en un minuto, sin herramientas ni conocimientos.</p>
         <div className="lst-actions">
           <DownloadButton from="arriba" />
           <a className="btn" href="#lista"><Eye size={18} />Verla acá</a>
