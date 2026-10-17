@@ -11,6 +11,8 @@ export async function GET() {
       accountId: account.id,
       label: account.company_name ?? account.display_name ?? account.email ?? "Cuenta Zentro Urbano",
       avatarUrl: account.avatar_url,
+      initials: account.avatar_initials,
+      kind: account.kind,
     });
   }
 
@@ -20,5 +22,7 @@ export async function GET() {
     accountId: null,
     label: null,
     avatarUrl: null,
+    initials: null,
+    kind: null,
   });
 }
