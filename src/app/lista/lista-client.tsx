@@ -1,11 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Backpack, BrickWall, Check, Download, Droplets, FilePen, Flame, MessageCircle, MoonStar, PartyPopper, RotateCcw, Share2, ShieldAlert, ShieldCheck, TriangleAlert, Zap, type LucideIcon } from "lucide-react";
+import { Backpack, BrickWall, Check, Download, Droplets, FilePen, Flame, House, ListChecks, MoonStar, RotateCcw, Share2, ShieldAlert, ShieldCheck, Zap, type LucideIcon } from "lucide-react";
 import { trackAnalyticsEvent } from "@/lib/analytics-events";
-import { listaKit, listaPdfPath, listaSections, listaTotal } from "@/lib/lista";
+import { listaItems, listaKit, listaLegacyIds, listaPdfPath, listaSections, listaTotal } from "@/lib/lista";
+import { CasitaWalk } from "./lista-casita";
+import { ItemRow, ProblemsCard, Ring, type ListaMarks } from "./lista-items";
 
-const storageKey = "zu-lista-marcados";
+const storageKey = "zu-lista-v2";
+const legacyKey = "zu-lista-marcados";
+const modeKey = "zu-lista-modo";
+
+const emptyMarks: ListaMarks = { done: [], problems: [], rooms: [] };
+const knownIds = new Set(listaItems.map(item => item.id));
+
+function strings(value: unknown) {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
+// Marks saved by the first 27-point page were positions ("2-4"); they map to ids through listaLegacyIds.
+function readMarks(): ListaMarks {
+  const saved = window.localStorage.getItem(storageKey);
+  if (saved) {
+    const parsed = JSON.parse(saved) as Partial<ListaMarks>;
+    return { done: strings(parsed.done).filter(id => knownIds.has(id)), problems: strings(parsed.problems).filter(id => knownIds.has(id)), rooms: strings(parsed.rooms) };
+  }
+  const legacy = strings(JSON.parse(window.localStorage.getItem(legacyKey) ?? "[]"));
+  const done = legacy.map(key => {
+    const [section, item] = key.split("-").map(Number);
+    return listaLegacyIds[section]?.[item];
+  }).filter((id): id is string => Boolean(id));
+  return { ...emptyMarks, done };
+}
 
 export function DownloadButton({ from, className = "btn pri" }: { from: string; className?: string }) {
   return <a
@@ -27,8 +53,6 @@ export function ShareButton({ url }: { url: string }) {
   ><Share2 size={18} />Mandarla por WhatsApp</a>;
 }
 
-const problemsKey = "zu-lista-problemas";
-
 // One look per topic; a topic without one falls back to the brand color.
 const sectionLooks: Record<string, { icon: LucideIcon; tone: string }> = {
   "Agua y lluvia": { icon: Droplets, tone: "agua" },
@@ -42,79 +66,80 @@ const sectionLooks: Record<string, { icon: LucideIcon; tone: string }> = {
 };
 const defaultLook = { icon: FilePen, tone: "firma" };
 
-function readSaved(key: string) {
-  const saved = JSON.parse(window.localStorage.getItem(key) ?? "[]");
-  return Array.isArray(saved) ? saved.filter((value): value is string => typeof value === "string") : [];
-}
 
-function Ring({ value, total }: { value: number; total: number }) {
-  const r = 15, c = 2 * Math.PI * r;
-  return <svg className="prog" viewBox="0 0 36 36" aria-hidden="true">
-    <circle cx="18" cy="18" r={r} />
-    <circle cx="18" cy="18" r={r} strokeDasharray={c} strokeDashoffset={c - (value / total) * c} />
-  </svg>;
-}
-
-// Tickable copy of the PDF, for people who do the visit with the phone in hand.
+// Tickable copy of the PDF, for people who do the visit with the phone in hand. Two ways to walk it:
+// by topic, or room by room on the pixel house ("Recorrer el depa"). Both share the same marks.
 // Each point is "revisado" or "hay un problema"; problems become the questions for the owner.
 // Marks live only in this browser so a reload mid-visit keeps them.
 export function Checklist() {
-  const [done, setDone] = useState<string[]>([]);
-  const [problems, setProblems] = useState<string[]>([]);
+  const [marks, setMarks] = useState<ListaMarks>(emptyMarks);
+  const [mode, setMode] = useState<"casa" | "tema">("casa");
 
   useEffect(() => {
     try {
       // Restoring browser-only state after hydration, so the server HTML stays the same.
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDone(readSaved(storageKey));
-      setProblems(readSaved(problemsKey));
+      setMarks(readMarks());
+      if (window.localStorage.getItem(modeKey) === "tema") setMode("tema");
     } catch {
       // Storage can be blocked; the list still works without it.
     }
   }, []);
 
-  function save(nextDone: string[], nextProblems: string[]) {
-    setDone(nextDone);
-    setProblems(nextProblems);
+  function save(next: ListaMarks) {
+    setMarks(next);
     try {
-      window.localStorage.setItem(storageKey, JSON.stringify(nextDone));
-      window.localStorage.setItem(problemsKey, JSON.stringify(nextProblems));
+      window.localStorage.setItem(storageKey, JSON.stringify(next));
     } catch {
       // Ignore: marks just won't survive a reload.
     }
   }
 
   function toggle(id: string) {
-    if (done.includes(id)) save(done.filter(value => value !== id), problems);
-    else save([...done, id], problems.filter(value => value !== id));
+    if (marks.done.includes(id)) save({ ...marks, done: marks.done.filter(value => value !== id) });
+    else save({ ...marks, done: [...marks.done, id], problems: marks.problems.filter(value => value !== id) });
   }
 
   function flag(id: string) {
-    if (problems.includes(id)) save(done, problems.filter(value => value !== id));
-    else save(done.filter(value => value !== id), [...problems, id]);
+    if (marks.problems.includes(id)) save({ ...marks, problems: marks.problems.filter(value => value !== id) });
+    else save({ ...marks, done: marks.done.filter(value => value !== id), problems: [...marks.problems, id] });
   }
 
-  const seen = done.length + problems.length;
-  const problemItems = listaSections.flatMap((section, sectionIndex) => section.items
-    .map((item, itemIndex) => ({ id: `${sectionIndex}-${itemIndex}`, item }))
-    .filter(({ id }) => problems.includes(id)));
-  const message = `Hola, vi el depa y quería consultarte estos puntos:\n${problemItems.map(({ item }) => `- ${item.title}`).join("\n")}`;
+  function pickMode(next: "casa" | "tema") {
+    setMode(next);
+    trackAnalyticsEvent("lista_modo", { modo: next });
+    try { window.localStorage.setItem(modeKey, next); } catch { /* only a preference */ }
+  }
 
+  return <div className="lst-modes">
+    <div className="lst-tabs" role="tablist" aria-label="Cómo querés recorrer la lista">
+      <button type="button" role="tab" aria-selected={mode === "casa"} onClick={() => pickMode("casa")}><House size={17} aria-hidden="true" />Recorrer el depa <span>Nuevo</span></button>
+      <button type="button" role="tab" aria-selected={mode === "tema"} onClick={() => pickMode("tema")}><ListChecks size={17} aria-hidden="true" />Por tema</button>
+    </div>
+    {mode === "casa"
+      ? <CasitaWalk marks={marks} save={save} onToggle={toggle} onFlag={flag} onReset={() => save(emptyMarks)} />
+      : <TopicView marks={marks} onToggle={toggle} onFlag={flag} onReset={() => save(emptyMarks)} />}
+  </div>;
+}
+
+function TopicView({ marks, onToggle, onFlag, onReset }: { marks: ListaMarks; onToggle: (id: string) => void; onFlag: (id: string) => void; onReset: () => void }) {
+  const marked = new Set([...marks.done, ...marks.problems]);
+  const seen = marked.size;
   return <div className="lst-check">
     <aside className="lst-side">
       <div className="lst-total">
         <div className="lst-total-ring"><Ring value={seen} total={listaTotal} /><strong>{seen}</strong></div>
         <div>
           <b>{seen === listaTotal ? "¡Revisaste todo!" : seen === 0 ? "Empezá por donde quieras" : "Vas bien, seguí"}</b>
-          <span>{seen} de {listaTotal} puntos{problems.length > 0 && <> · <em>{problems.length} con problema</em></>}</span>
+          <span>{seen} de {listaTotal} puntos{marks.problems.length > 0 && <> · <em>{marks.problems.length} con problema</em></>}</span>
         </div>
-        {seen > 0 && <button type="button" onClick={() => save([], [])} aria-label="Empezar de nuevo"><RotateCcw size={15} /></button>}
+        {seen > 0 && <button type="button" onClick={onReset} aria-label="Empezar de nuevo"><RotateCcw size={15} /></button>}
       </div>
       <nav className="lst-nav" aria-label="Temas de la lista">
         {listaSections.map((section, sectionIndex) => {
           const look = sectionLooks[section.title] ?? defaultLook;
           const Glyph = look.icon;
-          const count = section.items.filter((_, itemIndex) => [...done, ...problems].includes(`${sectionIndex}-${itemIndex}`)).length;
+          const count = section.items.filter(item => marked.has(item.id)).length;
           const complete = count === section.items.length;
           return <a key={section.title} href={`#tema-${sectionIndex}`} className={`t-${look.tone}${complete ? " full" : ""}`}>
             <span className="ico">{complete ? <Check size={16} strokeWidth={3} /> : <Glyph size={16} />}</span>
@@ -133,7 +158,7 @@ export function Checklist() {
       {listaSections.map((section, sectionIndex) => {
         const look = sectionLooks[section.title] ?? defaultLook;
         const Glyph = look.icon;
-        const count = section.items.filter((_, itemIndex) => [...done, ...problems].includes(`${sectionIndex}-${itemIndex}`)).length;
+        const count = section.items.filter(item => marked.has(item.id)).length;
         return <section key={section.title} id={`tema-${sectionIndex}`} className={`lst-sec t-${look.tone}`}>
           <header>
             <span className="ico"><Glyph size={22} aria-hidden="true" /></span>
@@ -143,43 +168,10 @@ export function Checklist() {
             </div>
             <span className="sec-count"><Ring value={count} total={section.items.length} /><span>{count}/{section.items.length}</span></span>
           </header>
-          <ul>
-            {section.items.map((item, itemIndex) => {
-              const id = `${sectionIndex}-${itemIndex}`;
-              const checked = done.includes(id);
-              const bad = problems.includes(id);
-                            return <li key={id} className={checked ? "on" : bad ? "bad" : ""}>
-                <label>
-                  <input type="checkbox" checked={checked} onChange={() => toggle(id)} />
-                  <span className="box" aria-hidden="true"><Check size={15} strokeWidth={3} /></span>
-                  <span className="txt">
-                    <strong>{item.title}</strong>
-                    <span>{item.detail}</span>
-                    {(item.kit || item.ask || item.serious) && <span className="tags">
-                      {item.kit && <span className="tag kit"><Backpack size={13} aria-hidden="true" />Llevá {item.kit}</span>}
-                      {item.ask && <span className="tag ask"><MessageCircle size={13} aria-hidden="true" />Preguntale al dueño</span>}
-                      {item.serious && <span className="tag grave"><TriangleAlert size={13} aria-hidden="true" />Esto es serio</span>}
-                    </span>}
-                  </span>
-                </label>
-                <button type="button" className="flag" aria-pressed={bad} aria-label={`${item.title} Marcar que hay un problema`} title="Marcar que hay un problema" onClick={() => flag(id)}>
-                  <TriangleAlert size={15} aria-hidden="true" /><span>{bad ? "Hay un problema" : "¿Problema?"}</span>
-                </button>
-              </li>;
-            })}
-          </ul>
+          <ul>{section.items.map(item => <ItemRow key={item.id} item={item} marks={marks} onToggle={onToggle} onFlag={onFlag} />)}</ul>
         </section>;
       })}
-
-      <section className={`lst-result${problemItems.length ? " has" : ""}`}>
-        {problemItems.length === 0
-          ? <><PartyPopper size={26} aria-hidden="true" /><div><h3>Lo que falle, anotalo acá</h3><p>Tocá <b>⚠ ¿Problema?</b> en cualquier punto y se junta en esta lista para que se lo preguntes al dueño antes de firmar.</p></div></>
-          : <><TriangleAlert size={26} aria-hidden="true" /><div>
-            <h3>{problemItems.length === 1 ? "1 punto para hablar con el dueño" : `${problemItems.length} puntos para hablar con el dueño`}</h3>
-            <ul>{problemItems.map(({ id, item }) => <li key={id}>{item.title}</li>)}</ul>
-            <a className="btn wa" href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer" onClick={() => trackAnalyticsEvent("lista_share", { method: "whatsapp_problemas" })}><MessageCircle size={18} />Mandarle estas preguntas</a>
-          </div></>}
-      </section>
+      <ProblemsCard marks={marks} />
     </div>
   </div>;
 }

@@ -201,3 +201,115 @@
   .lst-result{padding:18px;flex-direction:column;gap:8px}
   .lst-result .btn{width:100%}
 }
+
+/* Two ways to walk the list: "Recorrer el depa" (pixel house) and "Por tema". */
+.lst-modes{display:grid;gap:18px;margin-top:22px}
+.lst-modes .lst-check{margin-top:0}
+.lst-tabs{display:inline-flex;gap:4px;padding:4px;border-radius:12px;background:var(--subtle);border:1px solid var(--line);justify-self:start}
+.lst-tabs button{white-space:nowrap;display:inline-flex;align-items:center;gap:8px;min-height:42px;padding:0 16px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.lst-tabs button[aria-selected="true"]{background:var(--surface);color:var(--foreground);box-shadow:0 1px 4px rgb(33 53 43 / .14)}
+.lst-tabs button span{padding:2px 7px;border-radius:999px;background:var(--brand);color:#fff;font-size:11px;letter-spacing:.03em}
+
+/* Casita Pixel: native art is 176x124, scaled up without smoothing. */
+@font-face{font-family:ZUPixel;src:url(/lista/casita/PressStart2P.ttf) format("truetype");font-display:swap}
+.cz-walk{--t:var(--brand);--t-soft:var(--brand-soft);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:28px;align-items:start;scroll-margin-top:80px}
+.cz-stage{position:sticky;top:84px;display:grid;gap:12px}
+.cz-house{position:relative;aspect-ratio:176/124;width:100%;border-radius:14px;overflow:hidden;background:#0a1510;border:4px solid #0a1510;box-shadow:0 16px 40px rgb(33 53 43 / .25)}
+.cz-house img{position:absolute;inset:0;width:100%;height:100%;image-rendering:pixelated;user-select:none;pointer-events:none}
+.cz-house img.layer{transition:opacity .3s}
+.cz-house img.pop{animation:czPop .45s steps(3) both}
+.cz-house img.cz-chibi{inset:auto;height:auto;transition:left .45s steps(6),top .45s steps(6);filter:drop-shadow(0 2px 0 rgb(0 0 0 / .35))}
+@keyframes czPop{from{opacity:0;transform:translateY(-2%)}to{opacity:1;transform:none}}
+.cz-spot{position:absolute;border:2px dashed transparent;border-radius:4px;background:transparent;cursor:pointer;padding:0;transition:border-color .15s,background .15s}
+.cz-spot:hover,.cz-spot:focus-visible{border-color:rgb(255 230 140 / .9);background:rgb(255 230 140 / .08);outline:none}
+.cz-spot.here{border:3px solid #ffd04a}
+.cz-spot .badges{position:absolute;right:4px;top:4px;display:flex;gap:4px}
+.cz-spot i{display:grid;place-items:center;width:22px;height:22px;border:2px solid #0a1510;font-style:normal;font-weight:800;font-size:13px;color:#0a1510}
+.cz-spot i.bad{background:#ff6a50}
+.cz-spot i.ok{background:#5fd3a0}
+.cz-bubble{position:absolute;left:50%;top:6%;transform:translateX(-50%);padding:7px 12px;background:#fffbe8;color:#0a1510;border:3px solid #0a1510;font-size:13px;font-weight:700;white-space:nowrap;animation:czBob 1.2s steps(2) infinite;pointer-events:none}
+@keyframes czBob{50%{transform:translate(-50%,-3px)}}
+.cz-progress{display:flex;align-items:center;flex-wrap:wrap;gap:8px 14px;font-size:14px;color:var(--muted)}
+.cz-progress b{color:var(--foreground)}
+.cz-progress .bar{flex:1 1 140px;height:10px;background:var(--subtle);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.cz-progress .bar span{display:block;height:100%;background:var(--brand);transition:width .3s}
+.cz-progress button{border:0;background:none;color:var(--muted);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:4px 0}
+.cz-panel{display:grid;gap:14px;min-width:0}
+.cz-rooms{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cz-rooms button{display:flex;align-items:center;gap:10px;min-height:70px;padding:14px;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--foreground);font:inherit;text-align:left;cursor:pointer;transition:border-color .15s,background .15s}
+.cz-rooms button:hover{border-color:var(--brand);background:var(--brand-soft)}
+.cz-rooms button.extra{grid-column:1/-1}
+.cz-rooms button>svg{color:var(--brand)}
+.cz-rooms button span{display:grid;gap:3px}
+.cz-rooms b{font-size:15px}
+.cz-rooms small{color:var(--muted);font-size:13px;line-height:1.4}
+.cz-rooms em{color:#c2410c;font-style:normal;font-weight:600}
+.cz-rooms button.done{border-color:var(--brand)}
+.cz-rooms button.done b::after{content:" ✓";color:var(--brand)}
+.cz-cardbtn{display:flex;align-items:center;justify-content:center;gap:10px;min-height:54px;border:3px solid #0a1510;border-radius:4px;background:#ffd04a;color:#0a1510;font:inherit;font-size:16px;font-weight:800;cursor:pointer;box-shadow:0 4px 0 #0a1510;transition:transform .1s,box-shadow .1s}
+.cz-cardbtn:hover{transform:translateY(-1px);box-shadow:0 5px 0 #0a1510}
+.cz-cardbtn:active{transform:translateY(3px);box-shadow:0 1px 0 #0a1510}
+.cz-roomhead{display:flex;align-items:center;gap:12px}
+.cz-roomhead h3{flex:1;font-size:21px;font-weight:600}
+.cz-roomhead span{color:var(--muted);font-size:14px;font-weight:600}
+.cz-roomhead .back{display:inline-flex;align-items:center;gap:2px;min-height:38px;padding:0 12px 0 6px;border:1px solid var(--line);border-radius:999px;background:var(--surface);color:var(--foreground);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.cz-note{color:var(--muted);font-size:14px;line-height:1.5}
+.cz-sec{scroll-margin-top:0}
+.cz-next{display:flex;align-items:center;justify-content:center;gap:8px;min-height:50px;border:0;border-radius:10px;background:var(--brand);color:#fff;font:inherit;font-size:15px;font-weight:700;cursor:pointer}
+.cz-next:hover{background:var(--brand-hover)}
+.cz-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1200;padding:12px 18px;background:#0a1510;color:#ffd04a;border:3px solid #ffd04a;font-size:14px;font-weight:700;box-shadow:0 8px 24px rgb(0 0 0 / .3);animation:czPop .3s steps(3) both;max-width:calc(100vw - 32px)}
+
+.cz-modal{position:fixed;inset:0;z-index:1300;display:grid;place-items:center;padding:16px;background:rgb(6 14 10 / .72);overflow-y:auto}
+.cz-modal-box{position:relative;width:min(440px,100%);display:grid;gap:14px;padding-top:52px;outline:none;margin:auto}
+.cz-close{position:absolute;right:0;top:0;z-index:2;display:grid;place-items:center;width:40px;height:40px;border:3px solid #0a1510;border-radius:4px;background:#fff;color:#0a1510;cursor:pointer}
+.cz-card{--tone:#ffd04a;display:grid;gap:10px;padding:20px;background:#13231c;border:4px solid #e8b23a;outline:6px solid #0a1510;color:#f4f2ea;text-align:center}
+.cz-card.t-rojo{--tone:#ff6a50}
+.cz-card.t-verde{--tone:#5fd3a0}
+.cz-card-top,.cz-card-foot{display:flex;justify-content:space-between;font-family:ZUPixel,monospace;font-size:10px;line-height:1.4;color:#e8b23a}
+.cz-card-foot{color:#9fd8bc;font-size:8px}
+.cz-card-house .cz-house{border-radius:0;box-shadow:none}
+.cz-card-house .cz-spot{pointer-events:none}
+.cz-light{display:flex;justify-content:center;gap:10px}
+.cz-light i{width:22px;height:22px;background:#2a3a32;border:3px solid #0a1510}
+.cz-light i.on.rojo{background:#ff6a50}
+.cz-light i.on.amarillo{background:#ffd04a}
+.cz-light i.on.verde{background:#5fd3a0}
+.cz-over{font-family:ZUPixel,monospace;font-size:28px;line-height:1.2;color:var(--tone);text-shadow:3px 3px 0 #0a1510}
+.cz-why{font-size:15px;font-weight:600;line-height:1.4}
+.cz-card ul{list-style:none;padding:0;display:grid;gap:5px;text-align:left;font-size:13px;line-height:1.35}
+.cz-card li{display:flex;gap:8px}
+.cz-card li::before{content:"";flex-shrink:0;width:9px;height:9px;margin-top:4px;background:#e8b23a}
+.cz-card li.red::before{background:#e04a30}
+.cz-score{font-size:13px;color:#cfe6dc}
+.cz-fine{font-size:12px;color:rgb(255 255 255 / .55)}
+.cz-card-actions{display:grid;gap:10px}
+.cz-card-actions .btn{width:100%}
+.cz-card-actions .btn:disabled{opacity:.7;cursor:wait}
+
+.dark .lst-tabs button[aria-selected="true"]{box-shadow:none;background:var(--background)}
+.dark .cz-house{box-shadow:0 16px 40px rgb(0 0 0 / .5)}
+.dark .cz-rooms em{color:#f0a060}
+
+@media (prefers-reduced-motion:reduce){
+  .cz-bubble,.cz-house img.pop,.cz-toast{animation:none}
+  .cz-house img.cz-chibi{transition:none}
+}
+@media (max-width:980px){
+  .cz-walk{grid-template-columns:1fr;gap:16px}
+  .cz-stage{position:static;gap:8px}
+  .cz-stage .cz-house{width:min(100%,460px);justify-self:center}
+  .cz-progress{font-size:13px}
+  .cz-spot i{width:18px;height:18px;font-size:11px}
+  .cz-bubble{font-size:12px;padding:5px 9px}
+  .cz-toast{bottom:calc(env(safe-area-inset-bottom) + 92px)}
+}
+@media (max-width:560px){
+  .lst-tabs{justify-self:stretch}
+  .lst-tabs button{flex:1;justify-content:center;padding:0 8px}
+  .cz-walk.inroom .cz-house{width:68%}
+  .cz-rooms button{min-height:64px;padding:12px}
+  .cz-over{font-size:22px}
+}
+@media (max-width:420px){
+  .lst-tabs button span{display:none}
+}
