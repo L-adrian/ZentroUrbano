@@ -4,6 +4,8 @@ export type SponsoredAd = {
   id: string;
   advertiser: string;
   label: string;
+  // Logo shown in the corner box (about 150x64); falls back to the photo.
+  logo?: string;
   image: string;
   imageAlt: string;
   targetUrl: string;
@@ -13,6 +15,9 @@ export type SponsoredAd = {
 
 export const sponsoredAdFrequencyMinutes = 5;
 
+// Paying advertisers. To add one: put their logo in public/images/anunciantes/, add an entry with
+// targetUrl set to their WhatsApp (https://wa.me/591...) and active: true. Clicks go through
+// /api/ads/[id]/click, and /admin/publicidad shows views and clicks per advertiser.
 export const sponsoredAds: SponsoredAd[] = [
   {
     id: "mudanzas-santa-cruz-demo",
@@ -22,7 +27,7 @@ export const sponsoredAds: SponsoredAd[] = [
     imageAlt: "Servicio de mudanza residencial con cajas organizadas",
     targetUrl: "/publicidad?utm_source=zentro_ad&utm_medium=banner&utm_campaign=mudanzas_prime",
     placement: ["global", "property", "search"],
-    active: true,
+    active: false,
   },
   {
     id: "inmobiliaria-destacada-demo",
@@ -38,6 +43,10 @@ export const sponsoredAds: SponsoredAd[] = [
 
 export function getActiveSponsoredAds() {
   return sponsoredAds.filter((ad) => ad.active);
+}
+
+export function getSponsoredAdsFor(placement: SponsoredAdPlacement) {
+  return getActiveSponsoredAds().filter((ad) => ad.placement.includes(placement));
 }
 
 export function getSponsoredAdById(id: string) {

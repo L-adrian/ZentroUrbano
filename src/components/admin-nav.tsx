@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, Contact, House, MapPinned, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, Contact, House, MapPinned, Megaphone, UsersRound, type LucideIcon } from "lucide-react";
 
 type AdminNavItem = { href: string; label: string; icon: LucideIcon; badge?: "requests" };
 
@@ -26,7 +26,13 @@ const groups: { title: string; items: AdminNavItem[] }[] = [
       { href: "/admin/aliados", label: "Calendario de aliados", icon: CalendarDays },
     ],
   },
-  { title: "Datos", items: [{ href: "/admin/estadisticas", label: "Qué hizo la gente", icon: BarChart3 }] },
+  {
+    title: "Datos",
+    items: [
+      { href: "/admin/estadisticas", label: "Qué hizo la gente", icon: BarChart3 },
+      { href: "/admin/publicidad", label: "Publicidad", icon: Megaphone },
+    ],
+  },
 ];
 
 function isActive(pathname: string, href: string) {
