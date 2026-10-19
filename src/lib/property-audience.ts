@@ -273,3 +273,32 @@ export async function getListingReportSummaries(): Promise<ListingReportSummary[
   }
   return Array.from(summaries.values());
 }
+
+export type SponsoredAdStats = { adId: string; seenThisMonth: number; clicksThisMonth: number; seenLastMonth: number; clicksLastMonth: number };
+
+// Advertiser report: people who saw each ad and taps on it, this calendar month and the previous one.
+export async function getSponsoredAdStats(): Promise<SponsoredAdStats[]> {
+  if (!hasDatabaseConfig()) return [];
+  const thisMonth = "created_at >= date_format(now(), '%Y-%m-01')";
+  const lastMonth = "created_at >= date_format(now() - interval 1 month, '%Y-%m-01') and created_at < date_format(now(), '%Y-%m-01')";
+  const rows = await queryRows<{ adId: string; seenThisMonth: number | string; clicksThisMonth: number | string; seenLastMonth: number | string; clicksLastMonth: number | string }>(
+    `select ad_id as adId,
+            count(distinct case when event_type = 'ad_impression' and ${thisMonth} then ${personKey} end) as seenThisMonth,
+            sum(event_type = 'ad_click' and ${thisMonth}) as clicksThisMonth,
+            count(distinct case when event_type = 'ad_impression' and ${lastMonth} then ${personKey} end) as seenLastMonth,
+            sum(event_type = 'ad_click' and ${lastMonth}) as clicksLastMonth
+       from tracking_events
+      where ad_id is not null
+        and event_type in ('ad_impression', 'ad_click')
+        and created_at >= date_format(now() - interval 1 month, '%Y-%m-01')
+        and ${humansOnly}
+      group by ad_id`,
+  );
+  return (rows ?? []).map((row) => ({
+    adId: String(row.adId),
+    seenThisMonth: Number(row.seenThisMonth),
+    clicksThisMonth: Number(row.clicksThisMonth ?? 0),
+    seenLastMonth: Number(row.seenLastMonth),
+    clicksLastMonth: Number(row.clicksLastMonth ?? 0),
+  }));
+}

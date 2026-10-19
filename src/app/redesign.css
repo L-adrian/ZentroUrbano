@@ -920,6 +920,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .push-ad-body { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; color: var(--foreground); }
 .push-ad-logo { display: flex; align-items: center; justify-content: center; height: 64px; margin-bottom: 4px; border-radius: 10px; border: 1.5px dashed var(--brand); background: var(--brand-soft); color: var(--brand); transition: background .2s ease; }
 .push-ad-body:hover .push-ad-logo { background: var(--brand-surface); }
+.push-ad-logo.is-brand { overflow: hidden; border: 1px solid var(--line); background: #fff; }
+.push-ad-logo.is-brand img { width: 100%; height: 100%; object-fit: contain; }
+.push-ad-body:hover .push-ad-logo.is-brand { background: #fff; }
 .push-ad-body strong { font-size: 14px; }
 .push-ad-body small { font-size: 11px; line-height: 1.35; color: var(--muted); }
 @media (max-width: 768px) {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, Contact, MapPinned, UsersRound, type LucideIcon } from "lucide-react";
+import { BarChart3, BellRing, Box, CalendarDays, ClipboardList, Contact, MapPinned, Megaphone, UsersRound, type LucideIcon } from "lucide-react";
 import { getAdminAccountsOverview, getAdminListingHealth } from "@/lib/admin-accounts";
 import { adminListingPlaces } from "@/lib/admin-listing-places";
 import { getPublishedPropertiesData } from "@/lib/property-data";
@@ -42,6 +42,7 @@ export default async function AdminPage() {
     { href: "/admin/aliados", icon: CalendarDays, title: "Calendario de aliados", detail: "Lo que cada aliado registró por día" },
     { href: "/admin/recorridos", icon: Box, title: "Recorridos 3D", detail: "Recreaciones por revisar y publicar" },
     { href: "/admin/estadisticas", icon: BarChart3, title: "Qué hizo la gente", detail: "Visitas y contactos de los últimos 30 días" },
+    { href: "/admin/publicidad", icon: Megaphone, title: "Publicidad", detail: "Vistas y clics de cada anunciante" },
   ];
 
   return (
