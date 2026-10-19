@@ -1,10 +1,10 @@
 "use client";
 
-import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight, BookOpen, Sparkles, UsersRound, Building2, LifeBuoy, Megaphone, ClipboardList } from "lucide-react";
+import { House, Search, MapPin, Plus, UserRound, Menu, LogOut, LayoutDashboard, MessageCircle, ArrowUpRight, BookOpen, Sparkles, UsersRound, KeyRound, Truck, ChevronDown, ArrowRight, Building2, LifeBuoy, Megaphone, ClipboardList } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { CurrencySelector } from "@/components/currency-preference";
 import { RegionPicker } from "@/components/region-picker";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -26,6 +26,49 @@ function AccountFace({ account, size, onBroken }: { account: HeaderAccount; size
     return <Image src={account.avatarUrl} alt="" width={size} height={size} unoptimized className="account-face" onError={onBroken} />;
   }
   return <span className="account-face account-initials" aria-hidden="true">{initialsOf(account)}</span>;
+}
+
+// "Servicios" opens on hover (or keyboard focus) a small panel that separates Zentro's own services
+// for owners from the directory of other businesses. The panel is position: fixed because the nav
+// clips its overflow. A click on "Servicios" still goes straight to /servicios.
+function ServicesMenu({ pathname }: { pathname: string }) {
+  const wrapper = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLAnchorElement>(null);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const [position, setPosition] = useState<CSSProperties | null>(null);
+  const width = 420;
+  function open() {
+    window.clearTimeout(closeTimer.current);
+    const link = trigger.current?.getBoundingClientRect();
+    if (!link) return;
+    const left = Math.min(Math.max(16, link.left + link.width / 2 - width / 2), window.innerWidth - width - 16);
+    setPosition({ top: link.bottom + 8, left, width });
+  }
+  function close(delay = 150) {
+    window.clearTimeout(closeTimer.current);
+    closeTimer.current = window.setTimeout(() => setPosition(null), delay);
+  }
+  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
+  const active = pathname.startsWith("/servicios") || pathname.startsWith("/mudanza-y-hogar");
+  return <div ref={wrapper} className={`header-services${position ? " is-open" : ""}`} onMouseEnter={open} onMouseLeave={() => close()} onFocus={open}
+    onClick={(event) => { if ((event.target as HTMLElement).closest("a")) close(0); }}
+    onBlur={(event) => { if (!wrapper.current?.contains(event.relatedTarget as Node)) close(0); }}
+    onKeyDown={(event) => { if (event.key === "Escape") { close(0); trigger.current?.focus(); } }}>
+    <Link ref={trigger} href="/servicios" aria-current={active ? "page" : undefined}><Sparkles size={17} />Servicios<ChevronDown size={13} strokeWidth={2.4} className="header-services-chevron" aria-hidden="true" /></Link>
+    <div className="services-panel" style={position ?? undefined} hidden={!position}>
+      <Link href="/servicios" className="services-option">
+        <span className="services-option-icon"><KeyRound size={22} strokeWidth={1.8} /></span>
+        <span><strong>Servicios Zentro</strong><small>Para dueños: fotos, anuncio destacado y paquetes hasta que se alquile.</small></span>
+        <ArrowRight size={16} className="services-option-arrow" aria-hidden="true" />
+      </Link>
+      <Link href="/mudanza-y-hogar" className="services-option">
+        <span className="services-option-icon services-option-truck"><Truck size={22} strokeWidth={1.8} /></span>
+        <span><strong>Mudanza y hogar <em className="zu-new-badge">Nuevo</em></strong><small>Mudanzas, muebles, limpieza y más. Negocios de tu ciudad, contacto directo por WhatsApp.</small></span>
+        <ArrowRight size={16} className="services-option-arrow" aria-hidden="true" />
+      </Link>
+      <p className="services-panel-foot"><span>¿Tienes un negocio?</span><Link href="/publicidad" className="services-panel-cta">Aparece aquí <ArrowRight size={14} aria-hidden="true" /></Link></p>
+    </div>
+  </div>;
 }
 
 export function SiteHeader() {
@@ -99,7 +142,7 @@ export function SiteHeader() {
         <nav className="header-nav" aria-label="Navegación principal">
           {links.map(({ href, label, icon: Icon }) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}><Icon size={17} />{label}</Link>)}
           <Link href="/bienvenida" aria-current={pathname === "/bienvenida" ? "page" : undefined}><BookOpen size={17} />Cómo funciona</Link>
-          <Link href="/servicios" aria-current={pathname.startsWith("/servicios") ? "page" : undefined}><Sparkles size={17} />Servicios</Link>
+          <ServicesMenu pathname={pathname} />
           <Link href="/nuestro-equipo" aria-current={pathname === "/nuestro-equipo" ? "page" : undefined}><UsersRound size={17} />Equipo</Link>
         </nav>
         <div className="header-actions">
@@ -126,7 +169,8 @@ export function SiteHeader() {
                 <Link href="/propiedades"><Search size={18} />Explorar alquileres</Link>
                 <Link href="/mapa"><MapPin size={18} />Buscar en el mapa</Link>
                 <Link href="/publicar"><Plus size={18} />Publicar mi vivienda</Link>
-                <Link href="/servicios"><Sparkles size={18} />Servicios para propietarios</Link>
+                <Link href="/servicios"><KeyRound size={18} />Servicios Zentro</Link>
+                <Link href="/mudanza-y-hogar" className="menu-new-link"><Truck size={18} />Mudanza y hogar<em className="zu-new-badge">Nuevo</em></Link>
               </div>
               <div className="menu-section" role="group" aria-labelledby="menu-title-ayuda">
                 <span className="menu-section-title" id="menu-title-ayuda"><LifeBuoy size={13} aria-hidden="true" />Ayuda y soporte</span>
