@@ -5,8 +5,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { saveContactLeads } from "@/lib/contact-leads";
 import { hasDatabaseConfig, requiresDatabase } from "@/lib/mysql";
 import { getPublicationContactErrors, normalizePublicationPhone, validatePublicationDetails } from "@/lib/publication-input";
-import { ownerCorrectableRequest, PublicationError, storeDatabaseRequest, type UploadedPhoto } from "@/lib/database-publications";
+import { ownerCorrectableRequest, PublicationError, storeAliadoRequest, storeDatabaseRequest, type UploadedPhoto } from "@/lib/database-publications";
+import bcrypt from "bcryptjs";
 import { getCurrentAccount } from "@/lib/mysql-auth";
+import { isDisposableEmail, isWeakPassword, normalizeSignupEmail, normalizeSignupName, signupLimits } from "@/lib/signup-rules";
+import { getTeamMemberByAccount } from "@/lib/team";
 import { isRentalPropertyType } from "@/lib/rentals";
 import { persistentStorageRoot } from "@/lib/storage";
 import { isDisplayCurrency, parsePropertyExchangeRate } from "@/lib/currency";
@@ -27,8 +30,10 @@ export async function POST(request: NextRequest) {
   if (!account) {
     return NextResponse.json({ ok: false, code: "AUTH_REQUIRED", message: "Inicia sesión para enviar tu vivienda a revisión." }, { status: 401 });
   }
-  if (account.kind !== "owner") {
-    return NextResponse.json({ ok: false, message: "La publicación está disponible para propietarios de viviendas en alquiler." }, { status: 403 });
+  // An aliado publishes only for an owner, creating the owner's account in the same envío.
+  const aliado = account.kind === "aliado" && account.storage === "mysql" ? await getTeamMemberByAccount(account.id).catch(() => null) : null;
+  if (account.kind !== "owner" && !aliado) {
+    return NextResponse.json({ ok: false, message: account.kind === "aliado" ? "Tu cuenta de aliado todavía no está unida a tu ficha del equipo. Avísale a Zentro." : "La publicación está disponible para propietarios de viviendas en alquiler." }, { status: 403 });
   }
   if (Number(request.headers.get("content-length")) > maxTotalPhotoBytes + 1024 * 1024) {
     return NextResponse.json({ ok: false, message: "El envio supera el limite de 60 MB de fotos." }, { status: 413 });
@@ -86,6 +91,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", fieldErrors, message: Object.values(fieldErrors).join(" ") }, { status: 400 });
   }
   const normalizedPhone = normalizePublicationPhone(whatsapp)!;
+  const ownerAccount = aliado ? await checkOwnerAccount(payload.ownerAccount, contactName, normalizedPhone) : null;
+  if (ownerAccount && !ownerAccount.ok) {
+    return NextResponse.json({ ok: false, code: "OWNER_ACCOUNT", message: ownerAccount.message }, { status: 400 });
+  }
   const key = request.headers.get("idempotency-key") || "";
   if (hasDatabaseConfig() && !/^[a-zA-Z0-9_-]{32,64}$/.test(key)) {
     return NextResponse.json({ ok: false, code: "INVALID_REQUEST_KEY", message: "No pudimos identificar este envío. Vuelve a intentarlo; tus datos y fotos siguen en el formulario." }, { status: 400 });
@@ -108,6 +117,18 @@ export async function POST(request: NextRequest) {
   }
 
   const requestId = `publication_${randomUUID().replaceAll("-", "").slice(0, 24)}`;
+  if (aliado && ownerAccount?.ok && hasDatabaseConfig()) {
+    const details = validation!.details!;
+    try {
+      const result = await storeAliadoRequest({ id: requestId, contactName, whatsapp: normalizedPhone, sourceText, details,
+        price: details.price, currency: details.currency, exchangeRate: details.exchangeRate,
+        aliado: { memberId: aliado.member.id, name: aliado.member.name } }, ownerAccount.owner, uploaded, key);
+      return NextResponse.json({ ok: true, ...result, ownerLogin: ownerAccount.owner.username }, { status: 201 });
+    } catch (error) {
+      return NextResponse.json({ ok: false, ...(error instanceof PublicationError && error.code ? { code: error.code } : {}), message: error instanceof PublicationError ? error.message : "No pudimos guardar la solicitud en la base de datos. Conservamos los datos; intenta nuevamente." }, { status: error instanceof PublicationError ? error.status : 503 });
+    }
+  }
+  if (aliado) return NextResponse.json({ ok: false, message: "La base de datos no está disponible. Intenta nuevamente en unos minutos." }, { status: 503 });
   if (hasDatabaseConfig()) {
     const details = validation!.details!;
     try {
@@ -247,4 +268,25 @@ function parsePayload(value: string) {
 
 function readText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+// The owner's own account, made by the aliado: the owner signs in with their WhatsApp number (8
+// digits) or the email, if they gave one, and the password the aliado passes on to them.
+async function checkOwnerAccount(input: unknown, contactName: string, whatsapp: string) {
+  const data = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const name = normalizeSignupName(contactName);
+  if (!name) return { ok: false as const, message: "Escribe el nombre y apellido del dueño, solo con letras." };
+  const rawEmail = readText(data.email);
+  const email = rawEmail ? normalizeSignupEmail(rawEmail) : null;
+  if (rawEmail && !email) return { ok: false as const, message: "Revisa el correo del dueño (como nombre@gmail.com) o déjalo vacío." };
+  if (email && isDisposableEmail(email)) return { ok: false as const, message: "Usa un correo personal del dueño; no aceptamos correos temporales." };
+  const password = typeof data.password === "string" ? data.password : "";
+  if (password.length < signupLimits.passwordMin || new TextEncoder().encode(password).length > signupLimits.passwordBytes) {
+    return { ok: false as const, message: "La contraseña del dueño debe tener entre 8 y 72 caracteres." };
+  }
+  const username = whatsapp.slice(3);
+  if (isWeakPassword(password, email) || password === username || password === whatsapp) {
+    return { ok: false as const, message: "Esa contraseña es muy fácil de adivinar. Usa otra (puedes tocar «Crear una»)." };
+  }
+  return { ok: true as const, owner: { name, username, email, passwordHash: await bcrypt.hash(password, 12) } };
 }

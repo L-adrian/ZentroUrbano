@@ -29,6 +29,8 @@ export default async function PublishPage({ searchParams }: { searchParams: Prom
       : typeof query.parecida === "string" ? `/publicar?parecida=${encodeURIComponent(query.parecida)}` : "";
     redirect(back ? `/login?next=${encodeURIComponent(back)}` : "/login?next=%2Fpublicar&mode=signup");
   }
+  // An aliado publishes for an owner from their own page, which also creates the owner's account.
+  if (account.kind === "aliado") redirect("/cliente/publicar-dueno");
   if (account.kind !== "owner") redirect("/propiedades");
   const { prefill, problem } = await loadPublishPrefill(account.id, query);
   const department = await getSelectedDepartment();

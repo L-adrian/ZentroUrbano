@@ -19,6 +19,7 @@ import { listCalendarHomes } from "@/lib/calendar";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
+import { aliadoRequests } from "@/lib/database-publications";
 
 export const dynamic = "force-dynamic";
 
@@ -81,17 +82,18 @@ export default async function ClientPage() {
 async function aliadoPanel(accountId: string, name: string, roleLabel: string): Promise<AliadoPanelData> {
   const [team, login] = await Promise.all([getTeamMemberByAccount(accountId).catch(() => null), getCurrentLogin()]);
   const hasPassword = Boolean(login && login.account_id === accountId && Number(login.has_password));
-  if (!team) return { name, roleLabel, hasPassword, member: null, homes: [], visits: [], reports: null, panel: null };
+  if (!team) return { name, roleLabel, hasPassword, member: null, homes: [], visits: [], reports: null, panel: null, loaded: null };
   const { member, assignments } = team;
   const properties = new Map(getDirectRentals(await getPublishedPropertiesData()).map((property) => [property.slug, property]));
   // The log of this month and the previous one (the last 7 days can cross a month); null while
   // 012_aliado_reports is missing.
   const today = boliviaToday();
   const previousMonth = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
-  const [bookings, reports, panel] = await Promise.all([
+  const [bookings, reports, panel, loaded] = await Promise.all([
     listBookingsFor(assignments.map((assignment) => assignment.propertySlug)).catch(() => null),
     listMemberReports(member.id, previousMonth, today).catch(() => null),
     getPanelState(member.id).catch(() => null),
+    aliadoRequests(member.id).catch(() => null),
   ]);
   return {
     name,
@@ -99,6 +101,17 @@ async function aliadoPanel(accountId: string, name: string, roleLabel: string): 
     hasPassword,
     reports,
     panel,
+    // The homes this aliado loaded for owners, with where each review stands.
+    loaded: loaded === null ? null : loaded.map((request) => ({
+      id: request.id,
+      title: request.details?.title || "Vivienda",
+      zone: request.details?.zone ?? "",
+      ownerName: request.contactName,
+      status: request.status,
+      reason: request.reviewReason ?? null,
+      slug: request.status === "approved" ? request.propertySlug ?? null : null,
+      sentAt: new Date(request.createdAt).toLocaleDateString("es-BO", { timeZone: "America/La_Paz", day: "numeric", month: "short" }),
+    })),
     member: {
       name: member.name,
       slug: member.slug,

@@ -174,7 +174,18 @@ function restoreForm(saved: Record<string, unknown>, base: PropertyForm): Proper
   return restored;
 }
 
-type SendResult = { status: number; data: { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number } };
+type SendResult = { status: number; data: { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number; ownerLogin?: string } };
+
+// An Aliado Zentro loading a home for its owner: the same form, plus the owner's own account.
+export type ForOwner = { aliadoName: string; roleLabel: string };
+type OwnerAccess = { email: string; password: string };
+
+// Easy to read aloud and type on a phone, like "Patio4821".
+function suggestOwnerPassword() {
+  const words = ["Casa", "Patio", "Luna", "Verde", "Norte", "Palma", "Lago", "Cielo", "Monte", "Brisa"];
+  const values = crypto.getRandomValues(new Uint32Array(2));
+  return `${words[values[0] % words.length]}${String(1000 + (values[1] % 9000))}`;
+}
 
 // XMLHttpRequest instead of fetch: it reports how much of the upload has been sent.
 function sendPublication(body: FormData, key: string, onProgress: (fraction: number) => void) {
@@ -196,7 +207,7 @@ function sendPublication(body: FormData, key: string, onProgress: (fraction: num
 }
 
 // department: the one the visitor picked in the header, preselected for a new listing.
-export function PublishWizard({ account, prefill, department = defaultDepartment.slug }: { account: { id: string; name: string; phone: string }; prefill?: PublishPrefill; department?: string }) {
+export function PublishWizard({ account, prefill, department = defaultDepartment.slug, forOwner }: { account: { id: string; name: string; phone: string }; prefill?: PublishPrefill; department?: string; forOwner?: ForOwner }) {
   // A form opened from Mi cuenta has its own draft, so it never overwrites the regular one.
   const draftKey = `zu-publication-draft-v2:${account.id}${prefill ? `:${prefill.id}` : ""}`;
   const [step, setStep] = useState(0);
@@ -208,7 +219,9 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [receipt, setReceipt] = useState<{ requestId: string; photosStored: number } | null>(null);
+  const [receipt, setReceipt] = useState<{ requestId: string; photosStored: number; ownerLogin?: string; ownerPassword?: string; ownerName?: string; ownerPhone?: string } | null>(null);
+  // Never saved with the draft: the password stays only in this page until it is sent.
+  const [ownerAccess, setOwnerAccess] = useState<OwnerAccess>({ email: "", password: "" });
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number; label: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -471,6 +484,11 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
       setMessage(Object.values(wizardStepErrors(invalidStep, form)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
       return;
     }
+    if (forOwner && ownerAccess.password.length < 8) {
+      setStatus("error");
+      setMessage("Crea la contraseña del dueño (8 caracteres como mínimo). Puedes tocar «Crear una».");
+      return;
+    }
     if (photos.reduce((sum, photo) => sum + photo.file.size, 0) > maxTotalPhotoBytes) {
       setStatus("error");
       setMessage("Las fotos pesan más de 60 MB en total. Quita alguna o elige fotos más livianas.");
@@ -498,6 +516,7 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
         notes: `Solicitud de publicación directa. Calidad ${quality.score}%.`,
         website: "",
         ...(prefill?.kind === "correction" && prefill.requestId ? { correctionOf: prefill.requestId } : {}),
+        ...(forOwner ? { ownerAccount: { email: ownerAccess.email.trim(), password: ownerAccess.password } } : {}),
         photoReport: photos.map((photo) => ({
           fileName: photo.file.name,
           category: photo.category,
@@ -522,7 +541,8 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
         throw new Error(data.message ?? "No se pudo guardar la solicitud.");
       }
 
-      setReceipt({ requestId: data.requestId, photosStored: data.photosStored });
+      setReceipt({ requestId: data.requestId, photosStored: data.photosStored, ...(forOwner ? { ownerLogin: data.ownerLogin, ownerPassword: ownerAccess.password, ownerName: form.ownerName.trim(), ownerPhone: normalizePublicationPhone(form.phone) ?? "" } : {}) });
+      if (forOwner) setOwnerAccess({ email: "", password: "" });
       setStatus("success");
       // The next publication from this page is a new envío, not a retry of this one.
       submissionKey.current = crypto.randomUUID();
@@ -537,6 +557,10 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
     } finally {
       setUploadProgress(null);
     }
+  }
+
+  if (status === "success" && forOwner && receipt) {
+    return <OwnerReceipt receipt={receipt} aliado={forOwner} isLocal={form.type === "Local"} onAnother={() => { setReceipt(null); setStatus("idle"); setMessage(""); setPhotos([]); setForm({ ...initialForm, department }); setAcceptedTerms(false); setStep(0); setFurthestStep(0); }} />;
   }
 
   if (status === "success") {
@@ -588,7 +612,7 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
 
         <div className="p-4 sm:p-6">
           {prefill ? <PrefillNotice prefill={prefill} /> : null}
-          {sessionExpired && <div role="alert" className="publish-draft-notice"><span>{photoStorage ? "Tu sesión venció. Tus datos y fotos quedan guardados en este dispositivo." : "Tu sesión venció. Los datos quedan guardados; tendrás que adjuntar las fotos nuevamente."}</span><Link href={`/login?next=${encodeURIComponent(currentPublishPath(prefill))}`}>Volver a iniciar sesión</Link></div>}
+          {sessionExpired && <div role="alert" className="publish-draft-notice"><span>{photoStorage ? "Tu sesión venció. Tus datos y fotos quedan guardados en este dispositivo." : "Tu sesión venció. Los datos quedan guardados; tendrás que adjuntar las fotos nuevamente."}</span><Link href={`/login?next=${encodeURIComponent(forOwner ? "/cliente/publicar-dueno" : currentPublishPath(prefill))}`}>Volver a iniciar sesión</Link></div>}
           {(draftSaved || (photoStorage && photos.length > 0)) && <div className="publish-draft-notice"><span className="flex items-center gap-2"><Save size={14} />{photoStorage ? "Datos y fotos guardados en este dispositivo." : "Datos guardados en este dispositivo. Las fotos deben volver a adjuntarse al recargar."}</span><button type="button" onClick={clearDraft} disabled={processingPhotos || status === "sending"}>Borrar datos</button></div>}
           {step === 0 ? <ListingKindChooser form={form} updateField={updateField} /> : null}
           {step === 0 ? (
@@ -614,6 +638,7 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
               onEdit={goToStep}
               acceptedTerms={acceptedTerms}
               onAcceptedTermsChange={setAcceptedTerms}
+              forOwner={forOwner ? { access: ownerAccess, onChange: setOwnerAccess } : undefined}
             />
           ) : null}
 
@@ -1112,12 +1137,14 @@ function ConfirmationStep({
   onEdit,
   acceptedTerms,
   onAcceptedTermsChange,
+  forOwner,
 }: {
   form: PropertyForm;
   photos: UploadPhoto[];
   onEdit: (step: number) => void;
   acceptedTerms: boolean;
   onAcceptedTermsChange: (value: boolean) => void;
+  forOwner?: { access: OwnerAccess; onChange: (value: OwnerAccess) => void };
 }) {
   const symbol = form.currency === "BOB" ? "Bs" : "$us";
   const beforeVisit = beforeVisitRows(parseBeforeVisitInput(form).values) ?? [];
@@ -1181,13 +1208,75 @@ function ConfirmationStep({
         <CostSummary form={form} />
       </ReviewSection>
 
+      {forOwner ? <OwnerAccessFields form={form} access={forOwner.access} onChange={forOwner.onChange} /> : null}
+
       <label className="mt-6 flex cursor-pointer items-start gap-3 border border-neutral-300 p-4">
         <input type="checkbox" checked={acceptedTerms} onChange={(event) => onAcceptedTermsChange(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-[#176b4d]" />
         <span className="text-sm leading-6 text-neutral-700">
-          Confirmo que soy propietario, que el contrato de alquiler será directo conmigo y que no cobro comisión de intermediación. La información es correcta.
+          {forOwner
+            ? "Confirmo que el dueño me pidió publicar su vivienda, que el contrato de alquiler será directo con el dueño y que nadie cobra comisión. La información es correcta."
+            : "Confirmo que soy propietario, que el contrato de alquiler será directo conmigo y que no cobro comisión de intermediación. La información es correcta."}
         </span>
       </label>
     </section>
+  );
+}
+
+// The owner's sign-in: their WhatsApp number (or email, when given) and a password the aliado
+// passes on to them. The owner can change it later in Mi cuenta.
+function OwnerAccessFields({ form, access, onChange }: { form: PropertyForm; access: OwnerAccess; onChange: (value: OwnerAccess) => void }) {
+  const login = normalizePublicationPhone(form.phone)?.slice(3) ?? "";
+  return (
+    <div className="review-section owner-access">
+      <div className="review-section-heading"><h3>Cuenta del dueño</h3></div>
+      <p className="text-sm leading-6 text-neutral-600">Se crea al enviar, sin Google. Con ella el dueño entra en zentrourbano.com/login para ver visitas, pausar o editar su anuncio.</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2">
+        <Field label="Usuario para entrar">
+          <input value={login || "Falta el WhatsApp del dueño"} readOnly aria-readonly="true" className={`${inputClassName} bg-neutral-50 text-neutral-700`} />
+          <span className="text-xs text-neutral-600">Es su número de WhatsApp, sin +591.</span>
+        </Field>
+        <Field label="Correo del dueño (opcional)">
+          <input value={access.email} onChange={(event) => onChange({ ...access, email: event.target.value })} type="email" inputMode="email" autoComplete="off" autoCapitalize="none" spellCheck={false} placeholder="dueno@gmail.com" className={inputClassName} />
+          <span className="text-xs text-neutral-600">Si lo pones, también puede entrar con su correo.</span>
+        </Field>
+        <Field label="Contraseña del dueño">
+          <div className="flex gap-2">
+            <input value={access.password} onChange={(event) => onChange({ ...access, password: event.target.value })} type="text" autoComplete="new-password" autoCapitalize="none" spellCheck={false} placeholder="8 caracteres o más" className={`${inputClassName} min-w-0 flex-1`} />
+            <button type="button" onClick={() => onChange({ ...access, password: suggestOwnerPassword() })} className="shrink-0 border border-neutral-300 bg-white px-3 text-sm font-semibold text-neutral-800 hover:border-neutral-950">Crear una</button>
+          </div>
+          <span className="text-xs text-neutral-600">Muéstrasela al dueño. Al final te damos un mensaje para mandársela por WhatsApp.</span>
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+// After an aliado sends a home: the owner's sign-in, ready to send to the owner by WhatsApp.
+function OwnerReceipt({ receipt, aliado, isLocal, onAnother }: { receipt: { requestId: string; photosStored: number; ownerLogin?: string; ownerPassword?: string; ownerName?: string; ownerPhone?: string }; aliado: ForOwner; isLocal: boolean; onAnother: () => void }) {
+  const firstName = receipt.ownerName?.split(" ")[0] ?? "";
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => { ref.current?.focus({ preventScroll: true }); ref.current?.scrollIntoView({ block: "start", behavior: "instant" }); }, []);
+  const text = `Hola ${firstName}, soy ${aliado.aliadoName}, ${aliado.roleLabel}. Ya enviamos ${isLocal ? "tu local" : "tu vivienda"} a revisión en Zentro Urbano. Te aviso cuando esté publicada.\n\nTu cuenta para manejar tu anuncio:\nEntra en zentrourbano.com/login\nUsuario: ${receipt.ownerLogin ?? ""}\nContraseña: ${receipt.ownerPassword ?? ""}\n\nPuedes cambiar la contraseña en Mi cuenta. Publicar es gratis y nadie te cobra comisión.`;
+  return (
+    <div ref={ref} tabIndex={-1} className="publication-receipt mx-auto max-w-2xl scroll-mt-24 border border-neutral-300 bg-white p-6 sm:p-8" role="status">
+      <span className="flex h-10 w-10 items-center justify-center bg-[#edf7f2] text-[#176b4d]">
+        <Check className="h-5 w-5" aria-hidden="true" />
+      </span>
+      <h2 className="mt-5 text-2xl font-semibold tracking-tight">Enviado a revisión</h2>
+      <p className="mt-2 text-sm leading-6 text-neutral-600">Creamos la cuenta de {receipt.ownerName} y su anuncio quedó a revisión. Cuando se apruebe, aparece en tu panel y cuenta para tu pago.</p>
+      <p className="mt-3 text-sm text-neutral-600">{receipt.photosStored} {receipt.photosStored === 1 ? "foto guardada" : "fotos guardadas"}. Referencia: <strong className="break-all">{receipt.requestId}</strong></p>
+      <dl className="owner-access-card mt-5">
+        <div><dt>Entra en</dt><dd>zentrourbano.com/login</dd></div>
+        <div><dt>Usuario</dt><dd>{receipt.ownerLogin}</dd></div>
+        <div><dt>Contraseña</dt><dd>{receipt.ownerPassword}</dd></div>
+      </dl>
+      <p className="mt-2 text-xs text-neutral-500">Anótala o mándasela ahora: por seguridad no la volvemos a mostrar.</p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        {receipt.ownerPhone ? <a href={`https://wa.me/${receipt.ownerPhone}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="zu-button zu-button-primary"><Phone size={17} aria-hidden="true" />Mandarle sus datos por WhatsApp</a> : null}
+        <button type="button" onClick={onAnother} className="zu-button zu-button-secondary">Publicar otra vivienda</button>
+        <Link href="/cliente#anuncios" className="zu-button zu-button-secondary">Volver a mi panel</Link>
+      </div>
+    </div>
   );
 }
 

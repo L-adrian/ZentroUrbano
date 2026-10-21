@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
@@ -39,8 +39,40 @@ export async function databaseRequests(accountId?:string) {
     : "(SELECT * FROM publication_requests WHERE status='pending_review') UNION (SELECT * FROM publication_requests ORDER BY created_at DESC LIMIT 200) ORDER BY created_at DESC",accountId ? {accountId} : {});
   return (rows || []).map(mapRequest);
 }
-export async function storeDatabaseRequest(record:{id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null;correctionOf?:string},photos:UploadedPhoto[],key:string) {
+// Set when an Aliado Zentro loaded the home for its owner: Zentro pays the aliado per approved listing.
+export type PublicationAliado = {memberId:string;name:string};
+type StoredRecord = {id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null;correctionOf?:string;aliado?:PublicationAliado};
+export async function storeDatabaseRequest(record:StoredRecord,photos:UploadedPhoto[],key:string) {
+  return withTransaction(connection=>insertRequest(connection,record,photos,key));
+}
+
+// An aliado publishes for an owner who has no account yet: the owner's account (login with their
+// WhatsApp number, and email when given) and the request are saved together, or neither is.
+export async function storeAliadoRequest(record:Omit<StoredRecord,"accountId"|"accountEmail"|"aliado">&{aliado:PublicationAliado},owner:{name:string;username:string;email:string|null;passwordHash:string},photos:UploadedPhoto[],key:string) {
   return withTransaction(async connection=>{
+    // A retry of the same envío (lost answer) finds the request this aliado already sent.
+    const [sent]=await connection.execute<RowDataPacket[]>("SELECT id,status,account_id,payload FROM publication_requests WHERE idempotency_key=? AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.aliado.memberId'))=? LIMIT 1",[key,record.aliado.memberId]);
+    if (sent.length) return insertRequest(connection,{...record,accountId:sent[0].account_id,accountEmail:owner.email ?? ""},photos,key);
+    const [taken]=await connection.execute<RowDataPacket[]>("SELECT username,email FROM morada_users WHERE username=? OR (? IS NOT NULL AND email=?) LIMIT 1",[owner.username,owner.email,owner.email]);
+    if (taken.length) throw new PublicationError(409,taken[0].username === owner.username
+      ? "Ese WhatsApp ya tiene una cuenta en Zentro. Pídele al dueño que entre con su número y publique desde su cuenta, o escríbele a Zentro."
+      : "Ese correo ya tiene una cuenta en Zentro. Deja el correo vacío o pídele al dueño que publique desde su cuenta.","OWNER_EXISTS");
+    const accountId=`acct_${randomBytes(18).toString("hex")}`;
+    const initials=owner.name.split(/\s+/).slice(0,2).map(word=>word[0]).join("").toUpperCase();
+    await connection.execute("INSERT INTO client_accounts (id,kind,display_name,email,phone,avatar_initials,role_label,location) VALUES (?,'owner',?,?,?,?,'Propietario','Bolivia')",[accountId,owner.name,owner.email,record.whatsapp,initials]);
+    await connection.execute("INSERT INTO morada_users (id,account_id,email,username,password_hash) VALUES (?,?,?,?,?)",[`user_${randomBytes(18).toString("hex")}`,accountId,owner.email,owner.username,owner.passwordHash]);
+    return insertRequest(connection,{...record,accountId,accountEmail:owner.email ?? ""},photos,key);
+  });
+}
+
+// The homes an aliado loaded for owners, newest first, so they can follow each review.
+export async function aliadoRequests(memberId:string) {
+  const rows=await queryRows<RequestRow>("SELECT * FROM publication_requests WHERE JSON_UNQUOTE(JSON_EXTRACT(payload,'$.aliado.memberId'))=:memberId ORDER BY created_at DESC LIMIT 100",{memberId});
+  return (rows || []).map(mapRequest);
+}
+
+async function insertRequest(connection:PoolConnection,record:StoredRecord,photos:UploadedPhoto[],key:string) {
+  {
     // Serializing each owner's submissions makes retries idempotent, even across processes.
     const [accounts]=await connection.execute<RowDataPacket[]>("SELECT id FROM client_accounts WHERE id=? AND kind='owner' AND status='active' FOR UPDATE",[record.accountId]);
     if (!accounts.length) throw new PublicationError(403,"Tu cuenta no puede publicar.");
@@ -67,7 +99,7 @@ export async function storeDatabaseRequest(record:{id:string;accountId:string;ac
       await connection.execute("INSERT INTO publication_photos (request_id,filename,original_name,content_type,byte_size,original_data) VALUES (?,?,?,?,?,?)",[record.id,stored.storedName,stored.originalName,photo.type,photo.size,photo.bytes]);
     }
     return {requestId:record.id as string,status:"pending_review",photosStored:photos.length};
-  });
+  }
 }
 
 export async function readDatabasePhoto(id:string,filename:string,publicOnly=false) {
@@ -122,6 +154,8 @@ export async function reviewDatabaseRequest(id:string,admin:string,input:Record<
       await connection.execute(`INSERT INTO properties (${columns.join(",")}) VALUES (${columns.map(()=>"?").join(",")})`,values);
       await connection.execute("INSERT INTO client_account_properties (id,account_id,property_slug,status) VALUES (?,?,?,'active')",[`cap_${randomUUID().replaceAll("-","")}`,record.accountId,slug]);
       await replaceDemoForPublication(connection, slug);
+      // The aliado who loaded it works on this home and sees it in their panel.
+      if (record.aliado?.memberId) await connection.execute("INSERT IGNORE INTO property_team (property_slug,member_id,role,handles_visits) SELECT ?,id,'colaborador',0 FROM team_members WHERE id=?",[slug,record.aliado.memberId]);
     }
     const status=decision === "approve" ? "approved" : decision === "changes" ? "changes_requested" : "rejected";
     await connection.execute("UPDATE publication_requests SET status=?,property_slug=?,reviewed_by=?,review_reason=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",[status,slug,admin,reason,id]);
