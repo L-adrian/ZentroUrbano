@@ -14,6 +14,7 @@ import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { boliviaToday } from "@/lib/aliado-report-input";
 import { getPanelState, listMemberReports } from "@/lib/aliado-reports";
 import { buildSeoMetadata } from "@/lib/seo";
+import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
 
 export const dynamic = "force-dynamic";
 
@@ -41,10 +42,11 @@ export default async function ClientPage() {
 
   // Visits booked on the owner's listings; null while the visit tables are missing.
   const slugs = (dashboard.properties ?? []).map((property) => property.slug);
-  const [bookings, settings, login] = await Promise.all([
+  const [bookings, settings, login, urbanitoLink] = await Promise.all([
     listBookingsFor(slugs).catch(() => null),
     getVisitSettingsFor(slugs).catch(() => null),
     getCurrentLogin(),
+    urbanitoEnabled() ? getUrbanitoLink(dashboard.id).catch(() => null) : null,
   ]);
   const visits = bookings && settings ? { bookings, settings } : null;
 
@@ -54,6 +56,7 @@ export default async function ClientPage() {
         account={dashboard}
         visits={visits}
         login={login && login.account_id === dashboard.id ? { hasPassword: Boolean(Number(login.has_password)) } : null}
+        urbanito={urbanitoLink ? { linked: urbanitoLink.linked, botUsername: urbanitoBotUsername } : null}
       />
     </Suspense>
   );

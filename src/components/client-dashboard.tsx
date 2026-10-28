@@ -33,6 +33,7 @@ import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/befor
 import { PriceDisplay } from "@/components/currency-preference";
 import { OwnerLocationDialog } from "@/components/owner-location-dialog";
 import { OwnerServicesNote } from "@/components/owner-services-note";
+import { UrbanitoConnect } from "@/components/urbanito-connect";
 import { OwnerShareKit } from "@/components/owner-share-kit";
 import { AccountAvatar, OwnerProfilePanel, type AccountLogin, type AccountProfile } from "@/components/owner-profile-panel";
 import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
@@ -75,10 +76,13 @@ export function ClientDashboard({
   account,
   visits = null,
   login = null,
+  urbanito = null,
 }: {
   account: DemoAccount;
   visits?: OwnerVisits | null;
   login?: AccountLogin | null;
+  // Null hides the Urbanito card (not configured, or 013_urbanito_links not run yet).
+  urbanito?: { linked: boolean; botUsername: string } | null;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState<AccountProfile>({
@@ -401,6 +405,7 @@ export function ClientDashboard({
               {visits && tab !== "visitas" ? (
                 <UpcomingVisits bookings={upcomingVisits.slice(0, 4)} titles={titles} onShowAll={() => showTab("visitas")} />
               ) : null}
+              {urbanito ? <UrbanitoConnect linked={urbanito.linked} botUsername={urbanito.botUsername} /> : null}
               <OwnerServicesNote className="rounded-[28px]" />
             </aside>
           </>
