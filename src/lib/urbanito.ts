@@ -5,7 +5,7 @@ import { formatPrice } from "@/lib/properties";
 import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
 import { getListingAudience } from "@/lib/property-audience";
 import { isMissingTable } from "@/lib/team";
-import { hashLinkCode, listingLink, newLinkCode, normalizeLinkCode, urbanitoCodeMinutes, urbanitoKeyMatches } from "@/lib/urbanito-input";
+import { hashLinkCode, listingLink, newLinkCode, normalizeLinkCode, readUrbanitoSnapshot, urbanitoCodeMinutes, urbanitoKeyMatches, type UrbanitoSnapshot } from "@/lib/urbanito-input";
 import { listBookingsFor } from "@/lib/visits";
 
 export const urbanitoBotUsername = "UrbanitoZentroBot";
@@ -30,7 +30,13 @@ async function guard<T>(work: () => Promise<T>) {
   }
 }
 
-export type UrbanitoLinkStatus = { linked: boolean; linkedAt: string | null };
+export type UrbanitoLinkStatus = {
+  linked: boolean;
+  linkedAt: string | null;
+  // Null while 014_urbanito_snapshots is missing or the bot has not reported yet.
+  snapshot: (UrbanitoSnapshot & { updatedAt: string }) | null;
+  showChat: boolean;
+};
 
 export async function getUrbanitoLink(accountId: string): Promise<UrbanitoLinkStatus | null> {
   if (!hasDatabaseConfig()) return null;
@@ -39,10 +45,81 @@ export async function getUrbanitoLink(accountId: string): Promise<UrbanitoLinkSt
       "select telegram_id, linked_at from urbanito_links where account_id = :accountId",
       { accountId },
     );
-    return { linked: Boolean(row?.telegram_id), linkedAt: row?.telegram_id && row.linked_at ? new Date(row.linked_at).toISOString() : null };
+    const linked = Boolean(row?.telegram_id);
+    const saved = linked ? await getSnapshot(accountId) : null;
+    return {
+      linked,
+      linkedAt: linked && row?.linked_at ? new Date(row.linked_at).toISOString() : null,
+      snapshot: saved?.snapshot ?? null,
+      showChat: saved?.showChat ?? true,
+    };
   } catch (error) {
     if (isMissingTable(error)) return null;
     throw error;
+  }
+}
+
+async function getSnapshot(accountId: string) {
+  try {
+    const row = await queryOne<{ snapshot: string; show_chat: number; updated_at: Date }>(
+      "select snapshot, show_chat, updated_at from urbanito_snapshots where account_id = :accountId",
+      { accountId },
+    );
+    if (!row) return null;
+    const showChat = Boolean(Number(row.show_chat));
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(row.snapshot);
+    } catch {
+      parsed = null;
+    }
+    return { showChat, snapshot: parsed ? { ...readUrbanitoSnapshot(parsed, showChat), updatedAt: new Date(row.updated_at).toISOString() } : null };
+  } catch (error) {
+    // Linking works before 014_urbanito_snapshots runs; the tab just shows no activity yet.
+    if (isMissingTable(error)) return null;
+    throw error;
+  }
+}
+
+// The bot reports what it did for a linked owner. Returns null when that Telegram account is not linked.
+export async function saveUrbanitoSnapshot(telegramId: number, body: unknown) {
+  return guard(async () => {
+    const account = await queryOne<{ id: string }>("select account_id as id from urbanito_links where telegram_id = :telegramId", { telegramId });
+    if (!account) return null;
+    const current = await queryOne<{ show_chat: number }>("select show_chat from urbanito_snapshots where account_id = :accountId", { accountId: account.id });
+    const showChat = current ? Boolean(Number(current.show_chat)) : true;
+    await executeQuery(
+      `insert into urbanito_snapshots (account_id, snapshot) values (:accountId, :snapshot)
+       on duplicate key update snapshot = values(snapshot)`,
+      { accountId: account.id, snapshot: JSON.stringify(readUrbanitoSnapshot(body, showChat)) },
+    );
+    return { showChat };
+  });
+}
+
+// "Lo último que hablaron" on or off. Turning it off also deletes the messages already stored.
+export async function setUrbanitoChatVisible(accountId: string, visible: boolean) {
+  return guard(async () => {
+    const row = await queryOne<{ snapshot: string }>("select snapshot from urbanito_snapshots where account_id = :accountId", { accountId });
+    let snapshot = "{}";
+    try {
+      snapshot = JSON.stringify(readUrbanitoSnapshot(row ? JSON.parse(row.snapshot) : {}, visible));
+    } catch {
+      snapshot = JSON.stringify(readUrbanitoSnapshot({}, visible));
+    }
+    await executeQuery(
+      `insert into urbanito_snapshots (account_id, snapshot, show_chat) values (:accountId, :snapshot, :visible)
+       on duplicate key update snapshot = values(snapshot), show_chat = values(show_chat)`,
+      { accountId, snapshot, visible: visible ? 1 : 0 },
+    );
+  });
+}
+
+async function forgetSnapshot(where: string, params: Record<string, string | number>) {
+  try {
+    await executeQuery(`delete from urbanito_snapshots where ${where}`, params);
+  } catch (error) {
+    if (!isMissingTable(error)) throw error;
   }
 }
 
@@ -71,7 +148,7 @@ export async function createLinkCode(accountId: string) {
 export async function linkTelegram(rawCode: unknown, telegramId: number) {
   const code = normalizeLinkCode(rawCode);
   if (!code) return null;
-  return guard(() =>
+  const linked = await guard(() =>
     withTransaction(async (connection) => {
       const [rows] = await connection.execute<RowDataPacket[]>(
         `select ul.account_id, ca.display_name
@@ -86,19 +163,27 @@ export async function linkTelegram(rawCode: unknown, telegramId: number) {
         "update urbanito_links set telegram_id = ?, code_hash = null, code_expires_at = null, linked_at = utc_timestamp() where account_id = ?",
         [telegramId, row.account_id],
       );
-      return { nombre: row.display_name };
+      return { accountId: row.account_id, nombre: row.display_name };
     }),
   );
+  if (!linked) return null;
+  // A new Telegram account starts with an empty Urbanito tab, never the previous one's activity.
+  await forgetSnapshot("account_id = :accountId", { accountId: linked.accountId });
+  return { nombre: linked.nombre };
 }
 
 export async function unlinkTelegram(telegramId: number) {
-  return guard(() => executeQuery("update urbanito_links set telegram_id = null, linked_at = null where telegram_id = :telegramId", { telegramId }));
+  return guard(async () => {
+    await forgetSnapshot("account_id in (select account_id from urbanito_links where telegram_id = :telegramId)", { telegramId });
+    return executeQuery("update urbanito_links set telegram_id = null, linked_at = null where telegram_id = :telegramId", { telegramId });
+  });
 }
 
 export async function unlinkAccount(accountId: string) {
-  return guard(() =>
-    executeQuery("update urbanito_links set telegram_id = null, linked_at = null, code_hash = null, code_expires_at = null where account_id = :accountId", { accountId }),
-  );
+  return guard(async () => {
+    await forgetSnapshot("account_id = :accountId", { accountId });
+    return executeQuery("update urbanito_links set telegram_id = null, linked_at = null, code_hash = null, code_expires_at = null where account_id = :accountId", { accountId });
+  });
 }
 
 const bolivianDate = new Intl.DateTimeFormat("es-BO", { timeZone: "America/La_Paz", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });

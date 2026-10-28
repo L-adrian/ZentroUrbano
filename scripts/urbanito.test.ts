@@ -9,6 +9,7 @@ import {
   readTelegramId,
   readUrbanitoFilters,
   toUrbanitoListing,
+  readUrbanitoSnapshot,
   urbanitoKeyMatches,
 } from "../src/lib/urbanito-input";
 
@@ -53,4 +54,30 @@ test("the bot gets the page link and never the owner's phone", () => {
   const listing = toUrbanitoListing(curatedRentalProperties[0], "https://zentrourbano.com");
   assert.equal(listing.link, `https://zentrourbano.com/propiedades/${curatedRentalProperties[0].slug}`);
   assert.doesNotMatch(JSON.stringify(listing), /whatsapp|@|wa\.me/i);
+});
+
+test("the Urbanito summary is capped, cleaned and drops the chat when the owner hid it", () => {
+  const body = {
+    telegram_id: 7,
+    recordatorios: [{ cuando: "2026-10-29T00:00:00Z", texto: "Visita de Carla" }, { cuando: "no es fecha", texto: "x" }],
+    fichas: Array.from({ length: 20 }, (_, index) => ({ titulo: `Ficha ${index}`, creado: "2026-10-27T12:00:00Z", paginas: 2 })),
+    chat: [
+      { rol: "user", texto: "uno" },
+      { rol: "assistant", texto: "dos" },
+      { rol: "system", texto: "no" },
+      { rol: "user", texto: "tres" },
+      { rol: "assistant", texto: "cuatro" },
+      { rol: "user", texto: "x".repeat(900) },
+    ],
+    plan: { nombre: "Gratis", usados: 4, limite: 10 },
+    totales: { recordatorios: 4, fichas: -1, preguntas: "11" },
+  };
+  const shown = readUrbanitoSnapshot(body, true);
+  assert.equal(shown.recordatorios.length, 1);
+  assert.equal(shown.fichas.length, 12);
+  assert.deepEqual(shown.chat.map((message) => message.texto.length), [3, 4, 6, 500]);
+  assert.deepEqual(shown.plan, { nombre: "Gratis", usados: 4, limite: 10 });
+  assert.deepEqual(shown.totales, { recordatorios: 4, fichas: 0, preguntas: 0 });
+  assert.deepEqual(readUrbanitoSnapshot(body, false).chat, []);
+  assert.deepEqual(readUrbanitoSnapshot(null, true).recordatorios, []);
 });

@@ -56,7 +56,7 @@ export default async function ClientPage() {
         account={dashboard}
         visits={visits}
         login={login && login.account_id === dashboard.id ? { hasPassword: Boolean(Number(login.has_password)) } : null}
-        urbanito={urbanitoLink ? { linked: urbanitoLink.linked, botUsername: urbanitoBotUsername } : null}
+        urbanito={urbanitoLink ? { ...urbanitoLink, botUsername: urbanitoBotUsername } : null}
       />
     </Suspense>
   );

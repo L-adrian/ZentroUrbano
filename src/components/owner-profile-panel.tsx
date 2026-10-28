@@ -15,7 +15,18 @@ const buttonClassName =
 const darkButtonClassName =
   "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full bg-neutral-950 px-5 text-sm font-semibold text-white transition hover:bg-[#21352b] disabled:cursor-wait disabled:opacity-60";
 
-export function AccountAvatar({ account, size, onClick }: { account: AccountProfile; size: "lg" | "xl"; onClick?: () => void }) {
+export function AccountAvatar({
+  account,
+  size,
+  onClick,
+  initialsClassName = "bg-neutral-950 text-white",
+}: {
+  account: AccountProfile;
+  size: "lg" | "xl";
+  onClick?: () => void;
+  // Without a photo: the color of the initials box.
+  initialsClassName?: string;
+}) {
   const box = size === "xl" ? "h-24 w-24 rounded-[30px] text-2xl" : "h-16 w-16 rounded-[22px] text-lg";
   const face = account.avatarUrl ? (
     <Image
@@ -27,7 +38,7 @@ export function AccountAvatar({ account, size, onClick }: { account: AccountProf
       className={`${box} border border-black/10 object-cover`}
     />
   ) : (
-    <span className={`${box} flex items-center justify-center bg-neutral-950 font-semibold text-white`}>{account.avatarInitials}</span>
+    <span className={`${box} flex items-center justify-center font-semibold ${initialsClassName}`}>{account.avatarInitials}</span>
   );
   if (!onClick) return face;
   return (

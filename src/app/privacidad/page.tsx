@@ -30,6 +30,10 @@ const sections = [
     body: "Si pides que te avisemos cuando haya una vivienda como la que buscas, guardamos tu búsqueda, el WhatsApp o correo que escribas, tu nombre si lo das, la fecha y el número aleatorio de tu navegador. Solo lo usamos para escribirte sobre esa búsqueda: lo hace una persona de nuestro equipo, no un sistema automático, y no lo compartimos con los dueños. Cada aviso trae un enlace para darte de baja, y también puedes pedirlo por WhatsApp o correo.",
   },
   {
+    title: "Urbanito, el asistente en Telegram",
+    body: "Si usas Urbanito, guardamos lo que le escribes y lo que te responde (los audios, pasados a texto), tus recordatorios y los documentos que le pides, para que recuerde de qué venían hablando. La conversación se borra sola a los 90 días, y puedes borrarla antes escribiéndole /borrar. Para responderte, el texto pasa por el servicio de inteligencia artificial que usa Urbanito. Si conectas Urbanito a tu cuenta de Zentro Urbano, solo ve tus anuncios y tus visitas, y en Mi cuenta verás tus recordatorios, tus fichas y los últimos mensajes; puedes ocultar esos mensajes con un botón, y al desconectar Urbanito se borra lo que nos contó. Solo el administrador de Zentro Urbano puede revisar una conversación, para resolver un problema o un reclamo, y cada revisión queda registrada.",
+  },
+  {
     title: "Canales externos",
     body: "Zentro Urbano usa enlaces de WhatsApp, mapas de OpenStreetMap y servicios de imágenes. Al abrir esos servicios, aplican también sus propias políticas de privacidad.",
   },

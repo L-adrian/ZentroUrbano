@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { editableOwner } from "@/lib/account-profile";
 import { isSameSiteRequest } from "@/lib/request-origin";
-import { createLinkCode, unlinkAccount, urbanitoEnabled, UrbanitoUnavailable } from "@/lib/urbanito";
+import { createLinkCode, setUrbanitoChatVisible, unlinkAccount, urbanitoEnabled, UrbanitoUnavailable } from "@/lib/urbanito";
 import { urbanitoCodeMinutes } from "@/lib/urbanito-input";
 
 const reply = (status: number, body: Record<string, unknown>) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store" } });
 
-// Mi cuenta: the owner asks for a code to type in Urbanito, or disconnects Telegram.
+// Mi cuenta: the owner asks for a code to type in Urbanito, shows or hides the chat, or disconnects Telegram.
 async function ownerAction(request: Request, work: (accountId: string) => Promise<Response>) {
   if (!isSameSiteRequest(request)) return reply(403, { ok: false, message: "Origen no permitido." });
   if (!urbanitoEnabled()) return reply(503, { ok: false, message: "Urbanito todavía no está disponible." });
@@ -27,6 +27,15 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   return ownerAction(request, async (accountId) => {
     await unlinkAccount(accountId);
+    return reply(200, { ok: true });
+  });
+}
+
+export async function PATCH(request: Request) {
+  return ownerAction(request, async (accountId) => {
+    const body = (await request.json().catch(() => null)) as { mostrarChat?: unknown } | null;
+    if (typeof body?.mostrarChat !== "boolean") return reply(400, { ok: false, message: "Falta elegir si se muestra la conversación." });
+    await setUrbanitoChatVisible(accountId, body.mostrarChat);
     return reply(200, { ok: true });
   });
 }

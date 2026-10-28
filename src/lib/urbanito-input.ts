@@ -112,3 +112,53 @@ export function toUrbanitoListing(property: Property, origin: string) {
     link: listingLink(origin, property.slug),
   };
 }
+
+// What Urbanito did for a linked owner (POST /api/urbanito/resumen), shown in Mi cuenta > Urbanito.
+export type UrbanitoSnapshot = {
+  recordatorios: Array<{ cuando: string; texto: string }>;
+  fichas: Array<{ titulo: string; creado: string; paginas: number | null }>;
+  chat: Array<{ rol: "user" | "assistant"; texto: string; cuando: string | null }>;
+  plan: { nombre: string; usados: number; limite: number | null } | null;
+  totales: { recordatorios: number; fichas: number; preguntas: number };
+};
+
+const snapshotLimits = { recordatorios: 10, fichas: 12, chat: 4, texto: 500 };
+
+const list = (value: unknown) => (Array.isArray(value) ? value : []);
+const record = (value: unknown) => (value && typeof value === "object" ? (value as Record<string, unknown>) : {});
+const text = (value: unknown, max = 160) => (typeof value === "string" ? value.trim().slice(0, max) : "");
+const count = (value: unknown) => (typeof value === "number" && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0);
+const isoDate = (value: unknown) => {
+  const date = typeof value === "string" ? new Date(value) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.toISOString() : null;
+};
+
+// Everything is capped and cleaned: the bot is trusted with the key, but the page still never
+// stores more than it shows.
+export function readUrbanitoSnapshot(body: unknown, showChat: boolean): UrbanitoSnapshot {
+  const input = record(body);
+  const plan = record(input.plan);
+  const totals = record(input.totales);
+  return {
+    recordatorios: list(input.recordatorios).flatMap((item) => {
+      const when = isoDate(record(item).cuando);
+      const label = text(record(item).texto);
+      return when && label ? [{ cuando: when, texto: label }] : [];
+    }).slice(0, snapshotLimits.recordatorios),
+    fichas: list(input.fichas).flatMap((item) => {
+      const title = text(record(item).titulo, 120);
+      const created = isoDate(record(item).creado);
+      const pages = count(record(item).paginas);
+      return title && created ? [{ titulo: title, creado: created, paginas: pages || null }] : [];
+    }).slice(0, snapshotLimits.fichas),
+    chat: showChat
+      ? list(input.chat).flatMap((item) => {
+          const role = record(item).rol;
+          const message = text(record(item).texto, snapshotLimits.texto);
+          return (role === "user" || role === "assistant") && message ? [{ rol: role as "user" | "assistant", texto: message, cuando: isoDate(record(item).cuando) }] : [];
+        }).slice(-snapshotLimits.chat)
+      : [],
+    plan: text(plan.nombre, 40) ? { nombre: text(plan.nombre, 40), usados: count(plan.usados), limite: count(plan.limite) || null } : null,
+    totales: { recordatorios: count(totals.recordatorios), fichas: count(totals.fichas), preguntas: count(totals.preguntas) },
+  };
+}
