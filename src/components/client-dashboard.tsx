@@ -12,6 +12,8 @@ import {
   Edit3,
   Eye,
   Home,
+  Inbox,
+  LayoutGrid,
   LoaderCircle,
   LockKeyhole,
   LogOut,
@@ -19,7 +21,10 @@ import {
   MessageCircle,
   Plus,
   Save,
+  Send,
   Share2,
+  ShoppingBag,
+  Sparkles,
   UserRound,
   X,
   Clock3,
@@ -33,7 +38,8 @@ import { BeforeVisitFields, type BeforeVisitFormValue } from "@/components/befor
 import { PriceDisplay } from "@/components/currency-preference";
 import { OwnerLocationDialog } from "@/components/owner-location-dialog";
 import { OwnerServicesNote } from "@/components/owner-services-note";
-import { UrbanitoConnect } from "@/components/urbanito-connect";
+import { UrbanitoBanner, UrbanitoStrip, UrbanitoTab, type UrbanitoAccount } from "@/components/urbanito-panel";
+import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { OwnerShareKit } from "@/components/owner-share-kit";
 import { AccountAvatar, OwnerProfilePanel, type AccountLogin, type AccountProfile } from "@/components/owner-profile-panel";
 import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
@@ -81,8 +87,8 @@ export function ClientDashboard({
   account: DemoAccount;
   visits?: OwnerVisits | null;
   login?: AccountLogin | null;
-  // Null hides the Urbanito card (not configured, or 013_urbanito_links not run yet).
-  urbanito?: { linked: boolean; botUsername: string } | null;
+  // Null hides Urbanito (not configured, or 013_urbanito_links not run yet).
+  urbanito?: UrbanitoAccount | null;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState<AccountProfile>({
@@ -92,18 +98,26 @@ export function ClientDashboard({
     avatarInitials: account.avatarInitials,
   });
   const [tab, setTab] = useState<AccountTab>("resumen");
+  const urbanitoAvailable = Boolean(urbanito);
+  const [period, setPeriod] = useState<Period>("30");
+  // Read the clock once per visit, so the page stays stable while it is open.
+  const [{ todayLabel, tomorrowKey, now }] = useState(() => ({
+    todayLabel: capitalizeFirst(new Intl.DateTimeFormat("es-BO", { timeZone: "America/La_Paz", weekday: "long", day: "numeric", month: "long" }).format(new Date())),
+    tomorrowKey: boliviaDayKey(new Date(Date.now() + 24 * 60 * 60_000)),
+    now: Date.now(),
+  }));
   const [focusSlug, setFocusSlug] = useState<string | null>(null);
 
   // The tab lives in the address (#visitas, #perfil...) so links and the back button keep it.
   useEffect(() => {
     const fromHash = () => {
       const hash = window.location.hash.slice(1);
-      setTab(isAccountTab(hash) ? hash : "resumen");
+      setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) ? hash : "resumen");
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
     return () => window.removeEventListener("hashchange", fromHash);
-  }, []);
+  }, [urbanitoAvailable]);
 
   function showTab(next: AccountTab) {
     setTab(next);
@@ -197,13 +211,6 @@ export function ClientDashboard({
   const toLocate = liveProperties.filter((property) => property.rentalDetails && !ownerLocationStatus(property).confirmed);
   const hoursOff = visits ? liveProperties.filter((property) => !(visits.settings[property.slug] ?? defaultVisitSettings).enabled) : [];
   const needsFix = requests.filter((request) => request.status === "changes_requested" && !request.corrected);
-  const tabCounts: Record<AccountTab, number | null> = {
-    resumen: null,
-    anuncios: properties.length,
-    visitas: visits ? upcomingVisits.length : null,
-    solicitudes: requests.length,
-    perfil: null,
-  };
 
   function openListing(slug: string) {
     setFocusSlug(slug);
@@ -239,213 +246,363 @@ export function ClientDashboard({
     />
   ) : null;
 
-  const totals = showTotals ? {
-    views: audiences.reduce((total, audience) => total + audience.views30, 0),
-    contacts: audiences.reduce((total, audience) => total + audience.contacts30, 0),
+  const periodKey = period === "7" ? "7" : period === "30" ? "30" : "Total";
+  const periodStart = period === "total" ? null : now - Number(period) * 24 * 60 * 60_000;
+  const periodTotals: PeriodTotals | null = showTotals ? {
+    views: audiences.reduce((total, audience) => total + audience[`views${periodKey}`], 0),
+    contacts: audiences.reduce((total, audience) => total + audience[`contacts${periodKey}`], 0),
+    visits: (visits?.bookings ?? []).filter((booking) => booking.status === "reserved" && (periodStart === null || new Date(booking.createdAt).getTime() >= periodStart)).length,
   } : null;
+  // The home most people saw without writing gets one hint from its missing details.
+  const quiet = showTotals
+    ? liveProperties
+        .map((property) => ({ property, audience: listingFor(property).audience }))
+        .filter(({ audience }) => audience && audience[`views${periodKey}`] >= 10 && audience[`contacts${periodKey}`] === 0)
+        .sort((first, second) => (second.audience?.[`views${periodKey}`] ?? 0) - (first.audience?.[`views${periodKey}`] ?? 0))[0]
+    : undefined;
+  const quietHint = quiet ? getOwnerListingSuggestions(quiet.property)[0] : undefined;
+  const funnelTip = quiet
+    ? `${quiet.property.title} tiene ${quiet.audience?.[`views${periodKey}`]} vistas y ningún mensaje.${quietHint ? ` ${quietHint}` : " Revisa el precio y las fotos."}`
+    : null;
+
+  const navCounts: Partial<Record<AccountTab, number>> = {
+    anuncios: properties.length,
+    ...(visits ? { visitas: upcomingVisits.length } : {}),
+    solicitudes: requests.length,
+  };
+  const ownerName = account.companyName ?? profile.displayName;
+  const nextVisit = upcomingVisits[0] ?? null;
 
   return (
     <div className="zu-tones bg-neutral-50">
-      <section className="border-b border-black/10 bg-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-4 pb-4 pt-6 sm:pt-8">
-            <AccountAvatar account={profile} size="lg" onClick={() => showTab("perfil")} />
-            <div className="min-w-0 flex-1 basis-56">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#58745f]">Mi cuenta</p>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950 [overflow-wrap:anywhere] sm:text-4xl">
-                Hola, {account.companyName ?? profile.displayName}
-              </h1>
-              <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600">
-                <span className="rounded-full bg-[#eef7ef] px-3 py-1 text-xs font-semibold text-[#285340]">{account.roleLabel}</span>
-                {liveCount} anuncio{liveCount === 1 ? "" : "s"} publicado{liveCount === 1 ? "" : "s"}
+      <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:px-6 sm:py-7 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-7 lg:px-8">
+        <OwnerNav
+          profile={profile}
+          roleLabel={account.roleLabel}
+          tab={tab}
+          counts={navCounts}
+          pending={Boolean(toConfirm.length || needsFix.length)}
+          showUrbanito={Boolean(urbanito)}
+          urbanitoNew={Boolean(urbanito && !urbanito.linked)}
+          onSelect={showTab}
+          onLogout={logout}
+        />
+
+        <main className="grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-4">
+          <header className="flex flex-wrap items-end justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[#5f6b65]">
+                Mi cuenta · {tab === "resumen" ? todayLabel : accountTabs.find(([id]) => id === tab)?.[1]}
               </p>
+              <h1 className="mt-0.5 text-2xl font-semibold tracking-tight text-neutral-950 [overflow-wrap:anywhere] sm:text-3xl">
+                {tab === "resumen" ? `Hola, ${ownerName}` : tabTitles[tab]}
+              </h1>
             </div>
-            <div className="grid w-full grid-cols-[1fr_1fr_auto] gap-2 sm:flex sm:w-auto">
-              <Link href="/publicar" className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#087c65] px-4 text-sm font-semibold text-white transition hover:bg-[#06624f]">
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                {liveCount ? "Publicar otro" : "Publicar"}
-              </Link>
-              <button type="button" onClick={() => showTab("perfil")} className={secondaryButton}>
-                <UserRound className="h-4 w-4" aria-hidden="true" />
-                Editar perfil
-              </button>
-              <button type="button" onClick={logout} className={secondaryButton} aria-label="Salir">
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline">Salir</span>
-              </button>
+            {tab === "resumen" && showTotals ? <PeriodPicker period={period} onChange={setPeriod} /> : null}
+          </header>
+
+          {tab === "resumen" ? (
+            <>
+              {urbanito && !urbanito.linked ? (
+                <UrbanitoBanner
+                  greetingName={ownerName}
+                  nextVisit={nextVisit ? `${capitalizeFirst(visitWhenLabel(nextVisit.startsAt))} viene ${nextVisit.visitorName.split(" ")[0]}.` : null}
+                  onOpen={() => showTab("urbanito")}
+                />
+              ) : null}
+              <TodaySection
+                toConfirm={toConfirm.length}
+                onConfirmAll={confirmAll}
+                needsFix={needsFix.length}
+                nextVisit={nextVisit}
+                nextVisitTitle={nextVisit ? titles.get(nextVisit.propertySlug) ?? "" : ""}
+                toLocate={toLocate[0] ?? null}
+                hoursOff={hoursOff.length}
+                noPhoto={!profile.avatarUrl}
+                noListings={properties.length === 0 && !pendingCount}
+                onOpenListing={openListing}
+                onShowTab={showTab}
+              />
+              {urbanito?.linked ? <UrbanitoStrip botUsername={urbanito.botUsername} onOpen={() => showTab("urbanito")} /> : null}
+              <KpiCards
+                period={period}
+                totals={periodTotals}
+                upcomingVisits={visits ? upcomingVisits.length : null}
+                tomorrowVisits={visits ? upcomingVisits.filter((booking) => boliviaDayKey(booking.startsAt) === tomorrowKey).length : 0}
+                liveCount={liveCount}
+                toConfirm={toConfirm.length}
+              />
+              {emptyListings ?? (
+                <ListingsTable
+                  properties={properties}
+                  listingFor={listingFor}
+                  audienceUnavailable={Boolean(account.audienceUnavailable)}
+                  period={period}
+                  visitCounts={visits ? visitCounts : null}
+                  onManage={openListing}
+                />
+              )}
+              <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-2">
+                {periodTotals ? <FunnelPanel period={period} totals={periodTotals} tip={funnelTip} /> : null}
+                {visits ? <UpcomingVisits bookings={upcomingVisits.slice(0, 4)} titles={titles} onShowAll={() => showTab("visitas")} /> : null}
+              </div>
+            </>
+          ) : null}
+
+          {tab === "anuncios" ? (
+            <section className="rounded-[22px] border border-black/10 bg-white p-5 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-neutral-600">Edita, comparte o marca como alquilada cada vivienda.</p>
+                <Link href="/publicar" className={greenButton}>
+                  <Plus className="h-4 w-4" aria-hidden="true" />
+                  Publicar otra
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {emptyListings}
+                {listingCards(properties)}
+              </div>
+            </section>
+          ) : null}
+
+          {tab === "visitas" ? (
+            visits && properties.length > 0 ? (
+              <OwnerVisitsSection visits={visits} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} />
+            ) : (
+              <EmptyPanel
+                title="Todavía no hay visitas"
+                copy="Cuando tengas un anuncio publicado, aquí verás quién reservó una visita y podrás elegir los días y horas."
+                actionLabel="Publicar mi vivienda"
+                href="/publicar"
+              />
+            )
+          ) : null}
+
+          {tab === "solicitudes" ? (
+            requests.length ? (
+              <RequestsSection requests={requests} liveSlugs={new Set(liveProperties.map((property) => property.slug))} />
+            ) : (
+              <EmptyPanel
+                title="No tienes solicitudes recientes"
+                copy="Cada vez que publicas o vuelves a publicar una vivienda, la revisamos. Aquí verás en qué va."
+                actionLabel="Ver todas mis solicitudes"
+                href="/cliente/solicitudes"
+              />
+            )
+          ) : null}
+
+          {tab === "urbanito" && urbanito ? <UrbanitoTab account={urbanito} ownerName={ownerName} phone={profile.phone} /> : null}
+
+          {tab === "perfil" ? (
+            <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+              <OwnerProfilePanel
+                profile={profile}
+                email={account.email}
+                login={login}
+                hasListing={properties.length > 0}
+                hoursOn={properties.length > 0 && hoursOff.length === 0}
+                onProfileChange={(next) => {
+                  setProfile((current) => ({ ...current, ...next }));
+                  router.refresh();
+                  // The header shows the photo and name too; ask it to read the session again.
+                  window.dispatchEvent(new Event("morada-session"));
+                }}
+                onLogout={logout}
+              />
             </div>
-          </div>
+          ) : null}
 
-          <div className="grid grid-cols-3 gap-2 pb-4 lg:hidden">
-            <MiniStat value={liveCount} label="Publicados" />
-            <MiniStat value={totals?.views ?? null} label="Vieron · 30 días" />
-            <MiniStat value={totals?.contacts ?? null} label="WhatsApp · 30 días" />
-          </div>
-
-          <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 [scrollbar-width:none]" aria-label="Secciones de tu cuenta">
-            {accountTabs.map(([id, label]) => {
-              const count = tabCounts[id];
-              const active = tab === id;
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  onClick={() => showTab(id)}
-                  aria-current={active ? "page" : undefined}
-                  className={`flex shrink-0 cursor-pointer items-center gap-1.5 border-b-[3px] px-3 py-3 text-sm font-semibold transition ${
-                    active ? "border-[#087c65] text-[#087c65]" : "border-transparent text-neutral-600 hover:text-neutral-950"
-                  }`}
-                >
-                  {label}
-                  {count !== null ? (
-                    <span className={`rounded-full px-2 text-[11px] leading-5 ${active ? "bg-[#087c65] text-white" : "bg-neutral-100 text-neutral-800"}`}>{count}</span>
-                  ) : null}
-                  {id === "resumen" && (toConfirm.length || needsFix.length) ? <span className="h-2 w-2 rounded-full bg-[#e0892b]" aria-label="Hay algo pendiente" /> : null}
-                </button>
-              );
-            })}
-          </nav>
-        </div>
-      </section>
-
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 sm:py-8 lg:grid-cols-[1fr_340px] lg:px-8">
-        {tab === "perfil" ? (
-          <OwnerProfilePanel
-            profile={profile}
-            email={account.email}
-            login={login}
-            hasListing={properties.length > 0}
-            hoursOn={properties.length > 0 && hoursOff.length === 0}
-            onProfileChange={(next) => {
-              setProfile((current) => ({ ...current, ...next }));
-              router.refresh();
-              // The header shows the photo and name too; ask it to read the session again.
-              window.dispatchEvent(new Event("morada-session"));
-            }}
-            onLogout={logout}
-          />
-        ) : (
-          <>
-            <div className="grid min-w-0 content-start gap-6">
-              {tab === "resumen" ? (
-                <>
-                  <TodaySection
-                    toConfirm={toConfirm.length}
-                    onConfirmAll={confirmAll}
-                    needsFix={needsFix.length}
-                    nextVisit={upcomingVisits[0] ?? null}
-                    nextVisitTitle={upcomingVisits[0] ? titles.get(upcomingVisits[0].propertySlug) ?? "" : ""}
-                    toLocate={toLocate[0] ?? null}
-                    hoursOff={hoursOff.length}
-                    noPhoto={!profile.avatarUrl}
-                    noListings={properties.length === 0 && !pendingCount}
-                    onOpenListing={openListing}
-                    onShowTab={showTab}
-                  />
-                  <section className="rounded-[28px] border border-black/10 bg-white p-5 sm:p-6">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b4b31]">Anuncios</p>
-                        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">Tus viviendas</h2>
-                      </div>
-                      {properties.length > 3 ? (
-                        <button type="button" onClick={() => showTab("anuncios")} className="cursor-pointer text-sm font-semibold text-[#176b4d] underline-offset-4 hover:underline">
-                          Ver los {properties.length}
-                        </button>
-                      ) : null}
-                    </div>
-                    <div className="mt-4 grid gap-3">
-                      {emptyListings}
-                      {listingCards(properties.slice(0, 3))}
-                    </div>
-                  </section>
-                </>
-              ) : null}
-
-              {tab === "anuncios" ? (
-                <section className="rounded-[28px] border border-black/10 bg-white p-5 sm:p-6">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8b4b31]">Anuncios</p>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">Tus viviendas en Zentro Urbano</h2>
-                  <div className="mt-4 grid gap-3">
-                    {emptyListings}
-                    {listingCards(properties)}
-                  </div>
-                </section>
-              ) : null}
-
-              {tab === "visitas" ? (
-                visits && properties.length > 0 ? (
-                  <OwnerVisitsSection visits={visits} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} />
-                ) : (
-                  <EmptyPanel
-                    title="Todavía no hay visitas"
-                    copy="Cuando tengas un anuncio publicado, aquí verás quién reservó una visita y podrás elegir los días y horas."
-                    actionLabel="Publicar mi vivienda"
-                    href="/publicar"
-                  />
-                )
-              ) : null}
-
-              {tab === "solicitudes" ? (
-                requests.length ? (
-                  <RequestsSection requests={requests} liveSlugs={new Set(liveProperties.map((property) => property.slug))} />
-                ) : (
-                  <EmptyPanel
-                    title="No tienes solicitudes recientes"
-                    copy="Cada vez que publicas o vuelves a publicar una vivienda, la revisamos. Aquí verás en qué va."
-                    actionLabel="Ver todas mis solicitudes"
-                    href="/cliente/solicitudes"
-                  />
-                )
-              ) : null}
-            </div>
-
-            <aside className="grid content-start gap-6 lg:sticky lg:top-24 lg:self-start">
-              <StatsSection liveCount={liveCount} totals={totals} />
-              {visits && tab !== "visitas" ? (
-                <UpcomingVisits bookings={upcomingVisits.slice(0, 4)} titles={titles} onShowAll={() => showTab("visitas")} />
-              ) : null}
-              {urbanito ? <UrbanitoConnect linked={urbanito.linked} botUsername={urbanito.botUsername} /> : null}
-              <OwnerServicesNote className="rounded-[28px]" />
-            </aside>
-          </>
-        )}
-      </main>
+          {tab !== "resumen" && tab !== "urbanito" && tab !== "perfil" ? <OwnerServicesNote className="rounded-[22px]" /> : null}
+        </main>
+      </div>
     </div>
   );
 }
 
-type AccountTab = "resumen" | "anuncios" | "visitas" | "solicitudes" | "perfil";
+type AccountTab = "resumen" | "anuncios" | "visitas" | "solicitudes" | "urbanito" | "perfil";
 const accountTabs: Array<[AccountTab, string]> = [
   ["resumen", "Resumen"],
   ["anuncios", "Anuncios"],
   ["visitas", "Visitas"],
   ["solicitudes", "Solicitudes"],
+  ["urbanito", "Urbanito"],
   ["perfil", "Mi perfil"],
 ];
+const tabTitles: Record<AccountTab, string> = {
+  resumen: "Resumen",
+  anuncios: "Tus viviendas",
+  visitas: "Visitas",
+  solicitudes: "Solicitudes",
+  urbanito: "Urbanito",
+  perfil: "Mi perfil",
+};
 const isAccountTab = (value: string): value is AccountTab => accountTabs.some(([id]) => id === value);
+const capitalizeFirst = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-const secondaryButton =
-  "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-3 text-sm whitespace-nowrap sm:px-4 font-semibold text-neutral-800 transition hover:border-neutral-950";
+const greenButton =
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#176b4d] px-4 text-sm font-semibold text-white transition hover:bg-[#10533b]";
+const outlineButton =
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-[#cfe3d7] bg-white px-4 text-sm font-semibold text-[#0d4d36] transition hover:border-[#176b4d]";
 
-function MiniStat({ value, label }: { value: number | null; label: string }) {
+const navIcons: Record<AccountTab, ReactElement<{ className?: string }>> = {
+  resumen: <LayoutGrid />,
+  anuncios: <Home />,
+  visitas: <CalendarCheck />,
+  solicitudes: <Inbox />,
+  urbanito: <Send />,
+  perfil: <UserRound />,
+};
+
+// Green menu of Mi cuenta: a column on the computer, a grid of big buttons on the phone.
+function OwnerNav({
+  profile,
+  roleLabel,
+  tab,
+  counts,
+  pending,
+  showUrbanito,
+  urbanitoNew,
+  onSelect,
+  onLogout,
+}: {
+  profile: AccountProfile;
+  roleLabel: string;
+  tab: AccountTab;
+  counts: Partial<Record<AccountTab, number>>;
+  pending: boolean;
+  showUrbanito: boolean;
+  urbanitoNew: boolean;
+  onSelect: (tab: AccountTab) => void;
+  onLogout: () => void;
+}) {
+  const items = accountTabs.filter(([id]) => id !== "urbanito" || showUrbanito);
+  const item = "relative flex cursor-pointer items-center rounded-[12px] font-semibold transition";
   return (
-    <div className="rounded-[16px] border border-black/10 bg-neutral-50 px-3 py-2">
-      <p className="text-xl font-semibold text-neutral-950">{value === null ? "—" : value.toLocaleString("es-BO")}</p>
-      <p className="text-xs leading-4 text-neutral-600">{label}</p>
+    <aside className="owner-nav rounded-[22px] bg-[linear-gradient(180deg,#0f3b2b,#14513a)] p-3.5 text-white shadow-[0_18px_40px_rgb(15_59_43/0.25)] lg:sticky lg:top-24 lg:self-start lg:p-[18px]">
+      <div className="flex items-center gap-3 px-1 pb-3 lg:border-b lg:border-white/10 lg:pb-4">
+        <AccountAvatar account={profile} size="lg" onClick={() => onSelect("perfil")} initialsClassName="bg-[#3fbf87] text-[#0f3b2b]" />
+        <div className="min-w-0">
+          <p className="truncate text-[15.5px] font-semibold">{profile.displayName}</p>
+          <span className="mt-0.5 inline-block rounded-full bg-white/[0.12] px-2 py-0.5 text-xs font-semibold text-[#bdf0d5]">{roleLabel}</span>
+        </div>
+      </div>
+      <nav aria-label="Secciones de tu cuenta" className="mt-1 grid grid-cols-3 gap-2 lg:mt-3 lg:grid-cols-1 lg:gap-0.5">
+        {items.map(([id, label]) => {
+          const active = tab === id;
+          const count = counts[id];
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelect(id)}
+              aria-current={active ? "page" : undefined}
+              className={`${item} flex-col justify-center gap-1.5 border border-white/15 px-1 py-3 text-[13px] lg:h-11 lg:flex-row lg:justify-start lg:gap-3 lg:border-0 lg:px-3 lg:py-0 lg:text-[14.5px] ${
+                active ? "bg-white/[0.14] text-white" : "bg-white/[0.06] text-[#cde6d9] hover:bg-white/10 hover:text-white lg:bg-transparent"
+              }`}
+            >
+              {id === "urbanito" ? (
+                // eslint-disable-next-line @next/next/no-img-element -- 64 px sprite scaled with pixelated rendering
+                <img src="/images/urbanito/urbanito.png" alt="" width={64} height={64} className="h-6 w-6 [image-rendering:pixelated] lg:h-[22px] lg:w-[22px]" />
+              ) : (
+                cloneElement(navIcons[id], { className: "h-[18px] w-[18px] opacity-90" })
+              )}
+              {label}
+              {id === "urbanito" && urbanitoNew ? (
+                <span className="absolute right-1.5 top-1.5 rounded-full bg-[#f2b33d] px-1.5 text-[11px] font-bold leading-5 text-[#4a2c00] lg:static lg:ml-auto">Nuevo</span>
+              ) : count !== undefined ? (
+                <span className={`absolute right-1.5 top-1.5 min-w-6 rounded-full px-1.5 text-center text-xs leading-5 lg:static lg:ml-auto ${active ? "bg-[#3fbf87] text-[#0f3b2b]" : "bg-white/[0.12] text-white"}`}>{count}</span>
+              ) : id === "resumen" && pending ? (
+                <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-[#f2b33d] lg:static lg:ml-auto" aria-label="Hay algo pendiente" />
+              ) : null}
+            </button>
+          );
+        })}
+        <Link href="/servicios" className={`${item} hidden gap-3 px-3 text-[14.5px] text-[#cde6d9] hover:bg-white/10 hover:text-white lg:flex lg:h-11`}>
+          <ShoppingBag className="h-[18px] w-[18px] opacity-90" aria-hidden="true" />
+          Servicios
+        </Link>
+        <button type="button" onClick={onLogout} className={`${item} hidden gap-3 px-3 text-[14.5px] text-[#cde6d9] hover:bg-white/10 hover:text-white lg:mt-2 lg:flex lg:h-11 lg:border-t lg:border-white/10 lg:pt-2`}>
+          <LogOut className="h-[18px] w-[18px] opacity-90" aria-hidden="true" />
+          Salir
+        </button>
+      </nav>
+      <Link href="/publicar" className="mt-3 flex h-11 items-center justify-center gap-2 rounded-[12px] bg-[#3fbf87] text-[14.5px] font-semibold text-[#0f3b2b] transition hover:bg-[#4fcf96]">
+        <Plus className="h-[17px] w-[17px]" aria-hidden="true" />
+        Publicar vivienda
+      </Link>
+      <div className="mt-3.5 hidden rounded-[12px] bg-white/[0.07] p-3 text-[12.5px] leading-5 text-[#bcd6c8] lg:block">
+        <strong className="mb-0.5 block text-[13.5px] text-white">Publicar es gratis</strong>
+        ¿Ayuda con fotos o contrato?{" "}
+        <a href={whatsappUrl("Hola, quiero saber de los paquetes mensuales para propietarios de Zentro Urbano.")} target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline underline-offset-2">
+          Escríbenos por WhatsApp
+        </a>
+        , de 08:00 a 00:00.
+      </div>
+    </aside>
+  );
+}
+
+type Period = "7" | "30" | "total";
+const periodLabels: Record<Period, string> = { "7": "7 días", "30": "30 días", total: "Todo" };
+type PeriodTotals = { views: number; contacts: number; visits: number };
+
+function PeriodPicker({ period, onChange }: { period: Period; onChange: (period: Period) => void }) {
+  return (
+    <div role="group" aria-label="Período de los números" className="flex rounded-[12px] border border-black/10 bg-white p-[3px]">
+      {(Object.keys(periodLabels) as Period[]).map((value) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={period === value}
+          onClick={() => onChange(value)}
+          className={`h-8 cursor-pointer rounded-[9px] px-3 text-[13px] font-semibold ${period === value ? "bg-[#176b4d] text-white" : "text-neutral-600 hover:text-neutral-950"}`}
+        >
+          {periodLabels[value]}
+        </button>
+      ))}
     </div>
   );
 }
 
-function StatsSection({ liveCount, totals }: { liveCount: number; totals: { views: number; contacts: number } | null }) {
+function KpiCards({
+  period,
+  totals,
+  upcomingVisits,
+  tomorrowVisits,
+  liveCount,
+  toConfirm,
+}: {
+  period: Period;
+  totals: PeriodTotals | null;
+  upcomingVisits: number | null;
+  tomorrowVisits: number;
+  liveCount: number;
+  toConfirm: number;
+}) {
   const [open, setOpen] = useState(false);
+  const when = period === "total" ? "desde que publicaste" : `últimos ${periodLabels[period]}`;
+  const share = totals && totals.views ? Math.round((totals.contacts / totals.views) * 100) : null;
+  const cards: Array<{ icon: ReactElement<{ className?: string }>; label: string; value: number | null; note: string; muted?: boolean }> = [
+    { icon: <Eye />, label: "Personas que vieron", value: totals?.views ?? null, note: totals ? when : "Aún sin datos" },
+    { icon: <MessageCircle />, label: "Te escribieron", value: totals?.contacts ?? null, note: share !== null ? `${share}% de los que vieron` : when },
+    { icon: <CalendarCheck />, label: "Visitas reservadas", value: upcomingVisits, note: tomorrowVisits ? `${tomorrowVisits} mañana` : "Próximas" },
+    { icon: <Home />, label: "Anuncios activos", value: liveCount, note: toConfirm ? `${toConfirm} por confirmar` : liveCount ? "Todos al día" : "Publica la primera", muted: !toConfirm },
+  ];
   return (
-    <section className="hidden rounded-[28px] border border-black/10 bg-white p-5 lg:block">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#58745f]">Últimos 30 días</p>
-      <div className="mt-3 grid grid-cols-3 gap-2">
-        <MiniStat value={liveCount} label="Publicados" />
-        <MiniStat value={totals?.views ?? null} label="Vieron" />
-        <MiniStat value={totals?.contacts ?? null} label="WhatsApp" />
+    <section aria-label="Tus números">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4 lg:gap-3.5">
+        {cards.map((card, index) => (
+          <div key={card.label} className={`rounded-[18px] border p-3.5 sm:p-[18px] ${index === 0 ? "kpi-highlight border-[#176b4d] bg-[#176b4d] text-white" : "border-black/10 bg-white"}`}>
+            <p className={`flex items-center gap-2 text-[13px] font-medium sm:text-[13.5px] ${index === 0 ? "text-[#cdeedd]" : "text-neutral-600"}`}>
+              {cloneElement(card.icon, { className: `h-4 w-4 shrink-0 ${index === 0 ? "text-white" : "text-[#176b4d]"}` })}
+              {card.label}
+            </p>
+            <p className={`mt-2.5 text-[26px] font-semibold leading-none tracking-tight sm:text-[30px] ${index === 0 ? "text-white" : "text-neutral-950"}`}>
+              {card.value === null ? "—" : card.value.toLocaleString("es-BO")}
+            </p>
+            <p className={`mt-1.5 text-[12.5px] font-semibold ${index === 0 ? "text-[#cdeedd]" : card.muted ? "font-medium text-neutral-500" : "text-[#176b4d]"}`}>{card.note}</p>
+          </div>
+        ))}
       </div>
       <p className="mt-2 text-xs leading-5 text-neutral-600">Contamos personas distintas por anuncio: una vez por teléfono o computadora.</p>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="mt-1 inline-flex cursor-pointer items-center gap-1 text-xs font-semibold text-[#176b4d] underline-offset-4 hover:underline">
@@ -457,43 +614,176 @@ function StatsSection({ liveCount, totals }: { liveCount: number; totals: { view
   );
 }
 
-function UpcomingVisits({ bookings, titles, onShowAll }: { bookings: VisitBooking[]; titles: Map<string, string>; onShowAll: () => void }) {
-  const [[today, tomorrow]] = useState(() => {
-    const now = Date.now();
-    return [boliviaDayKey(new Date(now)), boliviaDayKey(new Date(now + 24 * 60 * 60_000))];
-  });
-  const groupOf = (booking: VisitBooking) => {
-    const day = boliviaDayKey(booking.startsAt);
-    return day === today ? "Hoy" : day === tomorrow ? "Mañana" : "Más adelante";
-  };
+function ListingsTable({
+  properties,
+  listingFor,
+  audienceUnavailable,
+  period,
+  visitCounts,
+  onManage,
+}: {
+  properties: Property[];
+  listingFor: (property: Property) => OwnerListingState;
+  audienceUnavailable: boolean;
+  period: Period;
+  visitCounts: Map<string, number> | null;
+  onManage: (slug: string) => void;
+}) {
+  const columns = "lg:grid-cols-[minmax(0,3.2fr)_1fr_0.6fr_0.75fr_0.6fr_1fr_88px]";
+  const pick = (audience: OwnerListingAudience | null | undefined, kind: "views" | "contacts") =>
+    audienceUnavailable || !audience ? null : audience[`${kind}${period === "7" ? "7" : period === "30" ? "30" : "Total"}`];
   return (
-    <section className="rounded-[28px] border border-black/10 bg-white p-5">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#58745f]">Próximas visitas</p>
+    <section className="overflow-hidden rounded-[18px] border border-black/10 bg-white" aria-labelledby="owner-homes-title">
+      <div className="flex items-center justify-between gap-3 p-4 sm:px-5">
+        <h2 id="owner-homes-title" className="text-base font-semibold text-neutral-950">Tus viviendas</h2>
+        <Link href="/publicar" className={outlineButton}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Publicar otra
+        </Link>
+      </div>
+      <div className={`hidden h-[38px] items-center gap-3 border-y border-black/10 bg-neutral-50 px-5 text-xs font-semibold uppercase tracking-[0.04em] text-neutral-500 lg:grid ${columns}`} aria-hidden="true">
+        <span>Vivienda</span><span>Estado</span><span>Vistas</span><span>WhatsApp</span><span>Visitas</span><span>Anuncio</span><span />
+      </div>
+      <ul>
+        {properties.map((property) => {
+          const listing = listingFor(property);
+          const live = listing.status === "live";
+          const urgent = live && availabilityPrompt(property)?.urgent;
+          const cover = property.images[0] ? ownerPhotoSrc(property.images[0], live) : null;
+          const percent = Math.round(((ownerListingChecks - getOwnerListingSuggestions(property).length) / ownerListingChecks) * 100);
+          const numbers: Array<[string, number | null]> = [
+            ["vistas", pick(listing.audience, "views")],
+            ["WhatsApp", pick(listing.audience, "contacts")],
+            ["visitas", visitCounts ? visitCounts.get(property.slug) ?? 0 : null],
+          ];
+          return (
+            <li key={property.slug} className={`grid grid-cols-3 items-center gap-3 border-t border-black/10 p-4 first:border-t-0 lg:px-5 lg:first:border-t-0 ${columns}`}>
+              <div className="col-span-3 flex min-w-0 items-center gap-3 lg:col-span-1">
+                {cover ? (
+                  <Image src={cover} alt="" width={168} height={124} sizes="96px" unoptimized={cover.startsWith("/api/")} className="h-[72px] w-24 shrink-0 rounded-[12px] object-cover lg:h-[62px] lg:w-[84px]" />
+                ) : (
+                  <span className="grid h-[72px] w-24 shrink-0 place-items-center rounded-[12px] bg-neutral-100 text-neutral-500 lg:h-[62px] lg:w-[84px]"><Home className="h-5 w-5" aria-hidden="true" /></span>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold leading-5 text-neutral-950 [overflow-wrap:anywhere]">{property.title}</p>
+                  <p className="text-[12.5px] text-neutral-600">{property.zone} · <PriceDisplay property={property} /></p>
+                </div>
+              </div>
+              <div className="col-span-3 lg:col-span-1">
+                {urgent ? (
+                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-1 text-[12.5px] font-semibold text-amber-900"><span className="h-1.5 w-1.5 rounded-full bg-current" />Por confirmar</span>
+                ) : (
+                  <ListingStatusBadge status={listing.status} />
+                )}
+              </div>
+              {numbers.map(([label, value]) => (
+                <p key={label} className="text-[15px] font-semibold text-neutral-950">
+                  {value === null ? "—" : value.toLocaleString("es-BO")}
+                  <span className="block text-[11.5px] font-normal text-neutral-500 lg:hidden">{label}</span>
+                </p>
+              ))}
+              <div className="col-span-2 flex items-center gap-2 text-[12.5px] text-neutral-600 lg:col-span-1">
+                <span
+                  className="relative grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full"
+                  style={{ background: `conic-gradient(#176b4d ${percent * 3.6}deg, rgb(0 0 0 / 0.1) 0)` }}
+                  role="img"
+                  aria-label={`Anuncio completo ${percent}%`}
+                >
+                  <span className="h-[22px] w-[22px] rounded-full bg-white" />
+                </span>
+                <span><strong className="text-neutral-950">{percent}%</strong><br />completo</span>
+              </div>
+              <div className="flex justify-end gap-1.5">
+                <Link href={`/propiedades/${property.slug}`} className={iconButton} title="Ver anuncio" aria-label={`Ver anuncio: ${property.title}`}>
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                </Link>
+                <button type="button" onClick={() => onManage(property.slug)} className={iconButton} title="Editar y más opciones" aria-label={`Editar y más opciones: ${property.title}`}>
+                  <Edit3 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+const iconButton =
+  "grid h-9 w-9 cursor-pointer place-items-center rounded-[10px] border border-[#cfe3d7] bg-white text-[#0d4d36] transition hover:border-[#176b4d]";
+
+function FunnelPanel({ period, totals, tip }: { period: Period; totals: PeriodTotals; tip: string | null }) {
+  const steps: Array<[string, number]> = [
+    ["Vieron", totals.views],
+    ["Te escribieron", totals.contacts],
+    ["Reservaron visita", totals.visits],
+  ];
+  const top = Math.max(1, totals.views);
+  return (
+    <section className="rounded-[18px] border border-black/10 bg-white p-5" aria-labelledby="owner-funnel-title">
+      <h2 id="owner-funnel-title" className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+        <BarChart3 className="h-[17px] w-[17px] text-[#176b4d]" aria-hidden="true" />
+        Del anuncio a la visita
+      </h2>
+      <p className="mt-1 text-[13.5px] text-neutral-600">
+        Cuántas personas avanzan en cada paso, {period === "total" ? "desde que publicaste" : `en los últimos ${periodLabels[period]}`}.
+      </p>
+      <dl className="mt-4 grid gap-2.5">
+        {steps.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-[96px_1fr_40px] items-center gap-3 text-[13.5px] sm:grid-cols-[120px_1fr_44px]">
+            <dt className="text-neutral-700">{label}</dt>
+            <dd className="h-[30px] overflow-hidden rounded-[8px] bg-neutral-100">
+              <span className="block h-full rounded-[8px] bg-[linear-gradient(90deg,#1f8a5e,#176b4d)]" style={{ width: `${value ? Math.max(4, Math.round((value / top) * 100)) : 0}%` }} />
+            </dd>
+            <dd className="text-right font-semibold text-neutral-950">{value.toLocaleString("es-BO")}</dd>
+          </div>
+        ))}
+      </dl>
+      {tip ? (
+        <p className="mt-4 flex gap-2 rounded-[12px] bg-amber-50 px-3 py-2.5 text-[13px] leading-5 text-amber-900">
+          <Sparkles className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          {tip}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
+function UpcomingVisits({ bookings, titles, onShowAll }: { bookings: VisitBooking[]; titles: Map<string, string>; onShowAll: () => void }) {
+  return (
+    <section className="rounded-[18px] border border-black/10 bg-white p-5" aria-labelledby="owner-visits-title">
+      <h2 id="owner-visits-title" className="flex items-center gap-2 text-base font-semibold text-neutral-950">
+        <CalendarCheck className="h-[17px] w-[17px] text-[#176b4d]" aria-hidden="true" />
+        Próximas visitas
+      </h2>
       {bookings.length === 0 ? (
         <p className="mt-2 text-sm leading-6 text-neutral-600">Todavía no hay visitas reservadas.</p>
       ) : (
-        <ul className="mt-1 grid">
-          {bookings.map((booking, index) => {
-            const group = groupOf(booking);
-            const firstOfGroup = index === 0 || groupOf(bookings[index - 1]) !== group;
-            const [day, rest] = visitShortLabel(booking.startsAt).split(" · ");
-            return (
-              <li key={booking.id}>
-                {firstOfGroup ? <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-neutral-500">{group}</p> : null}
-                <div className="flex items-center gap-3 border-t border-black/10 py-2.5 first:border-t-0">
-                  <span className="grid w-14 shrink-0 place-items-center rounded-[14px] border border-black/10 py-1 text-center text-xs leading-4 text-neutral-600">
+        <>
+          <p className="mt-1 text-[13.5px] text-neutral-600">Escríbele a cada persona para confirmar la dirección.</p>
+          <ul className="mt-2">
+            {bookings.map((booking) => {
+              const [day, rest] = visitShortLabel(booking.startsAt).split(" · ");
+              const message = `Hola ${booking.visitorName.split(" ")[0]}, te escribo por la visita que reservaste en Zentro Urbano para el ${visitWhenLabel(booking.startsAt)}.`;
+              return (
+                <li key={booking.id} className="flex items-center gap-3 border-t border-black/10 py-2.5">
+                  <span className="grid w-12 shrink-0 place-items-center rounded-[10px] border border-black/10 py-1 text-center text-[11.5px] font-semibold leading-4 text-neutral-500">
                     <span>{day.split(" ")[0]}</span>
-                    <span className="font-semibold text-neutral-950">{day.split(" ").slice(1).join(" ")}</span>
+                    <span className="text-[17px] text-neutral-950">{day.split(" ").slice(1, 2).join(" ")}</span>
                   </span>
-                  <span className="min-w-0 text-sm">
+                  <span className="min-w-0 flex-1 text-sm">
                     <strong className="block font-semibold text-neutral-950">{rest} · {booking.visitorName}</strong>
-                    <span className="block truncate text-neutral-600">{titles.get(booking.propertySlug) ?? ""}</span>
+                    <span className="block truncate text-[12.5px] text-neutral-600">{titles.get(booking.propertySlug) ?? ""}</span>
                   </span>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                  <a className={outlineButton} href={`https://wa.me/${booking.visitorWhatsapp}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">
+                    <WhatsAppIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">Escribir</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+        </>
       )}
       <button type="button" onClick={onShowAll} className="mt-3 inline-flex cursor-pointer items-center gap-1 text-sm font-semibold text-[#176b4d] underline-offset-4 hover:underline">
         Ver visitas y horarios <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -545,13 +835,13 @@ function TodaySection({
         key="confirm"
         tone="warn"
         icon={<CheckCircle2 />}
-        title={toConfirm === 1 ? "1 anuncio dice «Disponibilidad por confirmar»" : `${toConfirm} anuncios dicen «Disponibilidad por confirmar»`}
-        detail="Si siguen libres, confírmalos y vuelven a verse disponibles. Si alguno ya se alquiló, márcalo en Anuncios."
+        title={toConfirm === 1 ? "1 anuncio por confirmar" : `${toConfirm} anuncios por confirmar`}
+        detail="Si siguen libres, vuelven a verse disponibles. Si alguno ya se alquiló, márcalo en Anuncios."
       >
         <button
           type="button"
           disabled={busy}
-          className={taskButtonDark}
+          className={taskButtonAmber}
           onClick={async () => {
             setBusy(true);
             setError("");
@@ -566,7 +856,7 @@ function TodaySection({
           }}
         >
           {busy ? <LoaderCircle className="zu-spin h-4 w-4" aria-hidden="true" /> : <CheckCircle2 className="h-4 w-4" aria-hidden="true" />}
-          {toConfirm === 1 ? "Sigue disponible" : `Siguen disponibles (${toConfirm})`}
+          {toConfirm === 1 ? "Sí, sigue libre" : "Sí, siguen libres"}
         </button>
       </TaskRow>,
     );
@@ -581,10 +871,10 @@ function TodaySection({
   if (nextVisit) {
     const message = `Hola ${nextVisit.visitorName.split(" ")[0]}, te escribo por la visita que reservaste en Zentro Urbano para el ${visitWhenLabel(nextVisit.startsAt)}.`;
     tasks.push(
-      <TaskRow key="visit" icon={<CalendarCheck />} title={`${visitShortLabel(nextVisit.startsAt)} · ${nextVisit.visitorName}`} detail={`Visita a ${nextVisitTitle}. Escríbele para confirmar la dirección.`}>
-        <a className={taskButton} href={`https://wa.me/${nextVisit.visitorWhatsapp}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">
-          <MessageCircle className="h-4 w-4" aria-hidden="true" />
-          Escribir
+      <TaskRow key="visit" tone="green" icon={<MessageCircle />} title={`${capitalizeFirst(visitWhenLabel(nextVisit.startsAt))} viene ${nextVisit.visitorName.split(" ")[0]}`} detail={`${nextVisitTitle}. Escríbele para confirmar la dirección.`}>
+        <a className={taskButtonDark} href={`https://wa.me/${nextVisit.visitorWhatsapp}?text=${encodeURIComponent(message)}`} target="_blank" rel="noreferrer">
+          <WhatsAppIcon className="h-4 w-4" />
+          Escribir a {nextVisit.visitorName.split(" ")[0]}
         </a>
       </TaskRow>,
     );
@@ -612,12 +902,17 @@ function TodaySection({
   }
 
   return (
-    <section className="rounded-[28px] border border-black/10 bg-white p-5 sm:p-6" aria-labelledby="owner-today-title">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#58745f]">Para hoy</p>
-      <h2 id="owner-today-title" className="mt-1 text-2xl font-semibold tracking-tight text-neutral-950">
-        {tasks.length ? (tasks.length === 1 ? "1 cosa que te ayuda a alquilar más rápido" : `${tasks.length} cosas que te ayudan a alquilar más rápido`) : "Todo al día"}
-      </h2>
-      {tasks.length ? <div className="mt-4 grid gap-2.5">{tasks}</div> : (
+    <section className="rounded-[20px] border border-black/10 bg-white p-4 sm:p-[18px]" aria-labelledby="owner-today-title">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 id="owner-today-title" className="flex items-center gap-2 text-[17px] font-semibold text-neutral-950">
+          <CheckCircle2 className="h-[18px] w-[18px] text-[#176b4d]" aria-hidden="true" />
+          Para hoy
+        </h2>
+        <p className="text-[13.5px] text-neutral-600">
+          {tasks.length ? (tasks.length === 1 ? "1 cosa que te ayuda a alquilar más rápido" : `${tasks.length} cosas que te ayudan a alquilar más rápido`) : "Todo al día"}
+        </p>
+      </div>
+      {tasks.length ? <div className={`mt-3.5 grid gap-3 ${tasks.length === 1 ? "" : tasks.length % 2 === 0 ? "md:grid-cols-2" : "md:grid-cols-2 xl:grid-cols-3"}`}>{tasks}</div> : (
         <p className="mt-2 text-sm leading-6 text-neutral-600">No tienes nada pendiente. Te avisaremos aquí cuando algo necesite tu atención.</p>
       )}
       {notice ? <p role="status" className="mt-3 text-sm font-semibold text-[#176b4d]">{notice}</p> : null}
@@ -627,10 +922,13 @@ function TodaySection({
 }
 
 const taskButton =
-  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-neutral-800 transition hover:border-neutral-950";
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] border border-[#cfe3d7] bg-white px-4 text-sm font-semibold text-[#0d4d36] transition hover:border-[#176b4d]";
 const taskButtonDark =
-  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-[#21352b] disabled:cursor-wait disabled:opacity-60";
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#176b4d] px-4 text-sm font-semibold text-white transition hover:bg-[#10533b] disabled:cursor-wait disabled:opacity-60";
+const taskButtonAmber =
+  "inline-flex h-10 shrink-0 cursor-pointer items-center justify-center gap-2 rounded-[12px] bg-[#c77d12] px-4 text-sm font-semibold text-white transition hover:bg-[#a9690f] disabled:cursor-wait disabled:opacity-60";
 
+// One card of "Para hoy": icon, what to do and one button. Side by side on wide screens.
 function TaskRow({
   icon,
   title,
@@ -641,19 +939,18 @@ function TaskRow({
   icon: ReactElement<{ className?: string }>;
   title: string;
   detail: string;
-  tone?: "warn";
+  tone?: "warn" | "green";
   children: ReactNode;
 }) {
+  const bubble = tone === "warn" ? "bg-amber-100 text-amber-900" : tone === "green" ? "bg-[#e3f4ea] text-[#176b4d]" : "bg-neutral-100 text-[#58745f]";
   return (
-    <div className={`flex flex-wrap items-center gap-3 rounded-[18px] p-3 ring-1 ${tone === "warn" ? "bg-amber-50 ring-amber-300" : "bg-neutral-50 ring-black/10"}`}>
-      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[12px] bg-white text-[#58745f] ring-1 ring-black/10" aria-hidden="true">
-        {cloneElement(icon, { className: "h-4 w-4" })}
+    <div className={`grid grid-cols-[40px_1fr] content-start gap-x-3 gap-y-1 rounded-[16px] p-4 ring-1 md:flex md:flex-col md:gap-1.5 ${tone === "warn" ? "bg-amber-50 ring-amber-300" : "bg-neutral-50 ring-black/10"}`}>
+      <span className={`row-span-2 grid h-10 w-10 shrink-0 place-items-center rounded-[12px] md:mb-1 ${bubble}`} aria-hidden="true">
+        {cloneElement(icon, { className: "h-5 w-5" })}
       </span>
-      <div className="min-w-0 flex-1 basis-48">
-        <p className="text-sm font-semibold text-neutral-950">{title}</p>
-        <p className="text-sm leading-5 text-neutral-600">{detail}</p>
-      </div>
-      {children}
+      <p className="text-[15px] font-semibold text-neutral-950">{title}</p>
+      <p className="col-start-2 text-[13px] leading-5 text-neutral-600 md:mb-2">{detail}</p>
+      <div className="col-start-2 mt-2 md:mt-auto [&>*]:w-full md:[&>*]:w-auto">{children}</div>
     </div>
   );
 }
@@ -1575,12 +1872,12 @@ function EmptyPanel({
   href: string;
 }) {
   return (
-    <div className="rounded-[22px] border border-dashed border-black/15 bg-neutral-50 p-5">
+    <div className="rounded-[22px] border border-dashed border-black/15 bg-white p-5">
       <p className="text-base font-semibold text-neutral-950">{title}</p>
       <p className="mt-2 text-sm leading-6 text-neutral-600">{copy}</p>
       <Link
         href={href}
-        className="mt-4 inline-flex h-10 items-center justify-center rounded-full bg-neutral-950 px-4 text-sm font-semibold text-white transition hover:bg-[#21352b]"
+        className="mt-4 inline-flex h-10 items-center justify-center rounded-[12px] bg-[#176b4d] px-4 text-sm font-semibold text-white transition hover:bg-[#10533b]"
       >
         {actionLabel}
       </Link>
