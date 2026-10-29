@@ -13,6 +13,7 @@ import { visitWhenLabel } from "@/lib/visit-slots";
 import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { boliviaToday } from "@/lib/aliado-report-input";
 import { getPanelState, listMemberReports } from "@/lib/aliado-reports";
+import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
 
@@ -57,6 +58,7 @@ export default async function ClientPage() {
         visits={visits}
         login={login && login.account_id === dashboard.id ? { hasPassword: Boolean(Number(login.has_password)) } : null}
         urbanito={urbanitoLink ? { ...urbanitoLink, botUsername: urbanitoBotUsername } : null}
+        calendar={account?.storage === "mysql" && hasDatabaseConfig()}
       />
     </Suspense>
   );
