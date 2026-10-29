@@ -5,9 +5,10 @@ import { clientStageLabels, type AgencyClient } from "@/lib/crm-input";
 import { formatPrice, type Property } from "@/lib/properties";
 
 // Urbanito, the Telegram assistant, reads Zentro through /api/urbanito/* with a shared key
-// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). It only reads, except /publicar (a linked owner sends
-// a home to review, the same as the publish wizard; nothing goes live until an admin approves it) and
-// /clientes (an agent adds or updates a client in Clientes after confirming it in Telegram).
+// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). Besides reading, it does what the account could
+// do in Mi cuenta, always after the person confirms it in Telegram: /publicar (a home to review; nothing
+// goes live until an admin approves it), /casa ("sigue disponible", "ya se alquiló", "volver a publicar",
+// price), /visitas (cancel a visit, visit hours), /clientes and /compartir (agents only).
 
 export const urbanitoResultLimit = 8;
 export const urbanitoCodeMinutes = 15;

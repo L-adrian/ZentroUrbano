@@ -1,14 +1,17 @@
 import { hasDatabaseConfig } from "@/lib/mysql";
-import { CrmUnavailable, createClient, getAgency, getAgentLogin, listClients, updateClient, type CrmScope } from "@/lib/crm";
-import { readClientInput, type AgencyClient } from "@/lib/crm-input";
+import { CrmUnavailable, createClient, getAgency, getAgentLogin, listClients, markContacted, moveClient, updateClient, type CrmScope } from "@/lib/crm";
+import { clientAlert, isClientStage, isLostReason, readClientInput, type AgencyClient } from "@/lib/crm-input";
+import { boliviaParts } from "@/lib/calendar-input";
 import { getUrbanitoOwner } from "@/lib/urbanito";
 import { clientFormFields, clientNameMatches, readTelegramId, toUrbanitoClient, urbanitoResultLimit } from "@/lib/urbanito-input";
 import { forUrbanito, reply } from "../reply";
 
 export const runtime = "nodejs";
 
-// Clientes of an agent (or agency) linked to Urbanito. GET finds clients by name; POST creates one
-// or changes the one with that id. Urbanito always shows the change and asks before sending it.
+// Clientes of an agent (or agency) linked to Urbanito. GET finds clients by name, or with hoy=1 the
+// ones to contact today (late, unanswered, or with a next step today). POST creates one or changes
+// the one with that id; with "accion" it moves it to another stage or marks it as contacted.
+// Urbanito always shows the change and asks before sending it.
 type Who = { scope: CrmScope } | { error: Response };
 
 async function crmScope(telegramIdValue: unknown): Promise<Who> {
@@ -35,6 +38,18 @@ export async function GET(request: Request) {
     const who = await crmScope(params.get("telegram_id"));
     if ("error" in who) return who.error;
     try {
+      if (params.get("hoy") === "1") {
+        const now = Date.now();
+        const today = boliviaParts(new Date(now)).day;
+        const due = (await listClients(who.scope))
+          .map((client) => ({ client, alert: clientAlert(client, now) }))
+          .filter(({ client, alert }) => alert || (client.nextStepAt && boliviaParts(client.nextStepAt).day === today))
+          .sort((a, b) => (b.alert?.days ?? -1) - (a.alert?.days ?? -1));
+        return reply(200, {
+          pendientes: due.slice(0, 15).map(({ client, alert }) => ({ ...toUrbanitoClient(client), aviso: alert?.label ?? "Próximo paso hoy" })),
+          total: due.length,
+        });
+      }
       const query = (params.get("q") ?? "").slice(0, 120);
       const clients = (await listClients(who.scope)).filter((client) => !query || clientNameMatches(client.name, query));
       return reply(200, { clientes: clients.slice(0, urbanitoResultLimit).map(toUrbanitoClient), total: clients.length });
@@ -52,6 +67,24 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") return reply(400, { message: "Solicitud inválida." });
     const who = await crmScope(body.telegram_id);
     if ("error" in who) return who.error;
+    if (body.accion !== undefined) {
+      const id = typeof body.id === "string" ? body.id : "";
+      try {
+        if (body.accion === "contactado") {
+          const saved = await markContacted(who.scope, id);
+          return saved ? reply(200, { ok: true, cliente: toUrbanitoClient(saved) }) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
+        }
+        if (body.accion === "etapa" && isClientStage(body.etapa)) {
+          const reason = body.etapa === "perdido" ? (isLostReason(body.motivo) ? body.motivo : "otro") : null;
+          const saved = await moveClient(who.scope, id, body.etapa, reason);
+          return saved ? reply(200, { ok: true, cliente: toUrbanitoClient(saved) }) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
+        }
+        return reply(400, { message: "Acción no válida." });
+      } catch (error) {
+        if (error instanceof CrmUnavailable) return unavailable();
+        throw error;
+      }
+    }
     const changes = body.cambios && typeof body.cambios === "object" ? (body.cambios as Record<string, unknown>) : {};
     try {
       let current: AgencyClient | null = null;

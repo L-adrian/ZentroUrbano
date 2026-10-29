@@ -6,7 +6,11 @@ import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
 import { getListingAudience } from "@/lib/property-audience";
 import { isMissingTable } from "@/lib/team";
 import { hashLinkCode, listingLink, newLinkCode, normalizeLinkCode, readUrbanitoSnapshot, urbanitoCodeMinutes, urbanitoKeyMatches, type UrbanitoSnapshot } from "@/lib/urbanito-input";
-import { listBookingsFor } from "@/lib/visits";
+import { listBookingsFor, getVisitSettingsFor, cancelBooking, getBooking, saveVisitSettings } from "@/lib/visits";
+import { reconfirmDay, boliviaParts } from "@/lib/calendar-input";
+import { listPublicationRequests } from "@/lib/publication-requests";
+import { getAgency, getAgentLogin } from "@/lib/crm";
+import { normalizeVisitSettings } from "@/lib/visit-slots";
 
 export const urbanitoBotUsername = "UrbanitoZentroBot";
 
@@ -210,15 +214,23 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
           Object.fromEntries(slugs.map((slug, index) => [`slug${index}`, slug])),
         )) ?? []).map(mapPropertyRow)
       : [];
-    const [audience, bookings] = await Promise.all([
+    const [audience, bookings, hours, requests, agency, agent] = await Promise.all([
       getListingAudience(slugs).catch(() => null),
       listBookingsFor(slugs).catch(() => null),
+      getVisitSettingsFor(slugs).catch(() => null),
+      listPublicationRequests(account.id).catch(() => []),
+      getAgency(account.id).catch(() => null),
+      getAgentLogin(account.id).catch(() => null),
     ]);
+    const today = boliviaParts(new Date()).day;
     const statusBySlug = new Map(links.map((row) => [row.property_slug, row.status]));
     const titleBySlug = new Map(properties.map((property) => [property.slug, property.title]));
     return {
       cuenta: { nombre: account.display_name },
+      // The bot offers Clientes only to agents and agencies.
+      es_agente: Boolean(agency || agent),
       casas: properties.map((property) => ({
+        slug: property.slug,
         titulo: property.title,
         link: listingLink(origin, property.slug),
         estado: ownerListingStatusLabels[ownerListingStatus(statusBySlug.get(property.slug) ?? "active", property.published)],
@@ -227,11 +239,29 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
         vistas_total: audience ? audience.get(property.slug)?.viewsTotal ?? 0 : null,
         vistas_7_dias: audience ? audience.get(property.slug)?.views7 ?? 0 : null,
         disponible_confirmada: property.availabilityConfirmedAt ?? null,
+        // A live home asks every 21 days whether it is still free (the same date as the calendar).
+        confirmar_desde: property.published ? reconfirmDay(property.availabilityConfirmedAt) : null,
+        toca_confirmar: Boolean(property.published && (reconfirmDay(property.availabilityConfirmedAt) ?? today) <= today),
+        horarios_visita: hours?.[property.slug] ?? null,
       })),
+      // Requests of the last 30 days: in review, published, rejected or asked to be corrected.
+      solicitudes: requests
+        .filter((request) => Date.now() - Date.parse(request.reviewedAt ?? request.createdAt) < 30 * 86_400_000)
+        .slice(0, 10)
+        .map((request) => ({
+          id: request.id,
+          titulo: request.listing?.title || request.details?.title || "Vivienda sin título",
+          estado: request.status,
+          motivo: request.reviewReason ?? null,
+          corregir: request.status === "changes_requested" ? `${origin}/publicar?corregir=${encodeURIComponent(request.id)}` : null,
+          fecha: request.reviewedAt ?? request.createdAt,
+        })),
       visitas: (bookings ?? [])
         .filter((booking) => !booking.past && booking.status === "reserved")
         .slice(0, 20)
         .map((booking) => ({
+          id: booking.id,
+          slug: booking.propertySlug,
           casa: titleBySlug.get(booking.propertySlug) ?? booking.propertySlug,
           fecha: bolivianDate.format(new Date(booking.startsAt)),
           nombre: booking.visitorName,
@@ -251,4 +281,40 @@ export async function getUrbanitoOwner(telegramId: number) {
       { telegramId },
     ),
   );
+}
+
+// The linked account's own home (not closed): every change from Telegram checks this first.
+export async function urbanitoOwnsListing(accountId: string, slug: string) {
+  if (!/^[a-z0-9-]{1,180}$/.test(slug)) return false;
+  const row = await queryOne<{ id: string }>(
+    "select id from client_account_properties where account_id = :accountId and property_slug = :slug and status <> 'closed' limit 1",
+    { accountId, slug },
+  );
+  return Boolean(row);
+}
+
+// New monthly price of a home, in its own currency. Same limits as the editor in Mi cuenta.
+export async function setUrbanitoListingPrice(slug: string, price: number) {
+  await executeQuery(
+    `update properties set price = :price,
+            rental_details = case when rental_details is null then null else JSON_SET(rental_details, '$.price', :price) end,
+            updated_at = current_timestamp
+      where slug = :slug`,
+    { slug, price },
+  );
+}
+
+// Cancel a visit booked on one of the account's homes. Returns null when it is not theirs.
+export async function cancelUrbanitoVisit(accountId: string, bookingId: string) {
+  const booking = await getBooking(bookingId);
+  if (!booking || !(await urbanitoOwnsListing(accountId, booking.propertySlug))) return null;
+  return { cancelled: await cancelBooking(booking.id, "owner"), booking };
+}
+
+// Days and hours a home can be visited; null when the settings are not valid.
+export async function saveUrbanitoVisitHours(slug: string, raw: unknown) {
+  const settings = normalizeVisitSettings(raw);
+  if (!settings) return null;
+  await saveVisitSettings(slug, settings);
+  return settings;
 }
