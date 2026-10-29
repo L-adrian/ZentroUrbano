@@ -1,12 +1,16 @@
 import type { RowDataPacket } from "mysql2";
-import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
+import { markCorrected, ownerListingStatus, ownerListingStatusLabels, recentOwnerRequests } from "@/lib/listing-moderation";
 import { executeQuery, hasDatabaseConfig, queryOne, queryRows, withTransaction } from "@/lib/mysql";
 import { formatPrice } from "@/lib/properties";
 import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
 import { getListingAudience } from "@/lib/property-audience";
 import { isMissingTable } from "@/lib/team";
 import { hashLinkCode, listingLink, newLinkCode, normalizeLinkCode, readUrbanitoSnapshot, urbanitoCodeMinutes, urbanitoKeyMatches, type UrbanitoSnapshot } from "@/lib/urbanito-input";
-import { listBookingsFor } from "@/lib/visits";
+import { listBookingsFor, getVisitSettingsFor, cancelBooking, getBooking, saveVisitSettings } from "@/lib/visits";
+import { reconfirmDay, boliviaParts } from "@/lib/calendar-input";
+import { listPublicationRequests } from "@/lib/publication-requests";
+import { getAgency, getAgentLogin } from "@/lib/crm";
+import { normalizeVisitSettings } from "@/lib/visit-slots";
 
 export const urbanitoBotUsername = "UrbanitoZentroBot";
 
@@ -179,6 +183,16 @@ export async function unlinkTelegram(telegramId: number) {
   });
 }
 
+// A Telegram link counts as one more open session: when the sessions of an account are closed because
+// its password may be in the wrong hands, Urbanito loses access too. Never blocks the sign-in itself.
+export async function revokeUrbanitoLink(accountId: string) {
+  try {
+    await unlinkAccount(accountId);
+  } catch (error) {
+    if (!(error instanceof UrbanitoUnavailable)) console.error("urbanito revoke failed", error);
+  }
+}
+
 export async function unlinkAccount(accountId: string) {
   return guard(async () => {
     await forgetSnapshot("account_id = :accountId", { accountId });
@@ -210,28 +224,55 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
           Object.fromEntries(slugs.map((slug, index) => [`slug${index}`, slug])),
         )) ?? []).map(mapPropertyRow)
       : [];
-    const [audience, bookings] = await Promise.all([
+    const [audience, bookings, hours, requests, agency, agent] = await Promise.all([
       getListingAudience(slugs).catch(() => null),
       listBookingsFor(slugs).catch(() => null),
+      getVisitSettingsFor(slugs).catch(() => null),
+      listPublicationRequests(account.id).catch(() => []),
+      getAgency(account.id).catch(() => null),
+      getAgentLogin(account.id).catch(() => null),
     ]);
+    const today = boliviaParts(new Date()).day;
     const statusBySlug = new Map(links.map((row) => [row.property_slug, row.status]));
     const titleBySlug = new Map(properties.map((property) => [property.slug, property.title]));
     return {
       cuenta: { nombre: account.display_name },
+      // The bot offers Clientes only to agents and agencies.
+      es_agente: Boolean(agency || agent),
       casas: properties.map((property) => ({
+        slug: property.slug,
         titulo: property.title,
         link: listingLink(origin, property.slug),
         estado: ownerListingStatusLabels[ownerListingStatus(statusBySlug.get(property.slug) ?? "active", property.published)],
         zona: property.zone,
         precio: formatPrice(property),
+        moneda: property.currency === "USD" ? "USD" : "BOB",
         vistas_total: audience ? audience.get(property.slug)?.viewsTotal ?? 0 : null,
         vistas_7_dias: audience ? audience.get(property.slug)?.views7 ?? 0 : null,
         disponible_confirmada: property.availabilityConfirmedAt ?? null,
+        // A live home asks every 21 days whether it is still free (the same date as the calendar).
+        confirmar_desde: property.published ? reconfirmDay(property.availabilityConfirmedAt) : null,
+        toca_confirmar: Boolean(property.published && (reconfirmDay(property.availabilityConfirmedAt) ?? today) <= today),
+        horarios_visita: hours?.[property.slug] ?? null,
       })),
+      // The same requests as Mi cuenta: in review, asked to be corrected (until corrected) and decided lately.
+      solicitudes: recentOwnerRequests(markCorrected(requests))
+        .slice(0, 10)
+        .map((request) => ({
+          id: request.id,
+          titulo: request.listing?.title || request.details?.title || "Vivienda sin título",
+          estado: request.status,
+          motivo: request.reviewReason ?? null,
+          corregida: request.corrected,
+          corregir: request.status === "changes_requested" && !request.corrected && request.kind !== "republish" ? `${origin}/publicar?corregir=${encodeURIComponent(request.id)}` : null,
+          fecha: request.reviewedAt ?? request.createdAt,
+        })),
       visitas: (bookings ?? [])
         .filter((booking) => !booking.past && booking.status === "reserved")
         .slice(0, 20)
         .map((booking) => ({
+          id: booking.id,
+          slug: booking.propertySlug,
           casa: titleBySlug.get(booking.propertySlug) ?? booking.propertySlug,
           fecha: bolivianDate.format(new Date(booking.startsAt)),
           nombre: booking.visitorName,
@@ -240,4 +281,56 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
         })),
     };
   });
+}
+
+// The linked account that /publicar sends a home for: only active owners can publish (as in the wizard).
+export async function getUrbanitoOwner(telegramId: number) {
+  return guard(() =>
+    queryOne<{ id: string; kind: string; status: string; email: string; display_name: string; phone: string | null }>(
+      `select ca.id, ca.kind, ca.status, ca.email, ca.display_name, ca.phone from urbanito_links ul join client_accounts ca on ca.id = ul.account_id
+        where ul.telegram_id = :telegramId`,
+      { telegramId },
+    ),
+  );
+}
+
+// The linked account's own home (not closed): every change from Telegram checks this first.
+export async function urbanitoOwnsListing(accountId: string, slug: string) {
+  if (!/^[a-z0-9-]{1,180}$/.test(slug)) return false;
+  const row = await queryOne<{ id: string }>(
+    "select id from client_account_properties where account_id = :accountId and property_slug = :slug and status <> 'closed' limit 1",
+    { accountId, slug },
+  );
+  return Boolean(row);
+}
+
+// New monthly price of a home. The currency the owner said must be the one of the listing: changing
+// it goes through review, the same as in the editor of Mi cuenta. Returns the listing's currency.
+export async function setUrbanitoListingPrice(slug: string, price: number, currency: "BOB" | "USD") {
+  const current = await queryOne<{ currency: string }>("select currency from properties where slug = :slug", { slug });
+  if (!current) return { ok: false as const, currency: null };
+  if (current.currency !== currency) return { ok: false as const, currency: current.currency === "USD" ? "USD" as const : "BOB" as const };
+  await executeQuery(
+    `update properties set price = :price,
+            rental_details = case when rental_details is null then null else JSON_SET(rental_details, '$.price', :price) end,
+            updated_at = current_timestamp
+      where slug = :slug`,
+    { slug, price },
+  );
+  return { ok: true as const, currency };
+}
+
+// Cancel a visit booked on one of the account's homes. Returns null when it is not theirs.
+export async function cancelUrbanitoVisit(accountId: string, bookingId: string) {
+  const booking = await getBooking(bookingId);
+  if (!booking || !(await urbanitoOwnsListing(accountId, booking.propertySlug))) return null;
+  return { cancelled: await cancelBooking(booking.id, "owner"), booking };
+}
+
+// Days and hours a home can be visited; null when the settings are not valid.
+export async function saveUrbanitoVisitHours(slug: string, raw: unknown) {
+  const settings = normalizeVisitSettings(raw);
+  if (!settings) return null;
+  await saveVisitSettings(slug, settings);
+  return settings;
 }

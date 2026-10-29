@@ -66,7 +66,8 @@ export async function loginDatabaseGoogle(input: GoogleProfileInput) {
   if (!email || email.length > 190 || !subject || subject.length > 190) return denied();
   const avatar = input.avatarUrl?.startsWith("https://") && input.avatarUrl.length <= 600 ? input.avatarUrl : null;
   try {
-    return await withTransaction(async connection => {
+    let claimedAccount: string | null = null;
+    const result = await withTransaction(async connection => {
       const [users] = await connection.execute<RowDataPacket[]>("SELECT * FROM morada_users WHERE email=? OR provider_subject=? FOR UPDATE",[email,subject]);
       if (users.length > 1 || users.some(user=>user.email !== email || user.status !== "active" || (user.provider_subject && user.provider_subject !== subject))) return denied();
       const [accounts] = await connection.execute<RowDataPacket[]>("SELECT id,status FROM client_accounts WHERE email=? FOR UPDATE",[email]);
@@ -80,6 +81,7 @@ export async function loginDatabaseGoogle(input: GoogleProfileInput) {
         // old password and every open session stop working. The owner can create a new password in Mi cuenta.
         await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=?,password_hash=NULL WHERE id=?",[subject,userId]);
         await connection.execute("DELETE FROM morada_sessions WHERE user_id=?",[userId]);
+        claimedAccount = accountId;
       }
       else if (users.length) await connection.execute("UPDATE morada_users SET auth_provider='google',provider_subject=? WHERE id=?",[subject,userId]);
       else await connection.execute("INSERT INTO morada_users (id,account_id,email,auth_provider,provider_subject) VALUES (?,?,?,'google',?)",[userId,accountId,email,subject]);
@@ -87,5 +89,8 @@ export async function loginDatabaseGoogle(input: GoogleProfileInput) {
       if (avatar) await connection.execute("UPDATE client_accounts SET avatar_url=? WHERE id=? AND (avatar_url IS NULL OR avatar_url NOT LIKE '/media/cuentas/%')",[avatar,accountId]);
       return {ok:true as const,accountId,session:await session(connection,userId,accountId)};
     });
+    // The Telegram linked with that password stops working too.
+    if (claimedAccount) await (await import("@/lib/urbanito")).revokeUrbanitoLink(claimedAccount);
+    return result;
   } catch { return databaseAuthUnavailable(); }
 }
