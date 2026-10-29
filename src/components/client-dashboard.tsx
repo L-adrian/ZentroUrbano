@@ -42,6 +42,7 @@ import { UrbanitoBanner, UrbanitoStrip, UrbanitoTab, type UrbanitoAccount } from
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { OwnerShareKit } from "@/components/owner-share-kit";
 import { AccountAvatar, OwnerProfilePanel, type AccountLogin, type AccountProfile } from "@/components/owner-profile-panel";
+import { OwnerCalendar } from "@/components/owner-calendar";
 import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
 import "./listing-tones.css";
 import { currencyExchangeRateBobPerUsd, maxPropertyExchangeRate, parseCurrencyAmount, parsePropertyExchangeRate } from "@/lib/currency";
@@ -83,12 +84,15 @@ export function ClientDashboard({
   visits = null,
   login = null,
   urbanito = null,
+  calendar = false,
 }: {
   account: DemoAccount;
   visits?: OwnerVisits | null;
   login?: AccountLogin | null;
   // Null hides Urbanito (not configured, or 013_urbanito_links not run yet).
   urbanito?: UrbanitoAccount | null;
+  // Mi cuenta > Calendario reads /api/cliente/calendario, which needs a database account.
+  calendar?: boolean;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState<AccountProfile>({
@@ -111,7 +115,8 @@ export function ClientDashboard({
   // The tab lives in the address (#visitas, #perfil...) so links and the back button keep it.
   useEffect(() => {
     const fromHash = () => {
-      const hash = window.location.hash.slice(1);
+      // #visitas was the old name of the calendar tab.
+      const hash = window.location.hash.slice(1) === "visitas" ? "calendario" : window.location.hash.slice(1);
       setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) ? hash : "resumen");
     };
     fromHash();
@@ -267,7 +272,7 @@ export function ClientDashboard({
 
   const navCounts: Partial<Record<AccountTab, number>> = {
     anuncios: properties.length,
-    ...(visits ? { visitas: upcomingVisits.length } : {}),
+    ...(visits ? { calendario: upcomingVisits.length } : {}),
     solicitudes: requests.length,
   };
   const ownerName = account.companyName ?? profile.displayName;
@@ -344,7 +349,7 @@ export function ClientDashboard({
               )}
               <div className="grid grid-cols-[minmax(0,1fr)] gap-4 xl:grid-cols-2">
                 {periodTotals ? <FunnelPanel period={period} totals={periodTotals} tip={funnelTip} /> : null}
-                {visits ? <UpcomingVisits bookings={upcomingVisits.slice(0, 4)} titles={titles} onShowAll={() => showTab("visitas")} /> : null}
+                {visits ? <UpcomingVisits bookings={upcomingVisits.slice(0, 4)} titles={titles} onShowAll={() => showTab("calendario")} /> : null}
               </div>
             </>
           ) : null}
@@ -365,17 +370,23 @@ export function ClientDashboard({
             </section>
           ) : null}
 
-          {tab === "visitas" ? (
-            visits && properties.length > 0 ? (
-              <OwnerVisitsSection visits={visits} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} />
-            ) : (
-              <EmptyPanel
-                title="Todavía no hay visitas"
-                copy="Cuando tengas un anuncio publicado, aquí verás quién reservó una visita y podrás elegir los días y horas."
-                actionLabel="Publicar mi vivienda"
-                href="/publicar"
-              />
-            )
+          {tab === "calendario" ? (
+            <div className="grid gap-6">
+              {calendar ? <OwnerCalendar homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} /> : null}
+              {visits && properties.length > 0 ? (
+                <div className="grid gap-3">
+                  {calendar ? <h2 className="text-lg font-semibold tracking-[-0.01em] text-neutral-950">Reservas y horarios de visita</h2> : null}
+                  <OwnerVisitsSection visits={visits} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} />
+                </div>
+              ) : calendar ? null : (
+                <EmptyPanel
+                  title="Todavía no hay visitas"
+                  copy="Cuando tengas un anuncio publicado, aquí verás quién reservó una visita y podrás elegir los días y horas."
+                  actionLabel="Publicar mi vivienda"
+                  href="/publicar"
+                />
+              )}
+            </div>
           ) : null}
 
           {tab === "solicitudes" ? (
@@ -419,11 +430,11 @@ export function ClientDashboard({
   );
 }
 
-type AccountTab = "resumen" | "anuncios" | "visitas" | "solicitudes" | "urbanito" | "perfil";
+type AccountTab = "resumen" | "anuncios" | "calendario" | "solicitudes" | "urbanito" | "perfil";
 const accountTabs: Array<[AccountTab, string]> = [
   ["resumen", "Resumen"],
   ["anuncios", "Anuncios"],
-  ["visitas", "Visitas"],
+  ["calendario", "Calendario"],
   ["solicitudes", "Solicitudes"],
   ["urbanito", "Urbanito"],
   ["perfil", "Mi perfil"],
@@ -431,7 +442,7 @@ const accountTabs: Array<[AccountTab, string]> = [
 const tabTitles: Record<AccountTab, string> = {
   resumen: "Resumen",
   anuncios: "Tus viviendas",
-  visitas: "Visitas",
+  calendario: "Calendario",
   solicitudes: "Solicitudes",
   urbanito: "Urbanito",
   perfil: "Mi perfil",
@@ -447,7 +458,7 @@ const outlineButton =
 const navIcons: Record<AccountTab, ReactElement<{ className?: string }>> = {
   resumen: <LayoutGrid />,
   anuncios: <Home />,
-  visitas: <CalendarCheck />,
+  calendario: <CalendarCheck />,
   solicitudes: <Inbox />,
   urbanito: <Send />,
   perfil: <UserRound />,
@@ -882,7 +893,7 @@ function TodaySection({
   if (hoursOff) {
     tasks.push(
       <TaskRow key="hours" icon={<Clock3 />} title="Elige días y horas para visitar" detail="Así los interesados reservan solos y tú no coordinas por chat.">
-        <button type="button" className={taskButton} onClick={() => onShowTab("visitas")}>Elegir horarios</button>
+        <button type="button" className={taskButton} onClick={() => onShowTab("calendario")}>Elegir horarios</button>
       </TaskRow>,
     );
   }

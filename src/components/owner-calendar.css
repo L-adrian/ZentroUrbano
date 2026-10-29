@@ -1,0 +1,23 @@
+/* Calendar of Mi cuenta. Each kind keeps one color everywhere (month cell, day list, legend).
+   --k is the strong color (dots, bars, text on a tint), --kb the tint behind an event. */
+.cal-k-visita { --k: #0f766e; --kb: #ddf3ef; }
+.cal-k-llamada { --k: #a16207; --kb: #fdf3dc; }
+.cal-k-contrato { --k: #c2410c; --kb: #fdebe0; }
+.cal-k-cobro { --k: #2563c9; --kb: #e8f0fc; }
+.cal-k-reconfirmar { --k: #4b5563; --kb: #eef0f2; }
+.cal-k-urbanito { --k: #176b4d; --kb: #e2f2e9; }
+.cal-k-otro { --k: #475569; --kb: #e9edf2; }
+
+.dark .cal-k-visita { --k: #5fd3c1; --kb: rgb(95 211 193 / 0.14); }
+.dark .cal-k-llamada { --k: #f3c35b; --kb: rgb(243 195 91 / 0.14); }
+.dark .cal-k-contrato { --k: #ff9b6b; --kb: rgb(255 155 107 / 0.14); }
+.dark .cal-k-cobro { --k: #8db4ff; --kb: rgb(141 180 255 / 0.14); }
+.dark .cal-k-reconfirmar { --k: #b4bcc8; --kb: rgb(180 188 200 / 0.14); }
+.dark .cal-k-urbanito { --k: #6fe0a8; --kb: rgb(111 224 168 / 0.14); }
+.dark .cal-k-otro { --k: #c3cdda; --kb: rgb(195 205 218 / 0.14); }
+
+.cal-dot { background: var(--k); }
+.cal-chip { background: var(--kb); color: var(--k); }
+.cal-bar { box-shadow: inset 3px 0 0 var(--k); }
+.cal-check { border-color: var(--k); }
+.cal-check[aria-checked="true"] { background: var(--k); }

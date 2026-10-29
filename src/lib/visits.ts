@@ -144,6 +144,29 @@ export async function listBookingsFor(slugs: string[]): Promise<VisitBooking[] |
   }
 }
 
+// The calendar: visits of the owner's homes between two instants, cancelled ones included.
+export async function listBookingsBetween(slugs: string[], start: Date, end: Date): Promise<VisitBooking[] | null> {
+  if (!hasDatabaseConfig()) return null;
+  if (!slugs.length) return [];
+  try {
+    const rows = (await queryRows<BookingRow>(
+      `select ${bookingColumns} from visit_bookings
+        where property_slug in (${slugs.map((_, index) => `:slug${index}`).join(",")})
+          and starts_at >= :start and starts_at < :end
+        order by starts_at limit 500`,
+      {
+        ...Object.fromEntries(slugs.map((slug, index) => [`slug${index}`, slug])),
+        start: start.toISOString().slice(0, 19).replace("T", " "),
+        end: end.toISOString().slice(0, 19).replace("T", " "),
+      },
+    )) ?? [];
+    return rows.map(toBooking);
+  } catch (error) {
+    if (isMissingTable(error)) return null;
+    throw error;
+  }
+}
+
 export async function listRecentBookings(): Promise<VisitBooking[] | null> {
   if (!hasDatabaseConfig()) return null;
   try {
