@@ -241,3 +241,14 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
     };
   });
 }
+
+// The linked account that /publicar sends a home for: only active owners can publish (as in the wizard).
+export async function getUrbanitoOwner(telegramId: number) {
+  return guard(() =>
+    queryOne<{ id: string; kind: string; status: string; email: string; display_name: string; phone: string | null }>(
+      `select ca.id, ca.kind, ca.status, ca.email, ca.display_name, ca.phone from urbanito_links ul join client_accounts ca on ca.id = ul.account_id
+        where ul.telegram_id = :telegramId`,
+      { telegramId },
+    ),
+  );
+}

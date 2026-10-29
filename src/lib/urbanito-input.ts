@@ -3,7 +3,8 @@ import { getPropertyPriceInCurrency } from "@/lib/currency";
 import { formatPrice, type Property } from "@/lib/properties";
 
 // Urbanito, the Telegram assistant, reads Zentro through /api/urbanito/* with a shared key
-// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). Read-only: it never publishes or edits.
+// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). It only reads, except /publicar: a linked owner can send
+// a home to review, the same as the publish wizard. Nothing goes live until an admin approves it.
 
 export const urbanitoResultLimit = 8;
 export const urbanitoCodeMinutes = 15;
