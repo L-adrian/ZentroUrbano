@@ -55,7 +55,8 @@ export const nextAgentColor = (agents: Pick<AgencyAgent, "color">[]) =>
 
 export const crmLimits = { name: 120, wants: 160, nextStep: 160, note: 1000, budget: 10_000_000, agents: 30, clients: 2000 };
 
-export type AgencyAgent = { id: string; name: string; whatsapp: string | null; color: string; active: boolean };
+// username is the agent's own user, once the agency gave them one.
+export type AgencyAgent = { id: string; name: string; whatsapp: string | null; color: string; active: boolean; username?: string | null };
 
 export type AgencyClient = {
   id: string;
@@ -70,6 +71,8 @@ export type AgencyClient = {
   nextStep: string | null;
   nextStepAt: string | null;
   lastContactAt: string | null;
+  // The first answer, for the response time (null before 017_agency_tools).
+  firstContactAt?: string | null;
   lostReason: LostReason | null;
   note: string | null;
   stageChangedAt: string;
@@ -160,6 +163,22 @@ export function readAgentInput(body: unknown): AgentInputResult {
   const color = agentColors.find((option) => option === input.color) ?? agentColors[0];
   return { ok: true, agent: { name, whatsapp, color } };
 }
+
+// The agent's user: letters, numbers, dot, dash. The password is at least 8 characters.
+export type AgentLoginInputResult = { ok: true; username: string; password: string } | { ok: false; field: string; message: string };
+
+export function readAgentLoginInput(body: unknown): AgentLoginInputResult {
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const username = typeof input.usuario === "string" ? input.usuario.trim().toLowerCase() : "";
+  if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(username)) return { ok: false, field: "usuario", message: "Usa de 3 a 40 letras sin tilde, números, punto o guion. Por ejemplo ana.mercado" };
+  const password = typeof input.contrasena === "string" ? input.contrasena : "";
+  if (password.length < 8 || new TextEncoder().encode(password).length > 72) return { ok: false, field: "contrasena", message: "La contraseña necesita 8 caracteres como mínimo." };
+  return { ok: true, username, password };
+}
+
+// A suggested user from the agent's name: "Ana Mercado" -> "ana.mercado".
+export const suggestedUsername = (name: string) =>
+  name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, ".").replace(/^\.+|\.+$/g, "").split(".").slice(0, 2).join(".").slice(0, 40);
 
 // Who needs a message today. A new person waits at most one day; anyone else three days without
 // contact. A next step whose time passed always counts.

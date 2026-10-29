@@ -4,6 +4,8 @@ import { safeAuthNext } from "@/lib/auth-navigation";
 export const googleStateCookie = "morada_google_state";
 export const googleCallbackPath = "/api/auth/google/callback";
 const defaultClientId = "809668723376-r025lkrb69ma9mre361aa1i17lqt9rui.apps.googleusercontent.com";
+// The site's Google client, for sign-in and for Google Calendar.
+export const googleClientId = () => process.env.GOOGLE_CLIENT_ID?.trim() || defaultClientId;
 type OAuthEnvironment = { NEXT_PUBLIC_SITE_URL?: string; GOOGLE_REDIRECT_URI?: string; GOOGLE_CLIENT_ID?: string; GOOGLE_CLIENT_SECRET?: string };
 
 function isLoopback(hostname: string) { return ["localhost", "127.0.0.1", "[::1]"].includes(hostname); }

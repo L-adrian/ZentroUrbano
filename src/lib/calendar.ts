@@ -11,6 +11,7 @@ import {
   type CalendarKind,
 } from "@/lib/calendar-input";
 import { listClientSteps } from "@/lib/crm";
+import type { AgencyClient } from "@/lib/crm-input";
 import { executeQuery, hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
 import { isMissingTable } from "@/lib/team";
@@ -138,25 +139,31 @@ export async function getCalendar(accountId: string, start: Date, end: Date, hom
   });
 
   for (const client of steps) {
-    if (!client.nextStepAt) continue;
-    events.push({
-      id: `cliente-${client.id}`,
-      kind: client.stage === "visita" ? "visita" : "llamada",
-      source: "cliente",
-      title: `${client.nextStep ?? "Seguimiento"} · ${client.name}`,
-      startsAt: client.nextStepAt,
-      allDay: false,
-      repeatMonthly: false,
-      propertySlug: client.propertySlug,
-      propertyTitle: client.propertySlug ? titles.get(client.propertySlug) ?? null : null,
-      personName: client.name,
-      personWhatsapp: client.whatsapp,
-      note: client.wants,
-      cancelled: false,
-    });
+    const event = clientStepEvent(client, titles);
+    if (event) events.push(event);
   }
 
   return { events: sortCalendar(events), manualAvailable: manual !== null };
+}
+
+// A client's next step with a date, as a calendar event (agency and agent calendars).
+export function clientStepEvent(client: AgencyClient, titles: Map<string, string>): CalendarEvent | null {
+  if (!client.nextStepAt) return null;
+  return {
+    id: `cliente-${client.id}`,
+    kind: client.stage === "visita" ? "visita" : "llamada",
+    source: "cliente",
+    title: `${client.nextStep ?? "Seguimiento"} · ${client.name}`,
+    startsAt: client.nextStepAt,
+    allDay: false,
+    repeatMonthly: false,
+    propertySlug: client.propertySlug,
+    propertyTitle: client.propertySlug ? titles.get(client.propertySlug) ?? null : null,
+    personName: client.name,
+    personWhatsapp: client.whatsapp,
+    note: client.wants,
+    cancelled: false,
+  };
 }
 
 // null while 015_calendar_events is missing.

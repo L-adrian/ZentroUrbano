@@ -14,6 +14,7 @@ import {
   type CalendarKind,
   type ManualCalendarKind,
 } from "@/lib/calendar-input";
+import { GoogleCalendarCard } from "@/components/google-calendar-card";
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import "./owner-calendar.css";
 
@@ -351,12 +352,7 @@ export function OwnerCalendar({ homes }: { homes: Home[] }) {
               </div>
             )}
           </div>
-          <div className="self-start rounded-[8px] border border-black/10 bg-white px-4 py-3 text-[13px] leading-5 text-neutral-600">
-            <p className="font-semibold text-neutral-900">Google Calendar · pronto</p>
-            <p className="mt-1">
-              Primero lo usamos aquí. Mientras tanto, con <b className="font-semibold text-neutral-800">Bajar al celular</b> tus próximas visitas y avisos pasan al calendario de tu teléfono.
-            </p>
-          </div>
+          <GoogleCalendarCard />
         </aside>
       </div>
 

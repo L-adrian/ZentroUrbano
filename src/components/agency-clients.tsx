@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check, Columns3, Home, List, Pencil, Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, Check, Columns3, Home, KeyRound, List, Pencil, Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState, type DragEvent, type FormEvent, type ReactNode } from "react";
 import { addDays, boliviaParts } from "@/lib/calendar-input";
 import {
@@ -19,6 +19,7 @@ import {
   lostReasons,
   nextAgentColor,
   openClientStages,
+  suggestedUsername,
   type AgencyAgent,
   type AgencyClient,
   type ClientFilters,
@@ -106,6 +107,13 @@ function draftOf(client: AgencyClient): Draft {
   };
 }
 
+// An easy password to dictate: two words and two digits, e.g. "casa-verde-47".
+const passwordWords = ["casa", "patio", "techo", "llave", "jardin", "barrio", "puerta", "balcon", "verde", "norte", "sol", "luna"];
+function newPassword() {
+  const pick = () => passwordWords[crypto.getRandomValues(new Uint32Array(1))[0] % passwordWords.length];
+  return `${pick()}-${pick()}-${String(crypto.getRandomValues(new Uint32Array(1))[0] % 90 + 10)}`;
+}
+
 async function send(method: string, url: string, body?: Record<string, unknown>) {
   const response = await fetch(url, { method, headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const result = (await response.json().catch(() => ({}))) as Record<string, unknown>;
@@ -113,7 +121,9 @@ async function send(method: string, url: string, body?: Record<string, unknown>)
   return result;
 }
 
-export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName: string }) {
+// agentMode: an agent with their own user. They see only their clients, keep every client they add,
+// and do not manage agents or delete clients.
+export function AgencyClients({ homes, agencyName, agentMode = false }: { homes: Home[]; agencyName: string; agentMode?: boolean }) {
   // Read the clock once per visit, so ages and alerts stay put while the page is open.
   const [{ now, today }] = useState(() => ({ now: Date.now(), today: boliviaParts(new Date()).day }));
   const [clients, setClients] = useState<AgencyClient[] | null>(null);
@@ -210,10 +220,12 @@ export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName
             </button>
           ))}
         </div>
-        <button type="button" className={button} onClick={() => setAgentsOpen(true)}>
-          <Users className="h-4 w-4" aria-hidden="true" />
-          Agentes{activeAgents.length ? ` · ${activeAgents.length}` : ""}
-        </button>
+        {agentMode ? null : (
+          <button type="button" className={button} onClick={() => setAgentsOpen(true)}>
+            <Users className="h-4 w-4" aria-hidden="true" />
+            Agentes{activeAgents.length ? ` · ${activeAgents.length}` : ""}
+          </button>
+        )}
         <button type="button" className={`${greenButton} ml-auto`} onClick={() => setDraft(emptyDraft())} disabled={!clients}>
           <Plus className="h-4 w-4" aria-hidden="true" />
           Nuevo cliente
@@ -246,6 +258,7 @@ export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName
             onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
           />
         </label>
+        {agentMode ? null : (
         <select
           className={`${field} h-9 w-auto min-w-0 flex-[0_1_200px]`}
           aria-label="Agente"
@@ -258,6 +271,7 @@ export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName
           ))}
           <option value="sin-agente">Sin agente</option>
         </select>
+        )}
         <select
           className={`${field} h-9 w-auto min-w-0 flex-[0_1_190px]`}
           aria-label="De dónde llegó"
@@ -310,7 +324,7 @@ export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName
               <Plus className="h-4 w-4" aria-hidden="true" />
               Agregar el primer cliente
             </button>
-            {agents.length === 0 ? (
+            {agents.length === 0 && !agentMode ? (
               <button type="button" className={button} onClick={() => setAgentsOpen(true)}>
                 <UserPlus className="h-4 w-4" aria-hidden="true" />
                 Agregar agentes
@@ -333,6 +347,7 @@ export function AgencyClients({ homes, agencyName }: { homes: Home[]; agencyName
           draft={draft}
           homes={homes}
           agents={agents}
+          agentMode={agentMode}
           client={draft.id ? all.find((client) => client.id === draft.id) ?? null : null}
           now={now}
           onClose={() => setDraft(null)}
@@ -666,6 +681,7 @@ function ClientForm({
   agents,
   client,
   now,
+  agentMode,
   onClose,
   onSaved,
   onContacted,
@@ -675,6 +691,7 @@ function ClientForm({
   agents: AgencyAgent[];
   client: AgencyClient | null;
   now: number;
+  agentMode: boolean;
   onClose: () => void;
   onSaved: (client: AgencyClient | null, message: string) => void;
   onContacted: (client: AgencyClient) => void;
@@ -798,6 +815,7 @@ function ClientForm({
             </select>
             {fieldError("propiedad")}
           </label>
+          {agentMode ? null : (
           <label className={label}>
             Agente a cargo
             <select className={field} value={value.agente} onChange={(event) => set("agente", event.target.value)}>
@@ -808,6 +826,7 @@ function ClientForm({
             </select>
             {fieldError("agente")}
           </label>
+          )}
           <label className={label}>
             Qué busca
             <input className={field} value={value.busca} maxLength={crmLimits.wants} placeholder="2 dormitorios, Equipetrol, con garaje" onChange={(event) => set("busca", event.target.value)} />
@@ -855,7 +874,7 @@ function ClientForm({
         <div className="flex flex-wrap items-center gap-2">
           <button type="submit" className={greenButton} disabled={busy}>{value.id ? "Guardar cambios" : "Agregar cliente"}</button>
           <button type="button" className={button} onClick={onClose}>Cancelar</button>
-          {value.id ? (
+          {value.id && !agentMode ? (
             confirming ? (
               <span className="ml-auto flex gap-1.5">
                 <button
@@ -900,6 +919,8 @@ function LostPrompt({ client, onClose, onPick }: { client: AgencyClient; onClose
 
 function AgentsPanel({ agents, clients, onChange, onClose }: { agents: AgencyAgent[]; clients: AgencyClient[]; onChange: (agents: AgencyAgent[]) => void; onClose: () => void }) {
   const [editing, setEditing] = useState<{ id: string | null; nombre: string; whatsapp: string; color: string; activo: boolean } | null>(null);
+  const [login, setLogin] = useState<{ agent: AgencyAgent; usuario: string; contrasena: string } | null>(null);
+  const [given, setGiven] = useState<{ name: string; usuario: string; contrasena: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const open = (agentId: string) => clients.filter((client) => client.agentId === agentId && client.stage !== "alquilado" && client.stage !== "perdido").length;
@@ -922,27 +943,104 @@ function AgentsPanel({ agents, clients, onChange, onClose }: { agents: AgencyAge
     }
   }
 
+  async function saveLogin(event: FormEvent) {
+    event.preventDefault();
+    if (!login || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await send("PATCH", "/api/cliente/agentes", { id: login.agent.id, accion: "usuario", usuario: login.usuario, contrasena: login.contrasena });
+      onChange(result.agents as AgencyAgent[]);
+      setGiven({ name: login.agent.name, usuario: login.usuario.trim().toLowerCase(), contrasena: login.contrasena });
+      setLogin(null);
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <Modal title="Agentes" onClose={onClose} wide>
-      <p className="text-sm text-neutral-600">Cada agente tiene un color. Asígnale clientes y verás en el embudo quién atiende a quién. Por ahora entran con la cuenta de la inmobiliaria.</p>
+      <p className="text-sm text-neutral-600">Cada agente tiene un color. Dale un usuario y entra desde su celular a ver solo sus clientes.</p>
       {agents.length ? (
         <ul className="grid divide-y divide-black/[0.06] rounded-[8px] border border-black/10">
           {agents.map((agent) => (
             <li key={agent.id} className={`flex flex-wrap items-center gap-3 px-3 py-2.5 ${agent.active ? "" : "opacity-60"}`}>
               <AgentAvatar agent={agent} size={30} />
-              <div className="min-w-0 flex-1">
+              {/* On the phone the buttons go below the name. */}
+              <div className="min-w-0 flex-1 basis-[calc(100%-42px)] sm:basis-0">
                 <p className="text-sm font-semibold text-neutral-950">{agent.name}{agent.active ? "" : " · ya no está"}</p>
                 <p className="crm-num text-[12px] text-neutral-500">
                   {agent.whatsapp ? `+${agent.whatsapp}` : "Sin celular"} · {open(agent.id)} en curso · {won(agent.id)} alquilaron
                 </p>
+                <p className="text-[12px] text-neutral-500">{agent.username ? <>Usuario: <b className="font-semibold text-neutral-800">{agent.username}</b></> : "Todavía sin usuario"}</p>
               </div>
-              <button type="button" className={button} onClick={() => setEditing({ id: agent.id, nombre: agent.name, whatsapp: agent.whatsapp ?? "", color: agent.color, activo: agent.active })}>
+              <div className="flex gap-2 max-sm:pl-[42px]">
+              {agent.active ? (
+                <button
+                  type="button"
+                  className={button}
+                  onClick={() => {
+                    setEditing(null);
+                    setGiven(null);
+                    setLogin({ agent, usuario: agent.username ?? suggestedUsername(agent.name), contrasena: newPassword() });
+                  }}
+                >
+                  <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                  {agent.username ? "Nueva contraseña" : "Darle usuario"}
+                </button>
+              ) : null}
+              <button type="button" className={button} onClick={() => {
+                  setLogin(null);
+                  setEditing({ id: agent.id, nombre: agent.name, whatsapp: agent.whatsapp ?? "", color: agent.color, activo: agent.active });
+                }}>
                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                 Editar
               </button>
+              </div>
             </li>
           ))}
         </ul>
+      ) : null}
+
+      {given ? (
+        <div className="grid gap-2 rounded-[8px] border border-[#cfe3d7] bg-[#f1f8f4] p-3 text-[13px] text-[#0d4d36]" role="status">
+          <p className="font-semibold">Listo. Pásale esto a {given.name.split(" ")[0]}:</p>
+          <p className="crm-num">Entra a zentrourbano.com/login · Usuario: <b>{given.usuario}</b> · Contraseña: <b>{given.contrasena}</b></p>
+          <p className="text-[12px]">Guárdalo ahora: la contraseña no se vuelve a mostrar.</p>
+          <a
+            className="inline-flex h-9 w-fit items-center gap-2 rounded-[8px] bg-[#176b4d] px-3.5 text-[13px] font-semibold text-white hover:bg-[#10533b]"
+            href={`https://wa.me/${agents.find((agent) => agent.name === given.name)?.whatsapp ?? ""}?text=${encodeURIComponent(`Hola ${given.name.split(" ")[0]}, ya tienes tu usuario de Zentro Urbano para ver tus clientes.\nEntra a https://zentrourbano.com/login\nUsuario: ${given.usuario}\nContraseña: ${given.contrasena}`)}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <WhatsAppIcon className="h-4 w-4" />
+            Mandárselo por WhatsApp
+          </a>
+        </div>
+      ) : null}
+
+      {login ? (
+        <form onSubmit={saveLogin} className="grid gap-3 rounded-[8px] border border-black/10 bg-neutral-50 p-3">
+          <p className="text-[13px] font-semibold text-neutral-900">{login.agent.username ? `Nueva contraseña para ${login.agent.name}` : `Usuario para ${login.agent.name}`}</p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className={label}>
+              Usuario
+              <input className={field} value={login.usuario} maxLength={40} autoCapitalize="none" spellCheck={false} onChange={(event) => setLogin({ ...login, usuario: event.target.value })} required />
+            </label>
+            <label className={label}>
+              Contraseña
+              <input className={`${field} crm-num`} value={login.contrasena} maxLength={72} spellCheck={false} onChange={(event) => setLogin({ ...login, contrasena: event.target.value })} required />
+            </label>
+          </div>
+          <p className="text-[12px] text-neutral-500">Entra con este usuario en /login. Solo ve los clientes que tú le asignes. {login.agent.username ? "La contraseña anterior deja de funcionar." : ""}</p>
+          {error ? <p className="text-[13px] font-semibold text-red-700" role="alert">{error}</p> : null}
+          <div className="flex gap-2">
+            <button type="submit" className={greenButton} disabled={busy}>Guardar</button>
+            <button type="button" className={button} onClick={() => setLogin(null)}>Cancelar</button>
+          </div>
+        </form>
       ) : null}
 
       {editing ? (
@@ -976,7 +1074,7 @@ function AgentsPanel({ agents, clients, onChange, onClose }: { agents: AgencyAge
           {editing.id ? (
             <label className="flex items-center gap-2 text-[13px] font-semibold text-neutral-800">
               <input type="checkbox" checked={!editing.activo} onChange={(event) => setEditing({ ...editing, activo: !event.target.checked })} />
-              Ya no trabaja con nosotros (sus clientes guardan su nombre)
+              Ya no trabaja con nosotros (sus clientes guardan su nombre y su usuario deja de entrar)
             </label>
           ) : null}
           {error ? <p className="text-[13px] font-semibold text-red-700" role="alert">{error}</p> : null}

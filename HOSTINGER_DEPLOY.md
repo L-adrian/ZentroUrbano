@@ -43,6 +43,9 @@ Tambien puedes introducir las variables de CONFIGURACION.env.example manualmente
 - ZENTRO_REQUIRE_DATABASE=1 y MYSQL_CONNECTION_LIMIT=5.
 - NEXT_PUBLIC_SITE_URL=https://zentrourbano.com.
 - GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET y GOOGLE_REDIRECT_URI para activar Google.
+  Google Calendar en Mi cuenta usa el mismo cliente: activar la Google Calendar API, sumar el permiso
+  calendar.events en la pantalla de consentimiento y la URI
+  https://zentrourbano.com/api/cliente/google-calendar/callback. CALENDAR_TOKEN_KEY es opcional.
   No reutilices claves que se hayan compartido en mensajes.
 
 El registro publico crea propietarios, nunca administradores. La cuenta administradora

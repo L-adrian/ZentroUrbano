@@ -44,6 +44,7 @@ import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { OwnerShareKit } from "@/components/owner-share-kit";
 import { AccountAvatar, OwnerProfilePanel, type AccountLogin, type AccountProfile } from "@/components/owner-profile-panel";
 import { AgencyClients } from "@/components/agency-clients";
+import { AgencyPanel } from "@/components/agency-panel";
 import { OwnerCalendar } from "@/components/owner-calendar";
 import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
 import "./listing-tones.css";
@@ -123,7 +124,7 @@ export function ClientDashboard({
     const fromHash = () => {
       // #visitas was the old name of the calendar tab.
       const hash = window.location.hash.slice(1) === "visitas" ? "calendario" : window.location.hash.slice(1);
-      setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) && (hash !== "clientes" || isAgency) ? hash : "resumen");
+      setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) && ((hash !== "clientes" && hash !== "panel") || isAgency) ? hash : "resumen");
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -377,6 +378,16 @@ export function ClientDashboard({
             </section>
           ) : null}
 
+          {tab === "panel" && agency ? (
+            <AgencyPanel
+              agencyName={agency.name}
+              homes={properties.map((property) => {
+                const audience = listingFor(property).audience;
+                return { slug: property.slug, title: property.title, views30: audience?.views30 ?? 0, contacts30: audience?.contacts30 ?? 0 };
+              })}
+              visits={(visits?.bookings ?? []).map((booking) => ({ propertySlug: booking.propertySlug, startsAt: booking.startsAt, status: booking.status }))}
+            />
+          ) : null}
           {tab === "clientes" && agency ? <AgencyClients agencyName={agency.name} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} /> : null}
 
           {tab === "calendario" ? (
@@ -432,17 +443,18 @@ export function ClientDashboard({
             </div>
           ) : null}
 
-          {tab !== "resumen" && tab !== "urbanito" && tab !== "perfil" && tab !== "clientes" ? <OwnerServicesNote className="rounded-[22px]" /> : null}
+          {tab !== "resumen" && tab !== "urbanito" && tab !== "perfil" && tab !== "clientes" && tab !== "panel" ? <OwnerServicesNote className="rounded-[22px]" /> : null}
         </main>
       </div>
     </div>
   );
 }
 
-type AccountTab = "resumen" | "clientes" | "anuncios" | "calendario" | "solicitudes" | "urbanito" | "perfil";
+type AccountTab = "resumen" | "clientes" | "panel" | "anuncios" | "calendario" | "solicitudes" | "urbanito" | "perfil";
 const accountTabs: Array<[AccountTab, string]> = [
   ["resumen", "Resumen"],
   ["clientes", "Clientes"],
+  ["panel", "Panel"],
   ["anuncios", "Anuncios"],
   ["calendario", "Calendario"],
   ["solicitudes", "Solicitudes"],
@@ -452,6 +464,7 @@ const accountTabs: Array<[AccountTab, string]> = [
 const tabTitles: Record<AccountTab, string> = {
   resumen: "Resumen",
   clientes: "Clientes",
+  panel: "Panel de la inmobiliaria",
   anuncios: "Tus viviendas",
   calendario: "Calendario",
   solicitudes: "Solicitudes",
@@ -469,6 +482,7 @@ const outlineButton =
 const navIcons: Record<AccountTab, ReactElement<{ className?: string }>> = {
   resumen: <LayoutGrid />,
   clientes: <Users />,
+  panel: <BarChart3 />,
   anuncios: <Home />,
   calendario: <CalendarCheck />,
   solicitudes: <Inbox />,
@@ -500,7 +514,7 @@ function OwnerNav({
   onSelect: (tab: AccountTab) => void;
   onLogout: () => void;
 }) {
-  const items = accountTabs.filter(([id]) => (id !== "urbanito" || showUrbanito) && (id !== "clientes" || showClients));
+  const items = accountTabs.filter(([id]) => (id !== "urbanito" || showUrbanito) && ((id !== "clientes" && id !== "panel") || showClients));
   const item = "relative flex cursor-pointer items-center rounded-[12px] font-semibold transition";
   return (
     <aside className="owner-nav rounded-[22px] bg-[linear-gradient(180deg,#0f3b2b,#14513a)] p-3.5 text-white shadow-[0_18px_40px_rgb(15_59_43/0.25)] lg:sticky lg:top-24 lg:self-start lg:p-[18px]">
