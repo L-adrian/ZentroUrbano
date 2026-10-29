@@ -1,0 +1,14 @@
+/* Panel of an agency. One series per chart, so one color per chart: green for clients, slate for
+   lost clients. Text keeps the text colors; the bar only carries the size. */
+.crm-panel { --bar: #176b4d; --bar-soft: #e2f2e9; --bar-lost: #64748b; --track: #eef2ef; --grid: rgb(0 0 0 / 0.07); }
+.dark .crm-panel { --bar: #4cc08c; --bar-soft: rgb(76 192 140 / 0.16); --bar-lost: #94a3b8; --track: rgb(255 255 255 / 0.06); --grid: rgb(255 255 255 / 0.08); }
+
+.crm-bar { background: var(--bar); }
+.crm-bar-lost { background: var(--bar-lost); }
+.crm-track { background: var(--track); }
+.crm-gridline { border-color: var(--grid); }
+.crm-colbar { background: var(--bar); transition: opacity 120ms; }
+.crm-cols:hover .crm-colbar { opacity: 0.45; }
+.crm-cols .crm-colwrap:hover .crm-colbar,
+.crm-cols .crm-colwrap:focus-visible .crm-colbar { opacity: 1; }
+.crm-tip { box-shadow: 0 6px 20px rgb(0 0 0 / 0.16); }

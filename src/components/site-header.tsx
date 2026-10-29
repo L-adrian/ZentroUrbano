@@ -104,7 +104,9 @@ export function SiteHeader() {
   ];
   const accountHref = account.authenticated ? "/cliente" : "/login";
   const isAliado = account.kind === "aliado";
-  const isOwner = account.authenticated && !isAliado;
+  // An agency's agent has their own panel with only their clients.
+  const isAgent = account.kind === "agente";
+  const isOwner = account.authenticated && !isAliado && !isAgent;
   // A photo that fails to load (deleted file, expired Google link) falls back to the initials.
   const face: HeaderAccount = account.avatarUrl && account.avatarUrl === brokenAvatar ? { ...account, avatarUrl: null } : account;
   const markBroken = () => setBrokenAvatar(account.avatarUrl ?? null);
@@ -160,7 +162,7 @@ export function SiteHeader() {
                 : <p>Bienvenido a Zentro Urbano</p>}
               <div className="menu-section" role="group" aria-labelledby="menu-title-perfil">
                 <span className="menu-section-title" id="menu-title-perfil"><UserRound size={13} aria-hidden="true" />Tu perfil</span>
-                <Link href={accountHref} onClick={account.authenticated ? accountTab(null) : undefined}><LayoutDashboard size={18} />{account.authenticated ? (isAliado ? "Panel de aliado" : "Mi panel") : "Ingresar o crear cuenta"}<ArrowUpRight size={15} /></Link>
+                <Link href={accountHref} onClick={account.authenticated ? accountTab(null) : undefined}><LayoutDashboard size={18} />{account.authenticated ? (isAliado ? "Panel de aliado" : isAgent ? "Mis clientes" : "Mi panel") : "Ingresar o crear cuenta"}<ArrowUpRight size={15} /></Link>
                 {isOwner && <Link href="/cliente#anuncios" onClick={accountTab("anuncios")}><Megaphone size={18} />Mis anuncios</Link>}
                 {isOwner && <Link href="/cliente/solicitudes"><ClipboardList size={18} />Mis solicitudes</Link>}
               </div>

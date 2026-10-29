@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { AgentDashboard } from "@/components/agent-dashboard";
 import { AliadoDashboard, type AliadoPanelData } from "@/components/aliado-dashboard";
 import { ClientDashboard } from "@/components/client-dashboard";
 import { getCurrentAccount, getCurrentDashboardAccount, getCurrentLogin } from "@/lib/mysql-auth";
@@ -13,7 +14,8 @@ import { visitWhenLabel } from "@/lib/visit-slots";
 import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { boliviaToday } from "@/lib/aliado-report-input";
 import { getPanelState, listMemberReports } from "@/lib/aliado-reports";
-import { getAgency } from "@/lib/crm";
+import { getAgency, getAgentLogin } from "@/lib/crm";
+import { listCalendarHomes } from "@/lib/calendar";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
@@ -31,6 +33,14 @@ export default async function ClientPage() {
   const account = await getCurrentAccount();
   if (account?.kind === "aliado" && account.storage === "mysql") {
     return <AliadoDashboard data={await aliadoPanel(account.id, account.display_name, account.role_label)} />;
+  }
+  // An agent of an inmobiliaria: their clients only. A deactivated agent is signed out by the
+  // agency, so a missing row here just sends them away.
+  if (account?.kind === "agente" && account.storage === "mysql") {
+    const agent = await getAgentLogin(account.id).catch(() => null);
+    if (!agent) redirect("/propiedades");
+    const homes = await listCalendarHomes(agent.agencyAccountId).catch(() => []);
+    return <AgentDashboard agentName={agent.agentName} agencyName={agent.agencyName} color={agent.color} homes={homes.map((home) => ({ slug: home.slug, title: home.title }))} />;
   }
   if (account && account.kind !== "owner") {
     redirect("/propiedades");

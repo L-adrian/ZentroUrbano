@@ -1,0 +1,10 @@
+/* The agency report prints on A4 without the site header, footer or buttons. */
+@page { size: A4; margin: 14mm 12mm; }
+@media print {
+  .zu-header, .zu-footer, .zu-skip-link, nav.mobile-navigation, .no-print { display: none !important; }
+  .informe th { white-space: nowrap; }
+  body { background: #fff !important; }
+  .informe { padding: 0 !important; max-width: none !important; }
+  .informe section, .informe dl, .informe tr { break-inside: avoid; }
+  .informe * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

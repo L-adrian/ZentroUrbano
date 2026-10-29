@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { editableOwner } from "@/lib/account-profile";
 import {
   CalendarUnavailable,
@@ -9,6 +9,7 @@ import {
   updateCalendarEvent,
 } from "@/lib/calendar";
 import { readCalendarEventInput, readCalendarRange } from "@/lib/calendar-input";
+import { queueGoogleSync, syncIfStale } from "@/lib/google-calendar";
 import { isSameSiteRequest } from "@/lib/request-origin";
 import { validTeamId } from "@/lib/team";
 
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   if (!range) return reply(400, { ok: false, message: "Ese rango de fechas no es válido." });
   try {
     const data = await getCalendar(account.id, range.start, range.end);
+    after(() => syncIfStale(account.id));
     return reply(200, { ok: true, ...data });
   } catch (error) {
     console.error("calendar read failed", error);
@@ -36,7 +38,10 @@ async function ownerWrite(request: Request, work: (accountId: string, body: Reco
   const body = request.method === "DELETE" ? {} : ((await request.json().catch(() => null)) as Record<string, unknown> | null);
   if (!body) return reply(400, { ok: false, message: "No se pudo leer el pedido." });
   try {
-    return await work(account.id, body);
+    const response = await work(account.id, body);
+    // A change here also reaches the owner's Google Calendar, if connected.
+    if (response.ok) after(() => queueGoogleSync(account.id));
+    return response;
   } catch (error) {
     if (error instanceof CalendarUnavailable) return reply(503, { ok: false, message: "El calendario todavía no está listo para agregar eventos." });
     console.error("calendar write failed", error);
