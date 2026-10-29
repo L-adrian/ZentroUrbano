@@ -32,8 +32,8 @@ export async function agencyRequest(
   if (write && !isSameSiteRequest(request)) return crmReply(403, { ok: false, message: "Origen no permitido." });
   try {
     const scope = await currentCrmScope();
-    if (!scope) return crmReply(401, { ok: false, message: "Vuelve a ingresar a tu cuenta de inmobiliaria." });
-    if (options.agencyOnly && scope.agentId) return crmReply(403, { ok: false, message: "Esto lo hace la cuenta de la inmobiliaria." });
+    if (!scope) return crmReply(401, { ok: false, message: "Vuelve a ingresar a tu cuenta." });
+    if (options.agencyOnly && scope.agentId) return crmReply(403, { ok: false, message: "Esto lo hace la cuenta principal." });
     const body = write && request.method !== "DELETE" ? ((await request.json().catch(() => null)) as Record<string, unknown> | null) : {};
     if (!body) return crmReply(400, { ok: false, message: "No se pudo leer el pedido." });
     const response = await work({ accountId: scope.accountId, agentId: scope.agentId }, body);

@@ -156,7 +156,7 @@ function AccountCard({ account, agencies }: { account: AdminAccountSummary; agen
 
           <div className="mt-4 flex flex-wrap gap-2">
             <SoftBadge>{account.roleLabel}</SoftBadge>
-            <SoftBadge>{agencies?.[account.id]?.active ? "Inmobiliaria" : "Propietario"}</SoftBadge>
+            <SoftBadge>{agencies?.[account.id]?.active ? "Agente inmobiliario" : "Propietario"}</SoftBadge>
             {account.authProviders.length > 0 ? (
               account.authProviders.map((provider) => (
                 <SoftBadge key={provider}>{provider === "google" ? "Google" : "Email"}</SoftBadge>

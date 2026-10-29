@@ -17,10 +17,10 @@ async function readClient(scope: CrmScope, body: Record<string, unknown>) {
   if (!result.ok) return result;
   const { propertySlug, agentId } = result.client;
   if (propertySlug && !(await listCalendarHomes(scope.accountId)).some((home) => home.slug === propertySlug)) {
-    return { ok: false as const, field: "propiedad", message: "Esa vivienda no es de la inmobiliaria." };
+    return { ok: false as const, field: "propiedad", message: "Esa vivienda no está en tu cuenta." };
   }
   if (!scope.agentId && agentId && !(await listAgents(scope.accountId)).some((agent) => agent.id === agentId)) {
-    return { ok: false as const, field: "agente", message: "Ese agente no es de tu inmobiliaria." };
+    return { ok: false as const, field: "agente", message: "Esa persona no está en tu equipo." };
   }
   return result;
 }

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     async ({ accountId }, body) => {
       if (!validSlug(body.propiedad)) return crmReply(400, { ok: false, message: "Falta la vivienda." });
       const links = await createShareLink(accountId, body.propiedad);
-      return links ? crmReply(200, { ok: true, links }) : crmReply(404, { ok: false, message: "Esa vivienda no es de la inmobiliaria." });
+      return links ? crmReply(200, { ok: true, links }) : crmReply(404, { ok: false, message: "Esa vivienda no está en tu cuenta." });
     },
     { agencyOnly: true },
   );

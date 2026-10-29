@@ -14,7 +14,7 @@ export async function POST(request: Request, context: RouteContext<"/admin/cuent
   const payload = (await request.json().catch(() => null)) as { active?: unknown; name?: unknown } | null;
   const name = typeof payload?.name === "string" ? payload.name.replace(/\s+/g, " ").trim().slice(0, 160) : "";
   if (typeof payload?.active !== "boolean") return NextResponse.json({ ok: false, message: "Acción no válida." }, { status: 400 });
-  if (name.length < 2) return NextResponse.json({ ok: false, message: "Escribe el nombre de la inmobiliaria." }, { status: 400 });
+  if (name.length < 2) return NextResponse.json({ ok: false, message: "Escribe el nombre que verán sus clientes." }, { status: 400 });
   try {
     const owner = await queryOne<{ id: string }>("select id from client_accounts where id = :id and kind = 'owner'", { id });
     if (!owner) return NextResponse.json({ ok: false, message: "Esa cuenta no es de propietario." }, { status: 404 });
