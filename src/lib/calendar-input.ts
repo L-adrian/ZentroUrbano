@@ -20,7 +20,7 @@ export const calendarKindLabels: Record<CalendarKind, string> = {
   otro: "Otro",
 };
 
-export type CalendarSource = "manual" | "reserva" | "anuncio" | "urbanito";
+export type CalendarSource = "manual" | "reserva" | "anuncio" | "urbanito" | "cliente";
 
 export type CalendarEvent = {
   // Manual events keep their row id; a monthly one adds the month ("id@2026-11").

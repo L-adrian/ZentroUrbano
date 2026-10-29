@@ -26,6 +26,7 @@ import {
   ShoppingBag,
   Sparkles,
   UserRound,
+  Users,
   X,
   Clock3,
 } from "lucide-react";
@@ -42,6 +43,7 @@ import { UrbanitoBanner, UrbanitoStrip, UrbanitoTab, type UrbanitoAccount } from
 import { WhatsAppIcon } from "@/components/whatsapp-icon";
 import { OwnerShareKit } from "@/components/owner-share-kit";
 import { AccountAvatar, OwnerProfilePanel, type AccountLogin, type AccountProfile } from "@/components/owner-profile-panel";
+import { AgencyClients } from "@/components/agency-clients";
 import { OwnerCalendar } from "@/components/owner-calendar";
 import { OwnerVisitsSection, type OwnerVisits } from "@/components/owner-visits-section";
 import "./listing-tones.css";
@@ -85,6 +87,7 @@ export function ClientDashboard({
   login = null,
   urbanito = null,
   calendar = false,
+  agency = null,
 }: {
   account: DemoAccount;
   visits?: OwnerVisits | null;
@@ -93,6 +96,8 @@ export function ClientDashboard({
   urbanito?: UrbanitoAccount | null;
   // Mi cuenta > Calendario reads /api/cliente/calendario, which needs a database account.
   calendar?: boolean;
+  // An agency (inmobiliaria) also gets Clientes; null for a regular owner.
+  agency?: { name: string } | null;
 }) {
   const router = useRouter();
   const [profile, setProfile] = useState<AccountProfile>({
@@ -103,6 +108,7 @@ export function ClientDashboard({
   });
   const [tab, setTab] = useState<AccountTab>("resumen");
   const urbanitoAvailable = Boolean(urbanito);
+  const isAgency = Boolean(agency);
   const [period, setPeriod] = useState<Period>("30");
   // Read the clock once per visit, so the page stays stable while it is open.
   const [{ todayLabel, tomorrowKey, now }] = useState(() => ({
@@ -117,12 +123,12 @@ export function ClientDashboard({
     const fromHash = () => {
       // #visitas was the old name of the calendar tab.
       const hash = window.location.hash.slice(1) === "visitas" ? "calendario" : window.location.hash.slice(1);
-      setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) ? hash : "resumen");
+      setTab(isAccountTab(hash) && (hash !== "urbanito" || urbanitoAvailable) && (hash !== "clientes" || isAgency) ? hash : "resumen");
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
     return () => window.removeEventListener("hashchange", fromHash);
-  }, [urbanitoAvailable]);
+  }, [urbanitoAvailable, isAgency]);
 
   function showTab(next: AccountTab) {
     setTab(next);
@@ -288,6 +294,7 @@ export function ClientDashboard({
           counts={navCounts}
           pending={Boolean(toConfirm.length || needsFix.length)}
           showUrbanito={Boolean(urbanito)}
+          showClients={isAgency}
           urbanitoNew={Boolean(urbanito && !urbanito.linked)}
           onSelect={showTab}
           onLogout={logout}
@@ -370,6 +377,8 @@ export function ClientDashboard({
             </section>
           ) : null}
 
+          {tab === "clientes" && agency ? <AgencyClients agencyName={agency.name} homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} /> : null}
+
           {tab === "calendario" ? (
             <div className="grid gap-6">
               {calendar ? <OwnerCalendar homes={properties.map((property) => ({ slug: property.slug, title: property.title }))} /> : null}
@@ -423,16 +432,17 @@ export function ClientDashboard({
             </div>
           ) : null}
 
-          {tab !== "resumen" && tab !== "urbanito" && tab !== "perfil" ? <OwnerServicesNote className="rounded-[22px]" /> : null}
+          {tab !== "resumen" && tab !== "urbanito" && tab !== "perfil" && tab !== "clientes" ? <OwnerServicesNote className="rounded-[22px]" /> : null}
         </main>
       </div>
     </div>
   );
 }
 
-type AccountTab = "resumen" | "anuncios" | "calendario" | "solicitudes" | "urbanito" | "perfil";
+type AccountTab = "resumen" | "clientes" | "anuncios" | "calendario" | "solicitudes" | "urbanito" | "perfil";
 const accountTabs: Array<[AccountTab, string]> = [
   ["resumen", "Resumen"],
+  ["clientes", "Clientes"],
   ["anuncios", "Anuncios"],
   ["calendario", "Calendario"],
   ["solicitudes", "Solicitudes"],
@@ -441,6 +451,7 @@ const accountTabs: Array<[AccountTab, string]> = [
 ];
 const tabTitles: Record<AccountTab, string> = {
   resumen: "Resumen",
+  clientes: "Clientes",
   anuncios: "Tus viviendas",
   calendario: "Calendario",
   solicitudes: "Solicitudes",
@@ -457,6 +468,7 @@ const outlineButton =
 
 const navIcons: Record<AccountTab, ReactElement<{ className?: string }>> = {
   resumen: <LayoutGrid />,
+  clientes: <Users />,
   anuncios: <Home />,
   calendario: <CalendarCheck />,
   solicitudes: <Inbox />,
@@ -472,6 +484,7 @@ function OwnerNav({
   counts,
   pending,
   showUrbanito,
+  showClients,
   urbanitoNew,
   onSelect,
   onLogout,
@@ -482,11 +495,12 @@ function OwnerNav({
   counts: Partial<Record<AccountTab, number>>;
   pending: boolean;
   showUrbanito: boolean;
+  showClients: boolean;
   urbanitoNew: boolean;
   onSelect: (tab: AccountTab) => void;
   onLogout: () => void;
 }) {
-  const items = accountTabs.filter(([id]) => id !== "urbanito" || showUrbanito);
+  const items = accountTabs.filter(([id]) => (id !== "urbanito" || showUrbanito) && (id !== "clientes" || showClients));
   const item = "relative flex cursor-pointer items-center rounded-[12px] font-semibold transition";
   return (
     <aside className="owner-nav rounded-[22px] bg-[linear-gradient(180deg,#0f3b2b,#14513a)] p-3.5 text-white shadow-[0_18px_40px_rgb(15_59_43/0.25)] lg:sticky lg:top-24 lg:self-start lg:p-[18px]">
