@@ -3,13 +3,16 @@ import { BadgeCheck, Building2, Eye, Mail, MessageCircle, ShieldCheck, Users } f
 import type { ReactNode } from "react";
 import type { AdminAccountSummary } from "@/lib/admin-accounts";
 import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
+import { AdminAgencyToggle } from "@/components/admin-agency-toggle";
 
 type AdminAccountsOverviewProps = {
   databaseReady: boolean;
   accounts: AdminAccountSummary[];
+  // Accounts that are agencies (inmobiliarias); null while 016_agency_crm is missing.
+  agencies: Record<string, { name: string; active: boolean }> | null;
 };
 
-export function AdminAccountsOverview({ databaseReady, accounts }: AdminAccountsOverviewProps) {
+export function AdminAccountsOverview({ databaseReady, accounts, agencies }: AdminAccountsOverviewProps) {
   const totals = accounts.reduce(
     (summary, account) => ({
       accounts: summary.accounts + 1,
@@ -78,7 +81,7 @@ export function AdminAccountsOverview({ databaseReady, accounts }: AdminAccounts
 
           <div className="mt-6 space-y-4">
             {accounts.length > 0 ? (
-              accounts.map((account) => <AccountCard key={account.id} account={account} />)
+              accounts.map((account) => <AccountCard key={account.id} account={account} agencies={agencies} />)
             ) : (
               <div className="rounded-[24px] border border-dashed border-black/15 bg-neutral-50 p-5 text-sm text-neutral-600">
                 Todavía no hay cuentas creadas.
@@ -113,7 +116,7 @@ function MetricCard({
   );
 }
 
-function AccountCard({ account }: { account: AdminAccountSummary }) {
+function AccountCard({ account, agencies }: { account: AdminAccountSummary; agencies: AdminAccountsOverviewProps["agencies"] }) {
   return (
     <article className="rounded-[28px] border border-black/10 bg-white p-4 sm:p-5">
       <div className="grid gap-5 xl:grid-cols-[0.95fr_1.35fr]">
@@ -153,7 +156,7 @@ function AccountCard({ account }: { account: AdminAccountSummary }) {
 
           <div className="mt-4 flex flex-wrap gap-2">
             <SoftBadge>{account.roleLabel}</SoftBadge>
-            <SoftBadge>Propietario</SoftBadge>
+            <SoftBadge>{agencies?.[account.id]?.active ? "Inmobiliaria" : "Propietario"}</SoftBadge>
             {account.authProviders.length > 0 ? (
               account.authProviders.map((provider) => (
                 <SoftBadge key={provider}>{provider === "google" ? "Google" : "Email"}</SoftBadge>
@@ -169,6 +172,10 @@ function AccountCard({ account }: { account: AdminAccountSummary }) {
             <AccountStat label="Vistas · 30 días" value={account.views30} />
             <AccountStat label="WhatsApp · 30 días" value={account.whatsapp30} />
           </div>
+
+          {agencies ? (
+            <AdminAgencyToggle accountId={account.id} defaultName={account.companyName || account.displayName} agency={agencies[account.id] ?? null} />
+          ) : null}
 
           <p className="mt-4 text-xs font-medium text-neutral-400">
             Creada: {formatDate(account.createdAt)} · Actualizada: {formatDate(account.updatedAt)}

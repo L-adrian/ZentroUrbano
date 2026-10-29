@@ -10,6 +10,7 @@ import {
   type CalendarEventInput,
   type CalendarKind,
 } from "@/lib/calendar-input";
+import { listClientSteps } from "@/lib/crm";
 import { executeQuery, hasDatabaseConfig, queryOne, queryRows } from "@/lib/mysql";
 import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
 import { isMissingTable } from "@/lib/team";
@@ -62,10 +63,12 @@ export type CalendarData = { events: CalendarEvent[]; manualAvailable: boolean }
 export async function getCalendar(accountId: string, start: Date, end: Date, homes?: CalendarHome[]): Promise<CalendarData> {
   const ownHomes = homes ?? (await listCalendarHomes(accountId));
   const titles = new Map(ownHomes.map((home) => [home.slug, home.title]));
-  const [manual, bookings, urbanito] = await Promise.all([
+  const [manual, bookings, urbanito, steps] = await Promise.all([
     listManualEvents(accountId, start, end),
     listBookingsBetween(ownHomes.map((home) => home.slug), start, end).catch(() => null),
     getUrbanitoLink(accountId).catch(() => null),
+    // Only agencies have clients; for an owner this is empty.
+    listClientSteps(accountId, start, end).catch(() => []),
   ]);
   const events: CalendarEvent[] = (manual ?? []).map((event) => ({ ...event, propertyTitle: event.propertySlug ? titles.get(event.propertySlug) ?? null : null }));
 
@@ -133,6 +136,25 @@ export async function getCalendar(accountId: string, start: Date, end: Date, hom
       cancelled: false,
     });
   });
+
+  for (const client of steps) {
+    if (!client.nextStepAt) continue;
+    events.push({
+      id: `cliente-${client.id}`,
+      kind: client.stage === "visita" ? "visita" : "llamada",
+      source: "cliente",
+      title: `${client.nextStep ?? "Seguimiento"} · ${client.name}`,
+      startsAt: client.nextStepAt,
+      allDay: false,
+      repeatMonthly: false,
+      propertySlug: client.propertySlug,
+      propertyTitle: client.propertySlug ? titles.get(client.propertySlug) ?? null : null,
+      personName: client.name,
+      personWhatsapp: client.whatsapp,
+      note: client.wants,
+      cancelled: false,
+    });
+  }
 
   return { events: sortCalendar(events), manualAvailable: manual !== null };
 }

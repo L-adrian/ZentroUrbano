@@ -13,6 +13,7 @@ import { visitWhenLabel } from "@/lib/visit-slots";
 import { getVisitSettingsFor, listBookingsFor } from "@/lib/visits";
 import { boliviaToday } from "@/lib/aliado-report-input";
 import { getPanelState, listMemberReports } from "@/lib/aliado-reports";
+import { getAgency } from "@/lib/crm";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
@@ -43,11 +44,12 @@ export default async function ClientPage() {
 
   // Visits booked on the owner's listings; null while the visit tables are missing.
   const slugs = (dashboard.properties ?? []).map((property) => property.slug);
-  const [bookings, settings, login, urbanitoLink] = await Promise.all([
+  const [bookings, settings, login, urbanitoLink, agency] = await Promise.all([
     listBookingsFor(slugs).catch(() => null),
     getVisitSettingsFor(slugs).catch(() => null),
     getCurrentLogin(),
     urbanitoEnabled() ? getUrbanitoLink(dashboard.id).catch(() => null) : null,
+    account?.storage === "mysql" ? getAgency(dashboard.id).catch(() => null) : null,
   ]);
   const visits = bookings && settings ? { bookings, settings } : null;
 
@@ -59,6 +61,7 @@ export default async function ClientPage() {
         login={login && login.account_id === dashboard.id ? { hasPassword: Boolean(Number(login.has_password)) } : null}
         urbanito={urbanitoLink ? { ...urbanitoLink, botUsername: urbanitoBotUsername } : null}
         calendar={account?.storage === "mysql" && hasDatabaseConfig()}
+        agency={agency}
       />
     </Suspense>
   );

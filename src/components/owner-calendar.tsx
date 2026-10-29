@@ -387,6 +387,7 @@ const sourceNotes: Record<CalendarEvent["source"], string> = {
   reserva: "Reservada desde tu anuncio",
   anuncio: "Aviso de tu anuncio",
   urbanito: "Recordatorio de Urbanito",
+  cliente: "Próximo paso de un cliente",
 };
 
 function EventRow({
@@ -446,6 +447,9 @@ function EventRow({
             ) : null}
             {event.kind === "reconfirmar" ? (
               <Link className={button} href="/cliente#anuncios">Confirmar en Anuncios</Link>
+            ) : null}
+            {event.source === "cliente" ? (
+              <Link className={button} href="/cliente#clientes">Ver en Clientes</Link>
             ) : null}
             {event.propertySlug ? (
               <Link className={button} href={`/propiedades/${event.propertySlug}`} target="_blank">

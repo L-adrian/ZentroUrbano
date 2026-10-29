@@ -1,0 +1,29 @@
+/* Clientes of an agency. Each stage keeps one color everywhere (column, badge, filter).
+   --s is the strong color (bar, dot, text on a tint), --sb the tint behind it. */
+.crm-s-nuevo { --s: #2563c9; --sb: #e8f0fc; }
+.crm-s-contactado { --s: #a16207; --sb: #fdf3dc; }
+.crm-s-visita { --s: #0f766e; --sb: #ddf3ef; }
+.crm-s-negocia { --s: #c2410c; --sb: #fdebe0; }
+.crm-s-alquilado { --s: #176b4d; --sb: #e2f2e9; }
+.crm-s-perdido { --s: #6b7280; --sb: #eef0f2; }
+
+.dark .crm-s-nuevo { --s: #8db4ff; --sb: rgb(141 180 255 / 0.14); }
+.dark .crm-s-contactado { --s: #f3c35b; --sb: rgb(243 195 91 / 0.14); }
+.dark .crm-s-visita { --s: #5fd3c1; --sb: rgb(95 211 193 / 0.14); }
+.dark .crm-s-negocia { --s: #ff9b6b; --sb: rgb(255 155 107 / 0.14); }
+.dark .crm-s-alquilado { --s: #6fe0a8; --sb: rgb(111 224 168 / 0.14); }
+.dark .crm-s-perdido { --s: #b4bcc8; --sb: rgb(180 188 200 / 0.14); }
+
+.crm-top { border-top: 3px solid var(--s); }
+.crm-dot { background: var(--s); }
+.crm-badge { background: var(--sb); color: var(--s); }
+.crm-col { background: #eef2ef; }
+.dark .crm-col { background: rgb(255 255 255 / 0.04); }
+.crm-col[data-over="true"] { box-shadow: inset 0 0 0 2px var(--s); }
+.crm-num { font-variant-numeric: tabular-nums; }
+.crm-late { color: #a11d1d; }
+.dark .crm-late { color: #ff9c9c; }
+.crm-alert-chip { border-color: #e3a3a3; color: #a11d1d; background: #fff; }
+.crm-alert-chip[aria-pressed="true"] { background: #fdecec; }
+.dark .crm-alert-chip { border-color: rgb(255 156 156 / 0.4); color: #ff9c9c; background: transparent; }
+.dark .crm-alert-chip[aria-pressed="true"] { background: rgb(255 156 156 / 0.12); }
