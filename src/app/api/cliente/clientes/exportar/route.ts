@@ -5,7 +5,7 @@ import { agencyRequest } from "@/lib/crm-route";
 import { homeRows, panelPeriodLabels, panelPeriods, panelStats, type PanelPeriod } from "@/lib/crm-stats";
 import { getListingAudience } from "@/lib/property-audience";
 import { listBookingsFor } from "@/lib/visits";
-import { buildCsv, buildXlsx, type XlsxCell, type XlsxColumn } from "@/lib/xlsx";
+import { buildCsv, buildXlsx, type XlsxCell, type XlsxColumn, type XlsxSheet } from "@/lib/xlsx";
 
 const clientColumns: XlsxColumn[] = [
   { header: "Nombre", width: 26 },
@@ -28,8 +28,8 @@ const date = (value: string | null | undefined) => (value ? new Date(value) : nu
 const phoneText = (digits: string) => (digits.length > 8 ? `+${digits.slice(0, -8)} ${digits.slice(-8)}` : digits);
 const stamp = () => new Date(Date.now() - 4 * 3_600_000).toISOString().slice(0, 10);
 
-// Mi cuenta > Panel > Excel or CSV: every client of the agency (or of the agent). The Excel adds
-// the agents and the homes of the chosen period.
+// Mi cuenta > Panel > Excel or CSV: every client of the account (or of the agent). The Excel adds
+// the agents (when there is a team) and the homes of the chosen period.
 export async function GET(request: Request) {
   return agencyRequest(request, async (scope) => {
     const params = new URL(request.url).searchParams;
@@ -38,7 +38,11 @@ export async function GET(request: Request) {
     const [clients, agents, homes] = await Promise.all([listClients(scope), listAgents(scope.accountId), listCalendarHomes(scope.accountId)]);
     const titles = new Map(homes.map((home) => [home.slug, home.title]));
     const agentNames = new Map(agents.map((agent) => [agent.id, agent.name]));
-    const rows: XlsxCell[][] = clients.map((client) => [
+    // An agent who works alone gets no agent column and no agents sheet.
+    const team = agents.length > 0;
+    const agentColumn = clientColumns.findIndex((column) => column.header === "Agente");
+    const columns = team ? clientColumns : clientColumns.filter((_, index) => index !== agentColumn);
+    const fullRows: XlsxCell[][] = clients.map((client) => [
       client.name,
       // "+591 70011122": the space keeps it as text in Excel, so the number is not rounded.
       client.whatsapp ? phoneText(client.whatsapp) : null,
@@ -55,9 +59,10 @@ export async function GET(request: Request) {
       client.lostReason ? lostReasonLabels[client.lostReason] : null,
       client.note,
     ]);
+    const rows = team ? fullRows : fullRows.map((row) => row.filter((_, index) => index !== agentColumn));
     const name = `clientes-${stamp()}`;
     if (format === "csv") {
-      return new Response(buildCsv(clientColumns, rows), {
+      return new Response(buildCsv(columns, rows), {
         headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": `attachment; filename="${name}.csv"`, "Cache-Control": "private, no-store" },
       });
     }
@@ -75,8 +80,8 @@ export async function GET(request: Request) {
     );
     const label = panelPeriodLabels[period].toLowerCase();
     const file = buildXlsx([
-      { name: "Clientes", columns: clientColumns, rows },
-      {
+      { name: "Clientes", columns, rows },
+      ...(team ? [{
         name: `Agentes (${label})`,
         columns: [
           { header: "Agente", width: 24 },
@@ -98,7 +103,7 @@ export async function GET(request: Request) {
           row.responseHours === null ? null : Math.round(row.responseHours * 10) / 10,
           row.onTimeRate === null ? null : row.onTimeRate / 100,
         ]),
-      },
+      } satisfies XlsxSheet] : []),
       {
         name: `Viviendas (${label})`,
         columns: [

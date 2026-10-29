@@ -190,7 +190,7 @@ export function AgencyPanel({ homes, visits, agencyName }: { homes: Home[]; visi
         </Card>
       </div>
 
-      {stats.agents.length ? (
+      {agents.length && stats.agents.length ? (
         <Card title="Agentes" note={`Clientes que llegaron, cerraron y qué tan rápido respondieron ${periodWord}`} flush>
           {/* On the phone each agent is a short block; the table needs a wider screen. */}
           <ul className="border-t border-black/10 sm:hidden">
@@ -301,7 +301,7 @@ export function AgencyPanel({ homes, visits, agencyName }: { homes: Home[]; visi
       </Card>
 
       <p className="text-[12px] text-neutral-500">
-        Excel y CSV bajan todos los clientes de {agencyName}. El PDF arma un informe del periodo con tu logo, que es tu foto de perfil.
+        Excel y CSV bajan todos {agents.length ? `los clientes de ${agencyName}` : "tus clientes"}. El PDF arma un informe del periodo con tu logo, que es tu foto de perfil.
       </p>
 
       {sharing ? <ShareDialog home={sharing} onClose={() => setSharing(null)} /> : null}

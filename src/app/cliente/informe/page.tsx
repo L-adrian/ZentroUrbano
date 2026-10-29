@@ -16,7 +16,7 @@ import "./informe.css";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = buildSeoMetadata({ title: "Informe de la inmobiliaria", description: "Informe de clientes, agentes y viviendas.", path: "/cliente/informe", noIndex: true });
+export const metadata: Metadata = buildSeoMetadata({ title: "Informe de clientes", description: "Informe de clientes y viviendas.", path: "/cliente/informe", noIndex: true });
 
 const count = new Intl.NumberFormat("es-BO");
 const money = (value: number) => `Bs ${new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 }).format(value)}`;
@@ -106,7 +106,7 @@ export default async function AgencyReportPage(props: PageProps<"/cliente/inform
           </Block>
         ) : null}
 
-        {stats.agents.length ? (
+        {agents.length && stats.agents.length ? (
           <Block title="Agentes">
             <Table
               head={["Agente", "Llegaron", "En curso", "Alquilaron", "Cierre", "Responde en", "A tiempo"]}

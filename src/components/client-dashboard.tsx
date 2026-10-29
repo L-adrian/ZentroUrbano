@@ -290,7 +290,7 @@ export function ClientDashboard({
       <div className="mx-auto grid max-w-7xl grid-cols-[minmax(0,1fr)] gap-4 px-4 py-4 sm:px-6 sm:py-7 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-7 lg:px-8">
         <OwnerNav
           profile={profile}
-          roleLabel={account.roleLabel}
+          roleLabel={agency ? "Agente inmobiliario" : account.roleLabel}
           tab={tab}
           counts={navCounts}
           pending={Boolean(toConfirm.length || needsFix.length)}
@@ -464,7 +464,7 @@ const accountTabs: Array<[AccountTab, string]> = [
 const tabTitles: Record<AccountTab, string> = {
   resumen: "Resumen",
   clientes: "Clientes",
-  panel: "Panel de la inmobiliaria",
+  panel: "Tu panel",
   anuncios: "Tus viviendas",
   calendario: "Calendario",
   solicitudes: "Solicitudes",

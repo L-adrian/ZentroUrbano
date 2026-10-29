@@ -70,7 +70,7 @@ export default async function OwnerReportPage(props: PageProps<"/informe/[token]
           {stat("WhatsApp · 30 días", report.contacts30, `${report.contactsTotal === null ? "—" : count.format(report.contactsTotal)} en total`)}
           {stat("Visitas hechas", report.visitsPast, "Reservadas desde el anuncio")}
           {stat("Visitas por venir", report.visitsNext.length, "Ya tienen día y hora")}
-          {stat("Interesados", interested, "Anotados por la inmobiliaria")}
+          {stat("Interesados", interested, `Anotados por ${report.agencyName}`)}
         </dl>
 
         {report.visitsNext.length ? (

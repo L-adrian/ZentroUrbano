@@ -36,23 +36,24 @@ export function AdminAgencyToggle({ accountId, defaultName, agency }: { accountI
     <div className="mt-4 rounded-[16px] border border-black/10 bg-neutral-50 p-3 text-sm">
       <p className="flex items-center gap-2 font-semibold text-neutral-900">
         <Building2 className="h-4 w-4 text-[#58745f]" aria-hidden="true" />
-        {active ? "Es inmobiliaria: ve Clientes y Agentes" : "Inmobiliaria"}
+        {active ? "Es agente inmobiliario: ve Clientes y Panel" : "Agente inmobiliario"}
       </p>
       <div className="mt-2 flex flex-wrap gap-2">
-        <label className="sr-only" htmlFor={`agency-${accountId}`}>Nombre de la inmobiliaria</label>
+        <label className="sr-only" htmlFor={`agency-${accountId}`}>Nombre que verán sus clientes</label>
         <input
           id={`agency-${accountId}`}
           value={name}
           maxLength={160}
           onChange={(event) => setName(event.target.value)}
+          placeholder="Su nombre, o el de su inmobiliaria"
           className="h-9 min-w-0 flex-1 rounded-[10px] border border-black/15 bg-white px-3"
         />
         <button type="button" className="zu-button zu-button-secondary" disabled={busy} onClick={() => save(!active || name.trim() !== agency?.name)}>
           {busy ? <LoaderCircle size={16} className="zu-spin" aria-hidden="true" /> : null}
-          {active ? (name.trim() !== agency?.name ? "Guardar nombre" : "Quitar modo inmobiliaria") : "Activar como inmobiliaria"}
+          {active ? (name.trim() !== agency?.name ? "Guardar nombre" : "Quitar modo agente") : "Activar como agente inmobiliario"}
         </button>
       </div>
-      {active ? <p className="mt-2 text-xs text-neutral-500">Al quitarlo no se borra nada: sus clientes vuelven si lo activas otra vez.</p> : null}
+      {active ? <p className="mt-2 text-xs text-neutral-500">Si después trabaja con otras personas, las suma desde Clientes. Al quitarlo no se borra nada: sus clientes vuelven si lo activas otra vez.</p> : null}
       {error ? <p className="mt-2 text-xs font-semibold text-red-700" role="alert">{error}</p> : null}
     </div>
   );

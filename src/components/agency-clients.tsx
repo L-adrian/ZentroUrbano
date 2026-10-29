@@ -202,6 +202,8 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
   }
 
   const activeAgents = agents.filter((agent) => agent.active);
+  // An agent who works alone sees no agent columns or filters; "Sumar a mi equipo" stays at the end.
+  const solo = !agentMode && agents.length === 0;
 
   return (
     <div className="grid grid-cols-[minmax(0,1fr)] gap-3">
@@ -220,7 +222,7 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
             </button>
           ))}
         </div>
-        {agentMode ? null : (
+        {agentMode || solo ? null : (
           <button type="button" className={button} onClick={() => setAgentsOpen(true)}>
             <Users className="h-4 w-4" aria-hidden="true" />
             Agentes{activeAgents.length ? ` · ${activeAgents.length}` : ""}
@@ -258,7 +260,7 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
             onChange={(event) => setFilters((current) => ({ ...current, query: event.target.value }))}
           />
         </label>
-        {agentMode ? null : (
+        {agentMode || solo ? null : (
         <select
           className={`${field} h-9 w-auto min-w-0 flex-[0_1_200px]`}
           aria-label="Agente"
@@ -315,7 +317,7 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
         <div className="grid h-48 place-items-center rounded-[10px] border border-black/10 bg-white text-sm text-neutral-500">Cargando clientes…</div>
       ) : all.length === 0 ? (
         <section className="rounded-[10px] border border-dashed border-black/15 bg-white p-6">
-          <h2 className="text-base font-semibold text-neutral-950">Todavía no hay clientes en {agencyName}</h2>
+          <h2 className="text-base font-semibold text-neutral-950">{solo || agentMode ? "Todavía no tienes clientes" : `Todavía no hay clientes en ${agencyName}`}</h2>
           <p className="mt-1 max-w-[62ch] text-sm leading-6 text-neutral-600">
             Anota aquí a cada persona que pregunta por una vivienda: por WhatsApp, Facebook, el letrero o el anuncio en Zentro. Así nadie se queda sin respuesta y sabes en qué va cada uno.
           </p>
@@ -324,12 +326,6 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
               <Plus className="h-4 w-4" aria-hidden="true" />
               Agregar el primer cliente
             </button>
-            {agents.length === 0 && !agentMode ? (
-              <button type="button" className={button} onClick={() => setAgentsOpen(true)}>
-                <UserPlus className="h-4 w-4" aria-hidden="true" />
-                Agregar agentes
-              </button>
-            ) : null}
           </div>
         </section>
       ) : view === "embudo" ? (
@@ -342,12 +338,23 @@ export function AgencyClients({ homes, agencyName, agentMode = false }: { homes:
         <p className="text-sm text-neutral-600">Ningún cliente coincide con la búsqueda o los filtros.</p>
       ) : null}
 
+      {solo && clients ? (
+        <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-neutral-500">
+          ¿Trabajas con otras personas?
+          <button type="button" className="inline-flex cursor-pointer items-center gap-1 font-semibold text-[#176b4d] underline-offset-2 hover:underline" onClick={() => setAgentsOpen(true)}>
+            <UserPlus className="h-3.5 w-3.5" aria-hidden="true" />
+            Sumar a mi equipo
+          </button>
+        </p>
+      ) : null}
+
       {draft ? (
         <ClientForm
           draft={draft}
           homes={homes}
           agents={agents}
           agentMode={agentMode}
+          sender={{ name: agencyName, solo }}
           client={draft.id ? all.find((client) => client.id === draft.id) ?? null : null}
           now={now}
           onClose={() => setDraft(null)}
@@ -490,7 +497,7 @@ function Board({
     onDrop: (event: DragEvent) => drop(event, stage),
   });
   const card = (client: AgencyClient) => (
-    <ClientCard key={client.id} client={client} agent={client.agentId ? agentById.get(client.agentId) : undefined} homeTitle={client.propertySlug ? titles.get(client.propertySlug) : undefined} now={now} today={today} onOpen={() => onOpen(client)} />
+    <ClientCard key={client.id} client={client} agent={client.agentId ? agentById.get(client.agentId) : undefined} team={agentById.size > 0} homeTitle={client.propertySlug ? titles.get(client.propertySlug) : undefined} now={now} today={today} onOpen={() => onOpen(client)} />
   );
   const header = (stage: ClientStage, count: number, budget: number) => (
     <header className="crm-top rounded-t-[8px] border-x border-black/10 bg-white px-3 pb-2 pt-2.5">
@@ -555,7 +562,7 @@ function Board({
 
 const closedShown = 4;
 
-function ClientCard({ client, agent, homeTitle, now, today, onOpen }: { client: AgencyClient; agent?: AgencyAgent; homeTitle?: string; now: number; today: string; onOpen: () => void }) {
+function ClientCard({ client, agent, team, homeTitle, now, today, onOpen }: { client: AgencyClient; agent?: AgencyAgent; team: boolean; homeTitle?: string; now: number; today: string; onOpen: () => void }) {
   const days = daysInStage(client, now);
   return (
     <button
@@ -570,7 +577,7 @@ function ClientCard({ client, agent, homeTitle, now, today, onOpen }: { client: 
     >
       <span className="flex items-start justify-between gap-2">
         <span className="text-[13.5px] font-semibold leading-5 text-neutral-950 [overflow-wrap:anywhere]">{client.name}</span>
-        <AgentAvatar agent={agent} />
+        {team ? <AgentAvatar agent={agent} /> : null}
       </span>
       {homeTitle || client.wants ? (
         <span className="flex items-start gap-1.5 text-[12px] leading-4 text-neutral-600">
@@ -607,14 +614,16 @@ function ClientTable({
 }) {
   const head = "whitespace-nowrap px-3 py-2 text-left text-[11.5px] font-semibold uppercase tracking-[0.06em] text-neutral-500";
   const cell = "px-3 py-2.5 align-top";
+  // Without a team there is no agent column.
+  const team = agentById.size > 0;
   return (
     <div className="overflow-x-auto rounded-[10px] border border-black/10 bg-white">
-      <table className="w-full min-w-[820px] border-collapse text-[13px]">
+      <table className={`w-full ${team ? "min-w-[820px]" : "min-w-[700px]"} border-collapse text-[13px]`}>
         <thead className="border-b border-black/10 bg-neutral-50">
           <tr>
             <th className={head}>Cliente</th>
             <th className={head}>Etapa</th>
-            <th className={head}>Agente</th>
+            {team ? <th className={head}>Agente</th> : null}
             <th className={head}>Vivienda o qué busca</th>
             <th className={`${head} text-right`}>Presupuesto</th>
             <th className={head}>Próximo paso</th>
@@ -633,12 +642,14 @@ function ClientTable({
                   <StageBadge stage={client.stage} />
                   <p className="crm-num mt-1 whitespace-nowrap text-[12px] text-neutral-500">{client.lastContactAt ? `Contacto ${ago(client.lastContactAt, now)}` : "Sin contacto"}</p>
                 </td>
-                <td className={cell}>
-                  <span className="flex items-center gap-2">
-                    <AgentAvatar agent={agent} />
-                    <span className="whitespace-nowrap text-neutral-700">{agent?.name.split(" ")[0] ?? "—"}</span>
-                  </span>
-                </td>
+                {team ? (
+                  <td className={cell}>
+                    <span className="flex items-center gap-2">
+                      <AgentAvatar agent={agent} />
+                      <span className="whitespace-nowrap text-neutral-700">{agent?.name.split(" ")[0] ?? "—"}</span>
+                    </span>
+                  </td>
+                ) : null}
                 <td className={`${cell} max-w-[180px] text-neutral-700`}>
                   <span className="line-clamp-2">{(client.propertySlug ? titles.get(client.propertySlug) : null) ?? client.wants ?? "—"}</span>
                 </td>
@@ -682,6 +693,7 @@ function ClientForm({
   client,
   now,
   agentMode,
+  sender,
   onClose,
   onSaved,
   onContacted,
@@ -692,6 +704,8 @@ function ClientForm({
   client: AgencyClient | null;
   now: number;
   agentMode: boolean;
+  // Who the WhatsApp greeting comes from: the agent who works alone, or the agency.
+  sender: { name: string; solo: boolean };
   onClose: () => void;
   onSaved: (client: AgencyClient | null, message: string) => void;
   onContacted: (client: AgencyClient) => void;
@@ -733,7 +747,10 @@ function ClientForm({
 
   const firstName = value.nombre.trim().split(" ")[0] ?? "";
   const homeTitle = homes.find((home) => home.slug === value.propiedad)?.title;
-  const message = `Hola ${firstName}, te escribo de parte de la inmobiliaria${homeTitle ? ` por ${homeTitle}` : ""}.`;
+  const about = homeTitle ? ` por ${homeTitle}` : "";
+  const message = sender.solo
+    ? `Hola ${firstName}, soy ${sender.name}.${homeTitle ? ` Te escribo${about}.` : ""}`
+    : `Hola ${firstName}, te escribo de parte de ${sender.name}${about}.`;
 
   return (
     <Modal title={value.id ? value.nombre || "Cliente" : "Nuevo cliente"} onClose={onClose} wide>
@@ -815,7 +832,7 @@ function ClientForm({
             </select>
             {fieldError("propiedad")}
           </label>
-          {agentMode ? null : (
+          {agentMode || agents.length === 0 ? null : (
           <label className={label}>
             Agente a cargo
             <select className={field} value={value.agente} onChange={(event) => set("agente", event.target.value)}>
@@ -961,8 +978,12 @@ function AgentsPanel({ agents, clients, onChange, onClose }: { agents: AgencyAge
   }
 
   return (
-    <Modal title="Agentes" onClose={onClose} wide>
-      <p className="text-sm text-neutral-600">Cada agente tiene un color. Dale un usuario y entra desde su celular a ver solo sus clientes.</p>
+    <Modal title={agents.length ? "Agentes" : "Sumar a mi equipo"} onClose={onClose} wide>
+      <p className="text-sm text-neutral-600">
+        {agents.length
+          ? "Cada agente tiene un color. Dale un usuario y entra desde su celular a ver solo sus clientes."
+          : "Si trabajas con otras personas, súmalas aquí. Cada una tiene su color y su propio usuario, y ve solo los clientes que tú le asignes."}
+      </p>
       {agents.length ? (
         <ul className="grid divide-y divide-black/[0.06] rounded-[8px] border border-black/10">
           {agents.map((agent) => (
