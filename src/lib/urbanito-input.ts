@@ -1,10 +1,13 @@
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { getPropertyPriceInCurrency } from "@/lib/currency";
+import { boliviaParts } from "@/lib/calendar-input";
+import { clientStageLabels, type AgencyClient } from "@/lib/crm-input";
 import { formatPrice, type Property } from "@/lib/properties";
 
 // Urbanito, the Telegram assistant, reads Zentro through /api/urbanito/* with a shared key
-// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). It only reads, except /publicar: a linked owner can send
-// a home to review, the same as the publish wizard. Nothing goes live until an admin approves it.
+// (URBANITO_API_KEY here = ZENTRO_API_KEY in the bot). It only reads, except /publicar (a linked owner sends
+// a home to review, the same as the publish wizard; nothing goes live until an admin approves it) and
+// /clientes (an agent adds or updates a client in Clientes after confirming it in Telegram).
 
 export const urbanitoResultLimit = 8;
 export const urbanitoCodeMinutes = 15;
@@ -161,5 +164,47 @@ export function readUrbanitoSnapshot(body: unknown, showChat: boolean): Urbanito
       : [],
     plan: text(plan.nombre, 40) ? { nombre: text(plan.nombre, 40), usados: count(plan.usados), limite: count(plan.limite) || null } : null,
     totales: { recordatorios: count(totals.recordatorios), fichas: count(totals.fichas), preguntas: count(totals.preguntas) },
+  };
+}
+
+// Clientes for Urbanito: "juan perez" finds "Juan Pérez"; every word must appear in the name.
+const folded = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+export function clientNameMatches(name: string, query: string) {
+  const words = folded(query).split(/\s+/).filter(Boolean);
+  const target = folded(name);
+  return words.every((word) => target.includes(word));
+}
+
+// A saved client as the Clientes form sends it, so a change from Telegram keeps the rest.
+export function clientFormFields(client: AgencyClient): Record<string, unknown> {
+  const next = client.nextStepAt ? boliviaParts(client.nextStepAt) : null;
+  return {
+    nombre: client.name,
+    whatsapp: client.whatsapp ?? "",
+    etapa: client.stage,
+    origen: client.source,
+    presupuesto: client.budgetBob ?? "",
+    busca: client.wants ?? "",
+    proximoPaso: client.nextStep ?? "",
+    proximaFecha: next?.day ?? "",
+    proximaHora: next?.time ?? "",
+    motivo: client.lostReason ?? "",
+    nota: client.note ?? "",
+  };
+}
+
+// What the bot reads back: no ids of other tables, times in Bolivia.
+export function toUrbanitoClient(client: AgencyClient) {
+  const next = client.nextStepAt ? boliviaParts(client.nextStepAt) : null;
+  return {
+    id: client.id,
+    nombre: client.name,
+    etapa: clientStageLabels[client.stage],
+    whatsapp: client.whatsapp,
+    presupuesto: client.budgetBob,
+    busca: client.wants,
+    proximoPaso: client.nextStep,
+    proximaFecha: next ? `${next.day} ${next.time}` : null,
+    nota: client.note,
   };
 }

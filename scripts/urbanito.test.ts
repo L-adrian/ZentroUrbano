@@ -11,7 +11,11 @@ import {
   toUrbanitoListing,
   readUrbanitoSnapshot,
   urbanitoKeyMatches,
+  clientFormFields,
+  clientNameMatches,
+  toUrbanitoClient,
 } from "../src/lib/urbanito-input";
+import { readClientInput, type AgencyClient } from "../src/lib/crm-input";
 
 test("only the bot with the shared key gets in", () => {
   assert.equal(urbanitoKeyMatches("Bearer clave-larga", "clave-larga"), true);
@@ -80,4 +84,34 @@ test("the Urbanito summary is capped, cleaned and drops the chat when the owner 
   assert.deepEqual(shown.totales, { recordatorios: 4, fichas: 0, preguntas: 0 });
   assert.deepEqual(readUrbanitoSnapshot(body, false).chat, []);
   assert.deepEqual(readUrbanitoSnapshot(null, true).recordatorios, []);
+});
+
+test("Urbanito finds a client by name without accents or case", () => {
+  assert.equal(clientNameMatches("Juan Pérez Rojas", "juan perez"), true);
+  assert.equal(clientNameMatches("Juan Pérez Rojas", "perez"), true);
+  assert.equal(clientNameMatches("Juan Pérez Rojas", "juan vaca"), false);
+});
+
+test("a change from Telegram keeps what it does not mention", () => {
+  const client: AgencyClient = {
+    id: "11111111-1111-1111-1111-111111111111", name: "Juan Pérez", whatsapp: "59170012345", stage: "visita", source: "facebook",
+    budgetBob: 4000, wants: "Depto de 2 dormitorios", propertySlug: "depto-equipetrol", agentId: null,
+    nextStep: "Visita", nextStepAt: "2026-10-30T20:30:00.000Z", lastContactAt: null, lostReason: null, note: "Tiene un perro",
+    stageChangedAt: "2026-10-28T12:00:00.000Z", createdAt: "2026-10-27T12:00:00.000Z",
+  };
+  const form = clientFormFields(client);
+  assert.equal(form.proximaFecha, "2026-10-30");
+  assert.equal(form.proximaHora, "16:30");
+  const merged = readClientInput({ ...form, proximoPaso: "Llamarlo", proximaFecha: "2026-11-02", proximaHora: "10:00", propiedad: client.propertySlug });
+  assert.ok(merged.ok);
+  if (!merged.ok) return;
+  assert.equal(merged.client.nextStep, "Llamarlo");
+  assert.equal(merged.client.nextStepAt?.toISOString(), "2026-11-02T14:00:00.000Z");
+  assert.equal(merged.client.stage, "visita");
+  assert.equal(merged.client.budgetBob, 4000);
+  assert.equal(merged.client.whatsapp, "59170012345");
+  assert.equal(merged.client.note, "Tiene un perro");
+  assert.equal(merged.client.propertySlug, "depto-equipetrol");
+  assert.deepEqual(toUrbanitoClient(client).proximaFecha, "2026-10-30 16:30");
+  assert.equal(toUrbanitoClient(client).etapa, "Visita agendada");
 });
