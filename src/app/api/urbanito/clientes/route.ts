@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { CrmUnavailable, createClient, getAgency, getAgentLogin, listClients, markContacted, moveClient, updateClient, type CrmScope } from "@/lib/crm";
-import { clientAlert, isClientStage, isLostReason, readClientInput, type AgencyClient } from "@/lib/crm-input";
+import { clientAlert, isClientStage, openClientStages, isLostReason, readClientInput, type AgencyClient } from "@/lib/crm-input";
 import { boliviaParts } from "@/lib/calendar-input";
+import { queueAgencySync } from "@/lib/google-calendar";
 import { getUrbanitoOwner } from "@/lib/urbanito";
 import { clientFormFields, clientNameMatches, readTelegramId, toUrbanitoClient, urbanitoResultLimit } from "@/lib/urbanito-input";
 import { forUrbanito, reply } from "../reply";
@@ -43,7 +45,7 @@ export async function GET(request: Request) {
         const today = boliviaParts(new Date(now)).day;
         const due = (await listClients(who.scope))
           .map((client) => ({ client, alert: clientAlert(client, now) }))
-          .filter(({ client, alert }) => alert || (client.nextStepAt && boliviaParts(client.nextStepAt).day === today))
+          .filter(({ client, alert }) => alert || (openClientStages.includes(client.stage) && client.nextStepAt && boliviaParts(client.nextStepAt).day === today))
           .sort((a, b) => (b.alert?.days ?? -1) - (a.alert?.days ?? -1));
         return reply(200, {
           pendientes: due.slice(0, 15).map(({ client, alert }) => ({ ...toUrbanitoClient(client), aviso: alert?.label ?? "Próximo paso hoy" })),
@@ -67,17 +69,23 @@ export async function POST(request: Request) {
     if (!body || typeof body !== "object") return reply(400, { message: "Solicitud inválida." });
     const who = await crmScope(body.telegram_id);
     if ("error" in who) return who.error;
+    const { scope } = who;
+    // Next steps with a date also reach the Google Calendars of the agency and its agents, as on the web.
+    const synced = (response: Response) => {
+      if (response.ok) after(() => queueAgencySync(scope.accountId));
+      return response;
+    };
     if (body.accion !== undefined) {
       const id = typeof body.id === "string" ? body.id : "";
       try {
         if (body.accion === "contactado") {
           const saved = await markContacted(who.scope, id);
-          return saved ? reply(200, { ok: true, cliente: toUrbanitoClient(saved) }) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
+          return saved ? synced(reply(200, { ok: true, cliente: toUrbanitoClient(saved) })) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
         }
         if (body.accion === "etapa" && isClientStage(body.etapa)) {
           const reason = body.etapa === "perdido" ? (isLostReason(body.motivo) ? body.motivo : "otro") : null;
           const saved = await moveClient(who.scope, id, body.etapa, reason);
-          return saved ? reply(200, { ok: true, cliente: toUrbanitoClient(saved) }) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
+          return saved ? synced(reply(200, { ok: true, cliente: toUrbanitoClient(saved) })) : reply(404, { message: "No encontré ese cliente en tu cuenta." });
         }
         return reply(400, { message: "Acción no válida." });
       } catch (error) {
@@ -97,7 +105,7 @@ export async function POST(request: Request) {
       if (!input.ok) return reply(400, { code: "VALIDATION_ERROR", field: input.field, message: input.message });
       const saved = current ? await updateClient(who.scope, current.id, input.client) : await createClient(who.scope, input.client);
       if (!saved) return reply(404, { message: "No encontré ese cliente en tu cuenta." });
-      return reply(current ? 200 : 201, { ok: true, creado: !current, cliente: toUrbanitoClient(saved) });
+      return synced(reply(current ? 200 : 201, { ok: true, creado: !current, cliente: toUrbanitoClient(saved) }));
     } catch (error) {
       if (error instanceof CrmUnavailable) return unavailable();
       throw error;

@@ -99,5 +99,8 @@ export async function changeAccountPassword(current: unknown, next: unknown): Pr
     // Anyone who signed in with the old password is signed out; this device stays in.
     await connection.execute("delete from morada_sessions where user_id = ? and id <> ?", [login.user_id, login.session_id]);
   });
+  // So does a Telegram linked to Urbanito; the owner links it again from Mi cuenta. A first password
+  // (an account made with Google) replaces nothing, so the link stays.
+  if (user?.password_hash) await (await import("@/lib/urbanito")).revokeUrbanitoLink(login.account_id);
   return { ok: true };
 }

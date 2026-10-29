@@ -115,6 +115,8 @@ export function toUrbanitoListing(property: Property, origin: string) {
     mascotas: property.pets,
     amoblado: property.furnished,
     link: listingLink(origin, property.slug),
+    // When it was first published: the bot's alerts only announce homes published after they were made.
+    publicada: property.publishedAt ?? null,
   };
 }
 
@@ -181,7 +183,8 @@ export function clientFormFields(client: AgencyClient): Record<string, unknown> 
   const next = client.nextStepAt ? boliviaParts(client.nextStepAt) : null;
   return {
     nombre: client.name,
-    whatsapp: client.whatsapp ?? "",
+    // Stored as digits only; the reader wants the "+" back for numbers from other countries.
+    whatsapp: client.whatsapp ? `+${client.whatsapp}` : "",
     etapa: client.stage,
     origen: client.source,
     presupuesto: client.budgetBob ?? "",

@@ -1,3 +1,4 @@
+import { parseCurrencyAmount } from "@/lib/currency";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { PublicationError, requestListingRepublish, revalidateListingPages, updateListingAvailability } from "@/lib/database-publications";
 import { trackServerEvent } from "@/lib/tracking";
@@ -27,9 +28,17 @@ export async function POST(request: Request) {
 
     try {
       if (action === "precio") {
-        const price = Number(body.precio);
-        if (!Number.isFinite(price) || price <= 0 || price > 100_000_000) return reply(400, { message: "Escribe el precio por mes, solo números." });
-        await setUrbanitoListingPrice(slug, Math.round(price * 100) / 100);
+        // Same reading as the editor: "3.400" is three thousand four hundred.
+        const price = parseCurrencyAmount(body.precio);
+        if (price === null || price <= 0 || price > 100_000_000) return reply(400, { message: "Escribe el precio por mes, solo números." });
+        const currency = body.moneda === "USD" || body.moneda === "BOB" ? body.moneda : null;
+        if (!currency) return reply(400, { message: "Falta la moneda del precio: Bs o $us." });
+        const saved = await setUrbanitoListingPrice(slug, Math.round(price * 100) / 100, currency);
+        if (!saved.ok) {
+          return saved.currency
+            ? reply(409, { code: "CURRENCY", moneda: saved.currency, message: `Este aviso está en ${saved.currency === "USD" ? "$us" : "Bs"}. Para cambiar la moneda envíalo de nuevo a revisión desde Mi cuenta.` })
+            : reply(404, { message: "No encontré ese anuncio." });
+        }
         revalidateListingPages(slug);
         return reply(200, { ok: true, accion: action });
       }

@@ -1,5 +1,5 @@
 import type { RowDataPacket } from "mysql2";
-import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
+import { markCorrected, ownerListingStatus, ownerListingStatusLabels, recentOwnerRequests } from "@/lib/listing-moderation";
 import { executeQuery, hasDatabaseConfig, queryOne, queryRows, withTransaction } from "@/lib/mysql";
 import { formatPrice } from "@/lib/properties";
 import { mapPropertyRow, type PropertyRow } from "@/lib/property-data";
@@ -183,6 +183,16 @@ export async function unlinkTelegram(telegramId: number) {
   });
 }
 
+// A Telegram link counts as one more open session: when the sessions of an account are closed because
+// its password may be in the wrong hands, Urbanito loses access too. Never blocks the sign-in itself.
+export async function revokeUrbanitoLink(accountId: string) {
+  try {
+    await unlinkAccount(accountId);
+  } catch (error) {
+    if (!(error instanceof UrbanitoUnavailable)) console.error("urbanito revoke failed", error);
+  }
+}
+
 export async function unlinkAccount(accountId: string) {
   return guard(async () => {
     await forgetSnapshot("account_id = :accountId", { accountId });
@@ -236,6 +246,7 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
         estado: ownerListingStatusLabels[ownerListingStatus(statusBySlug.get(property.slug) ?? "active", property.published)],
         zona: property.zone,
         precio: formatPrice(property),
+        moneda: property.currency === "USD" ? "USD" : "BOB",
         vistas_total: audience ? audience.get(property.slug)?.viewsTotal ?? 0 : null,
         vistas_7_dias: audience ? audience.get(property.slug)?.views7 ?? 0 : null,
         disponible_confirmada: property.availabilityConfirmedAt ?? null,
@@ -244,16 +255,16 @@ export async function getUrbanitoAccount(telegramId: number, origin: string) {
         toca_confirmar: Boolean(property.published && (reconfirmDay(property.availabilityConfirmedAt) ?? today) <= today),
         horarios_visita: hours?.[property.slug] ?? null,
       })),
-      // Requests of the last 30 days: in review, published, rejected or asked to be corrected.
-      solicitudes: requests
-        .filter((request) => Date.now() - Date.parse(request.reviewedAt ?? request.createdAt) < 30 * 86_400_000)
+      // The same requests as Mi cuenta: in review, asked to be corrected (until corrected) and decided lately.
+      solicitudes: recentOwnerRequests(markCorrected(requests))
         .slice(0, 10)
         .map((request) => ({
           id: request.id,
           titulo: request.listing?.title || request.details?.title || "Vivienda sin título",
           estado: request.status,
           motivo: request.reviewReason ?? null,
-          corregir: request.status === "changes_requested" ? `${origin}/publicar?corregir=${encodeURIComponent(request.id)}` : null,
+          corregida: request.corrected,
+          corregir: request.status === "changes_requested" && !request.corrected && request.kind !== "republish" ? `${origin}/publicar?corregir=${encodeURIComponent(request.id)}` : null,
           fecha: request.reviewedAt ?? request.createdAt,
         })),
       visitas: (bookings ?? [])
@@ -293,8 +304,12 @@ export async function urbanitoOwnsListing(accountId: string, slug: string) {
   return Boolean(row);
 }
 
-// New monthly price of a home, in its own currency. Same limits as the editor in Mi cuenta.
-export async function setUrbanitoListingPrice(slug: string, price: number) {
+// New monthly price of a home. The currency the owner said must be the one of the listing: changing
+// it goes through review, the same as in the editor of Mi cuenta. Returns the listing's currency.
+export async function setUrbanitoListingPrice(slug: string, price: number, currency: "BOB" | "USD") {
+  const current = await queryOne<{ currency: string }>("select currency from properties where slug = :slug", { slug });
+  if (!current) return { ok: false as const, currency: null };
+  if (current.currency !== currency) return { ok: false as const, currency: current.currency === "USD" ? "USD" as const : "BOB" as const };
   await executeQuery(
     `update properties set price = :price,
             rental_details = case when rental_details is null then null else JSON_SET(rental_details, '$.price', :price) end,
@@ -302,6 +317,7 @@ export async function setUrbanitoListingPrice(slug: string, price: number) {
       where slug = :slug`,
     { slug, price },
   );
+  return { ok: true as const, currency };
 }
 
 // Cancel a visit booked on one of the account's homes. Returns null when it is not theirs.

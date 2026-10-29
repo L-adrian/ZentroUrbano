@@ -115,3 +115,14 @@ test("a change from Telegram keeps what it does not mention", () => {
   assert.deepEqual(toUrbanitoClient(client).proximaFecha, "2026-10-30 16:30");
   assert.equal(toUrbanitoClient(client).etapa, "Visita agendada");
 });
+
+test("a client with a number from another country can still be changed from Telegram", () => {
+  const client: AgencyClient = {
+    id: "c2", agentId: null, propertySlug: null, name: "John", whatsapp: "18095550101", stage: "nuevo", source: "otro",
+    budgetBob: null, wants: null, nextStep: null, nextStepAt: null, lastContactAt: null, lostReason: null, note: null,
+    stageChangedAt: "2026-10-28T12:00:00.000Z", createdAt: "2026-10-27T12:00:00.000Z",
+  } as AgencyClient;
+  const merged = readClientInput({ ...clientFormFields(client), nota: "Llega en diciembre" });
+  assert.ok(merged.ok);
+  if (merged.ok) assert.equal(merged.client.whatsapp, "18095550101");
+});
