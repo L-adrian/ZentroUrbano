@@ -119,7 +119,7 @@ function MetricCard({
 function AccountCard({ account, agencies }: { account: AdminAccountSummary; agencies: AdminAccountsOverviewProps["agencies"] }) {
   return (
     <article className="rounded-[28px] border border-black/10 bg-white p-4 sm:p-5">
-      <div className="grid gap-5 xl:grid-cols-[0.95fr_1.35fr]">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[0.95fr_1.35fr]">
         <div>
           <div className="flex items-start gap-4">
             <span

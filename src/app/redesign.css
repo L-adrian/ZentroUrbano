@@ -448,7 +448,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .rental-card-contact.is-external:hover { background: var(--brand-soft); border-color: var(--brand); }
 .rental-owner-label { flex-wrap: wrap; row-gap: 2px; font-size: 12px; margin-top: 8px; }
 .rental-views { gap: 4px; margin-left: 6px; }
-@container (max-width: 279px) { .rental-card-pricing, .rental-card-contact { width: 100%; } }
+/* Cards in a grid of 2+ columns are under 320px wide: there the WhatsApp button always goes under the
+   price, full width, so every button in a row sits at the same height whatever the price length.
+   Phones (one card per row) keep it beside the price. */
+@container (max-width: 319px) { .rental-card-pricing, .rental-card-contact { width: 100%; } }
+/* One line, so a long view count never pushes the price and button up in only some cards. */
+.rental-owner-label { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+.rental-views { min-width: 0; overflow: hidden; }
 @media (max-width: 540px) { .rental-card-title { font-size: 17px; min-height: auto; }.rental-card-price { font-size: 22px; }.rental-card-location, .rental-card-facts { font-size: 14px; }.rental-entry-label { font-size: 14px; }.rental-owner-label { font-size: 13px; }.rental-card-contact { min-height: 46px; padding-inline: 16px; font-size: 15px; } }
 
 /* Home budget: shows how the amount was understood ("Hasta Bs 3.000 por mes"). */
@@ -1292,3 +1298,15 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .home-services-cta > div:last-child { display: flex; gap: 12px; flex-shrink: 0; }
 @media (max-width: 900px) { .home-services-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.home-services-cta { flex-direction: column; align-items: flex-start; }.home-services-page { padding-block: 30px 45px; }.home-services-heading h1 { font-size: 27px; } }
 @media (max-width: 600px) { .home-services-grid { grid-template-columns: 1fr; }.home-services-cta > div:last-child { flex-direction: column; width: 100%; }.home-services-cta .zu-button { justify-content: center; } }
+
+/* Responsive review 2026-11. */
+/* A featured card has 12px padding + 2px border at the bottom; the other cards in its grid get the same
+   space so their WhatsApp buttons line up with it. */
+@media (min-width: 769px) { :is(.rental-grid, .catalog-card-grid):has(> .rental-card.is-featured) > .rental-card:not(.is-featured) { padding-bottom: 14px; } }
+/* Header: the city button never shrinks, so its name is never cut ("Santa Cr…"). The Bolivia flag shows
+   in the city list instead, which leaves room for the whole menu (Equipo was clipped with Cochabamba). */
+@media (min-width: 1101px) { .region-menu { flex-shrink: 0; } }
+.region-chip .region-flag:not(.is-department) { display: none; }
+@media (min-width: 1180px) and (max-width: 1279px) { .header-nav a { padding-inline: 6px; } }
+/* Admin on phones: a wide child (a table, a long email) no longer widens the whole page past the screen. */
+.admin-page { grid-template-columns: minmax(0, 1fr); }
