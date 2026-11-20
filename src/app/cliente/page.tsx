@@ -19,6 +19,9 @@ import { listCalendarHomes } from "@/lib/calendar";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
+import { aliadoListingStates, aliadoRequests } from "@/lib/database-publications";
+import { getListingAudience } from "@/lib/property-audience";
+import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -81,17 +84,26 @@ export default async function ClientPage() {
 async function aliadoPanel(accountId: string, name: string, roleLabel: string): Promise<AliadoPanelData> {
   const [team, login] = await Promise.all([getTeamMemberByAccount(accountId).catch(() => null), getCurrentLogin()]);
   const hasPassword = Boolean(login && login.account_id === accountId && Number(login.has_password));
-  if (!team) return { name, roleLabel, hasPassword, member: null, homes: [], visits: [], reports: null, panel: null };
+  if (!team) return { name, roleLabel, hasPassword, member: null, homes: [], visits: [], reports: null, panel: null, loaded: null };
   const { member, assignments } = team;
   const properties = new Map(getDirectRentals(await getPublishedPropertiesData()).map((property) => [property.slug, property]));
   // The log of this month and the previous one (the last 7 days can cross a month); null while
   // 012_aliado_reports is missing.
   const today = boliviaToday();
   const previousMonth = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 2, 1)).toISOString().slice(0, 10);
-  const [bookings, reports, panel] = await Promise.all([
+  const [bookings, reports, panel, loaded] = await Promise.all([
     listBookingsFor(assignments.map((assignment) => assignment.propertySlug)).catch(() => null),
     listMemberReports(member.id, previousMonth, today).catch(() => null),
     getPanelState(member.id).catch(() => null),
+    aliadoRequests(member.id).catch(() => null),
+  ]);
+  // What the owner sees of each published home they loaded: people who opened it, asked for the
+  // WhatsApp and booked a visit, and whether it is still shown.
+  const loadedSlugs = (loaded ?? []).flatMap((request) => request.status === "approved" && request.propertySlug ? [request.propertySlug] : []);
+  const [audience, states, loadedBookings] = await Promise.all([
+    getListingAudience(loadedSlugs).catch(() => null),
+    aliadoListingStates(loadedSlugs).catch(() => null),
+    listBookingsFor(loadedSlugs).catch(() => null),
   ]);
   return {
     name,
@@ -99,6 +111,24 @@ async function aliadoPanel(accountId: string, name: string, roleLabel: string): 
     hasPassword,
     reports,
     panel,
+    // The homes this aliado loaded for owners, with where each review stands.
+    loaded: loaded === null ? null : loaded.map((request) => ({
+      metrics: request.status === "approved" && request.propertySlug ? {
+        audience: audience ? audience.get(request.propertySlug) ?? { views7: 0, views30: 0, viewsTotal: 0, contacts7: 0, contacts30: 0, contactsTotal: 0 } : null,
+        visits: loadedBookings === null ? null : loadedBookings.filter((booking) => booking.propertySlug === request.propertySlug && booking.status !== "cancelled").length,
+        state: states?.get(request.propertySlug) ? ownerListingStatusLabels[ownerListingStatus(states.get(request.propertySlug)!.accountStatus, states.get(request.propertySlug)!.published)] : null,
+        live: states?.get(request.propertySlug)?.published ?? null,
+      } : null,
+      direct: Boolean(request.aliado?.direct),
+      id: request.id,
+      title: request.details?.title || "Vivienda",
+      zone: request.details?.zone ?? "",
+      ownerName: request.contactName,
+      status: request.status,
+      reason: request.reviewReason ?? null,
+      slug: request.status === "approved" ? request.propertySlug ?? null : null,
+      sentAt: new Date(request.createdAt).toLocaleDateString("es-BO", { timeZone: "America/La_Paz", day: "numeric", month: "short" }),
+    })),
     member: {
       name: member.name,
       slug: member.slug,

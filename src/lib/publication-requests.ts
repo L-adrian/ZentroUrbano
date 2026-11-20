@@ -14,6 +14,8 @@ export type PublicationRequest = {
   photos: { storedName: string; originalName: string; type: string; category?: string }[];
   // Set when this request corrects an earlier one ("Corregir y reenviar").
   correctionOf?: string;
+  // Set when an Aliado Zentro loaded the home for its owner (paid per approved listing).
+  aliado?: { memberId: string; name: string; direct?: boolean };
   // "republish": a hidden listing its owner wants to show again. It goes live only after approval.
   kind?: "republish";
   listing?: { title: string; zone: string; price: number; currency: string; images: string[]; previousStatus: string; availabilityConfirmedAt: string | null };

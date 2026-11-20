@@ -1299,6 +1299,13 @@ button, a { -webkit-tap-highlight-color: transparent; }
 @media (max-width: 900px) { .home-services-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.home-services-cta { flex-direction: column; align-items: flex-start; }.home-services-page { padding-block: 30px 45px; }.home-services-heading h1 { font-size: 27px; } }
 @media (max-width: 600px) { .home-services-grid { grid-template-columns: 1fr; }.home-services-cta > div:last-child { flex-direction: column; width: 100%; }.home-services-cta .zu-button { justify-content: center; } }
 
+/* Aliado publishing for an owner: the owner's sign-in shown after sending. */
+.owner-access-card { display: grid; gap: 1px; border: 1px solid var(--line); background: var(--line); }
+.owner-access-card > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 10px 14px; background: var(--subtle); }
+.owner-access-card dt { font-size: 13px; color: var(--muted); }
+.owner-access-card dd { font-size: 15px; font-weight: 700; color: var(--foreground); overflow-wrap: anywhere; }
+@media (max-width: 520px) { .owner-access-card > div { grid-template-columns: 1fr; gap: 2px; } }
+
 /* Responsive review 2026-11. */
 /* A featured card has 12px padding + 2px border at the bottom; the other cards in its grid get the same
    space so their WhatsApp buttons line up with it. */

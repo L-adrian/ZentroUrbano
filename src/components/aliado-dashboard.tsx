@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarCheck, ExternalLink, Home, LogOut, MessageCircle, ShieldCheck, UsersRound } from "lucide-react";
+import { CalendarCheck, ExternalLink, FilePlus2, Home, LogOut, MessageCircle, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -35,21 +35,44 @@ export type AliadoPanelData = {
   // The daily log of the last weeks; null while 012_aliado_reports is missing.
   reports: AliadoReport[] | null;
   panel: { layout: BoardLayout | null; todos: Todo[] } | null;
+  // Homes the aliado published for owners; null while the database is not reachable.
+  loaded: AliadoLoaded[] | null;
+};
+
+export type AliadoLoaded = {
+  id: string; title: string; zone: string; ownerName: string; status: string; reason: string | null; slug: string | null; sentAt: string;
+  // Published straight away by the aliado, without the admin review.
+  direct: boolean;
+  // The same numbers the owner sees in Mi cuenta; null until it is published.
+  metrics: {
+    audience: { views7: number; views30: number; viewsTotal: number; contacts7: number; contacts30: number; contactsTotal: number } | null;
+    visits: number | null;
+    state: string | null;
+    live: boolean | null;
+  } | null;
+};
+
+const loadedStatus: Record<string, { label: string; className: string }> = {
+  pending_review: { label: "En revisión", className: "bg-amber-50 text-amber-800" },
+  approved: { label: "Publicado", className: "bg-[#eef7ef] text-[#285340]" },
+  changes_requested: { label: "Piden corrección", className: "bg-orange-50 text-orange-800" },
+  rejected: { label: "No aprobado", className: "bg-neutral-100 text-neutral-700" },
 };
 
 // Where each card starts; the aliado can drag them anywhere and the order is saved.
 const defaultLayout: BoardLayout = {
-  main: ["registro", "visitas", "viviendas", "contrasena"],
+  main: ["registro", "cargados", "visitas", "viviendas", "contrasena"],
   side: ["mes", "pendientes", "reglas", "ayuda", "frase"],
 };
 
 // The panel is split in tabs so the aliado does not see everything at once; inside each tab the
 // cards can still be dragged and ordered.
-type AliadoTab = "registro" | "visitas" | "cuenta";
+type AliadoTab = "registro" | "anuncios" | "visitas" | "cuenta";
 const aliadoTabs: Array<{ id: AliadoTab; label: string; cards: string[] }> = [
   { id: "registro", label: "Mi registro", cards: ["registro", "mes"] },
+  { id: "anuncios", label: "Publicar por un dueño", cards: ["cargados", "ayuda"] },
   { id: "visitas", label: "Visitas y pendientes", cards: ["visitas", "viviendas", "pendientes"] },
-  { id: "cuenta", label: "Cuenta y reglas", cards: ["contrasena", "reglas", "ayuda", "frase"] },
+  { id: "cuenta", label: "Cuenta y reglas", cards: ["contrasena", "reglas", "frase"] },
 ];
 const isAliadoTab = (value: string): value is AliadoTab => aliadoTabs.some((tab) => tab.id === value);
 
@@ -125,6 +148,46 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
       key: "pendientes",
       title: "Mis pendientes",
       node: <TodoCard initial={data.panel?.todos ?? []} />,
+    }] : []),
+    ...(member ? [{
+      key: "cargados",
+      title: "Anuncios que cargaste",
+      node: (
+      <section className={card} aria-labelledby="aliado-cargados">
+        <h2 id="aliado-cargados" className="flex items-center gap-2 text-xl font-semibold tracking-tight text-neutral-950">
+          <FilePlus2 className="h-5 w-5 text-[#087c65]" aria-hidden="true" />
+          Anuncios que cargaste
+        </h2>
+        <p className="mt-1 text-sm text-neutral-600">Publica la vivienda de un dueño junto a él: sale al momento y se crea su cuenta para que después la maneje. Aquí ves cuánta gente la mira y escribe.</p>
+        <Link href="/cliente/publicar-dueno" className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-[#087c65] px-5 text-sm font-semibold text-white transition hover:bg-[#06624f] sm:w-auto">
+          <FilePlus2 className="h-4 w-4" aria-hidden="true" />
+          Publicar la vivienda de un dueño
+        </Link>
+        {data.loaded === null ? null : data.loaded.length === 0 ? (
+          <p className="mt-4 rounded-[18px] bg-neutral-50 p-4 text-sm text-neutral-600">Todavía no cargaste anuncios. Cuando envíes uno, aquí ves si está en revisión o aprobado.</p>
+        ) : (
+          <ul className="mt-4 grid gap-2">
+            {data.loaded.map((item) => {
+              const hidden = item.metrics?.live === false;
+              const state = hidden
+                ? { label: item.metrics?.state ?? "Oculto", className: "bg-neutral-100 text-neutral-700" }
+                : loadedStatus[item.status] ?? { label: item.status, className: "bg-neutral-100 text-neutral-700" };
+              return (
+                <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-black/10 px-4 py-3">
+                  <div className="min-w-0 flex-1 basis-56">
+                    {item.slug ? <Link href={`/propiedades/${item.slug}`} className="font-semibold text-neutral-950 underline-offset-2 hover:underline">{item.title}</Link> : <p className="font-semibold text-neutral-950">{item.title}</p>}
+                    <p className="mt-0.5 text-sm text-neutral-600">Dueño: {item.ownerName}{item.zone ? ` · ${item.zone}` : ""} · {item.sentAt}</p>
+                    {item.reason && item.status !== "approved" ? <p className="mt-1 text-sm text-neutral-700">“{item.reason}”</p> : null}
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${state.className}`}>{state.label}</span>
+                  {item.metrics ? <LoadedMetrics metrics={item.metrics} /> : null}
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+      ),
     }] : []),
     {
       key: "visitas",
@@ -216,7 +279,7 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
       node: (
       <section className={card} aria-labelledby="aliado-ayuda">
         <h2 id="aliado-ayuda" className="text-lg font-semibold tracking-tight text-neutral-950">¿Ayudas a un dueño a publicar?</h2>
-        <p className="mt-2 text-sm leading-6 text-neutral-600">El dueño crea su propia cuenta y publica desde su celular. Tú lo acompañas paso a paso.</p>
+        <p className="mt-2 text-sm leading-6 text-neutral-600">Puedes cargar su vivienda tú mismo con «Publicar la vivienda de un dueño», o acompañarlo mientras él crea su cuenta y publica desde su celular. Si piden una corrección, el dueño la hace desde su cuenta.</p>
         <Link href="/equipo" className={`${secondaryButton} mt-4 w-full`}>
           <ExternalLink className="h-4 w-4" aria-hidden="true" />
           Ver la guía del aliado
@@ -303,5 +366,28 @@ export function AliadoDashboard({ data }: { data: AliadoPanelData }) {
       ) : null}
       <AliadoBoard cards={cards} visible={visibleCards} layout={normalizeLayout(data.panel?.layout ?? null, defaultLayout, cards.map((item) => item.key))} defaults={defaultLayout} onSave={(next) => void savePanel({ action: "layout", layout: next })} />
     </div>
+  );
+}
+
+// The numbers of one published home: people who opened it, asked for the owner's WhatsApp and
+// booked a visit. Each person counts once per period.
+function LoadedMetrics({ metrics }: { metrics: NonNullable<AliadoLoaded["metrics"]> }) {
+  const { audience } = metrics;
+  const cells: Array<[string, string, string]> = audience ? [
+    ["Vistas", audience.views7.toLocaleString("es-BO"), `${audience.views30.toLocaleString("es-BO")} en 30 días · ${audience.viewsTotal.toLocaleString("es-BO")} en total`],
+    ["Pidieron WhatsApp", audience.contacts7.toLocaleString("es-BO"), `${audience.contacts30.toLocaleString("es-BO")} en 30 días · ${audience.contactsTotal.toLocaleString("es-BO")} en total`],
+  ] : [];
+  if (metrics.visits !== null) cells.push(["Visitas reservadas", metrics.visits.toLocaleString("es-BO"), "en total"]);
+  if (!cells.length) return <p className="w-full text-sm text-neutral-500">Las métricas no están disponibles en este momento.</p>;
+  return (
+    <dl className="grid w-full grid-cols-1 gap-2 border-t border-black/5 pt-3 sm:grid-cols-3">
+      {cells.map(([label, value, detail], index) => (
+        <div key={label} className="rounded-[14px] bg-neutral-50 px-3 py-2">
+          <dt className="text-xs font-semibold text-neutral-600">{label}{index < 2 ? " · 7 días" : ""}</dt>
+          <dd className="mt-0.5 text-xl font-semibold text-neutral-950">{value}</dd>
+          <dd className="text-xs text-neutral-500">{detail}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }

@@ -14,10 +14,13 @@ export function OwnerLocationDialog({
   property,
   onClose,
   onConfirm,
+  forNewHome = false,
 }: {
   property: Pick<Property, "slug" | "title" | "coordinates" | "locationConfirmedAt">;
   onClose: () => void;
   onConfirm: (point: Point) => Promise<void>;
+  // An Aliado Zentro marking a home that is not published yet: no "moved" distance, other words.
+  forNewHome?: boolean;
 }) {
   const [Picker, setPicker] = useState<ComponentType<OwnerLocationPickerProps> | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -91,7 +94,7 @@ export function OwnerLocationDialog({
         <div className="flex items-start justify-between gap-4 border-b border-black/10 p-5 sm:p-6">
           <div className="min-w-0">
             <h3 id="owner-location-title" ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-neutral-950 outline-none">
-              Verificar ubicación
+              {forNewHome ? "Ubicación de la vivienda" : "Verificar ubicación"}
             </h3>
             <p className="mt-1 text-sm text-neutral-600 [overflow-wrap:anywhere]">{property.title}</p>
           </div>
@@ -108,7 +111,9 @@ export function OwnerLocationDialog({
 
         <div className="grid gap-4 p-5 sm:p-6">
           <p className="text-sm leading-6 text-neutral-700">
-            Mueve el mapa hasta que el pin quede sobre la puerta de tu vivienda. También puedes tocar el lugar en el mapa.
+            {forNewHome
+              ? "Mueve el mapa hasta que el pin quede sobre la puerta de la vivienda. Si estás ahí, toca el botón de ubicación del mapa."
+              : "Mueve el mapa hasta que el pin quede sobre la puerta de tu vivienda. También puedes tocar el lugar en el mapa."}
           </p>
           <div className="owner-location-frame relative isolate overflow-hidden rounded-[20px] border border-black/10">
             {Picker ? (
@@ -141,16 +146,16 @@ export function OwnerLocationDialog({
             ) : null}
           </div>
 
-          <p className="text-sm text-neutral-600" aria-live="polite">
+          {forNewHome ? null : <p className="text-sm text-neutral-600" aria-live="polite">
             {moved < 5 ? "El pin está donde lo teníamos." : `Moviste el pin ${formatDistance(moved)}.`}
-          </p>
-          {moved > ownerLocationWarnMeters ? (
+          </p>}
+          {!forNewHome && moved > ownerLocationWarnMeters ? (
             <p className="rounded-[16px] bg-amber-50 p-3 text-sm leading-6 text-amber-950 ring-1 ring-amber-200">
               El nuevo punto está a {formatDistance(moved)} del anterior. Revisa que sea tu vivienda antes de confirmar.
             </p>
           ) : null}
           <p className="text-sm leading-6 text-neutral-600">
-            Al confirmar, tu anuncio mostrará este punto exacto en el mapa con «Ubicación confirmada por el dueño». No pasa por una nueva revisión.
+            {forNewHome ? "El anuncio muestra una zona aproximada alrededor de este punto. El dueño puede confirmar el punto exacto desde su cuenta." : <>Al confirmar, tu anuncio mostrará este punto exacto en el mapa con «Ubicación confirmada por el dueño». No pasa por una nueva revisión.</>}
           </p>
           {tilesFailed ? (
             <p role="status" className="rounded-[16px] bg-amber-50 p-3 text-sm leading-6 text-amber-950 ring-1 ring-amber-200">
