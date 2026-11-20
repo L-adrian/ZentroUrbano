@@ -49,6 +49,7 @@ import {
   saveDraftPhotoList,
 } from "@/lib/photo-draft-store";
 import { validPhotoCategory, type PrefillPhoto, type PublishPrefill } from "@/lib/publish-prefill";
+import { OwnerLocationDialog } from "@/components/owner-location-dialog";
 
 const steps = ["Fotos", "Información", "Precio", "Confirmación"] as const;
 const stepIcons = [Images, Home, CircleDollarSign, ListChecks];
@@ -174,11 +175,11 @@ function restoreForm(saved: Record<string, unknown>, base: PropertyForm): Proper
   return restored;
 }
 
-type SendResult = { status: number; data: { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number; ownerLogin?: string } };
+type SendResult = { status: number; data: { ok?: boolean; code?: string; message?: string; fieldErrors?: PublicationFieldErrors; requestId?: string; photosStored?: number; ownerLogin?: string; status?: string; propertySlug?: string | null } };
 
 // An Aliado Zentro loading a home for its owner: the same form, plus the owner's own account.
 export type ForOwner = { aliadoName: string; roleLabel: string };
-type OwnerAccess = { email: string; password: string };
+type OwnerAccess = { email: string; password: string; location: { lat: number; lng: number } | null };
 
 // Easy to read aloud and type on a phone, like "Patio4821".
 function suggestOwnerPassword() {
@@ -219,9 +220,9 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
   const [message, setMessage] = useState("");
-  const [receipt, setReceipt] = useState<{ requestId: string; photosStored: number; ownerLogin?: string; ownerPassword?: string; ownerName?: string; ownerPhone?: string } | null>(null);
+  const [receipt, setReceipt] = useState<OwnerReceiptData | null>(null);
   // Never saved with the draft: the password stays only in this page until it is sent.
-  const [ownerAccess, setOwnerAccess] = useState<OwnerAccess>({ email: "", password: "" });
+  const [ownerAccess, setOwnerAccess] = useState<OwnerAccess>({ email: "", password: "", location: null });
   const [processingPhotos, setProcessingPhotos] = useState(false);
   const [photoProgress, setPhotoProgress] = useState<{ done: number; total: number; label: string } | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -484,6 +485,11 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
       setMessage(Object.values(wizardStepErrors(invalidStep, form)).join(" ") || "Revisa las fotos y sus categorías antes de enviar.");
       return;
     }
+    if (forOwner && !ownerAccess.location) {
+      setStatus("error");
+      setMessage("Marca en el mapa dónde está la vivienda. Así se publica al momento.");
+      return;
+    }
     if (forOwner && ownerAccess.password.length < 8) {
       setStatus("error");
       setMessage("Crea la contraseña del dueño (8 caracteres como mínimo). Puedes tocar «Crear una».");
@@ -516,7 +522,7 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
         notes: `Solicitud de publicación directa. Calidad ${quality.score}%.`,
         website: "",
         ...(prefill?.kind === "correction" && prefill.requestId ? { correctionOf: prefill.requestId } : {}),
-        ...(forOwner ? { ownerAccount: { email: ownerAccess.email.trim(), password: ownerAccess.password } } : {}),
+        ...(forOwner ? { ownerAccount: { email: ownerAccess.email.trim(), password: ownerAccess.password }, location: ownerAccess.location } : {}),
         photoReport: photos.map((photo) => ({
           fileName: photo.file.name,
           category: photo.category,
@@ -541,8 +547,8 @@ export function PublishWizard({ account, prefill, department = defaultDepartment
         throw new Error(data.message ?? "No se pudo guardar la solicitud.");
       }
 
-      setReceipt({ requestId: data.requestId, photosStored: data.photosStored, ...(forOwner ? { ownerLogin: data.ownerLogin, ownerPassword: ownerAccess.password, ownerName: form.ownerName.trim(), ownerPhone: normalizePublicationPhone(form.phone) ?? "" } : {}) });
-      if (forOwner) setOwnerAccess({ email: "", password: "" });
+      setReceipt({ requestId: data.requestId, photosStored: data.photosStored, ...(forOwner ? { ownerLogin: data.ownerLogin, propertySlug: data.status === "approved" ? data.propertySlug ?? null : null, ownerPassword: ownerAccess.password, ownerName: form.ownerName.trim(), ownerPhone: normalizePublicationPhone(form.phone) ?? "" } : {}) });
+      if (forOwner) setOwnerAccess({ email: "", password: "", location: null });
       setStatus("success");
       // The next publication from this page is a new envío, not a retry of this one.
       submissionKey.current = crypto.randomUUID();
@@ -1226,7 +1232,28 @@ function ConfirmationStep({
 // passes on to them. The owner can change it later in Mi cuenta.
 function OwnerAccessFields({ form, access, onChange }: { form: PropertyForm; access: OwnerAccess; onChange: (value: OwnerAccess) => void }) {
   const login = normalizePublicationPhone(form.phone)?.slice(3) ?? "";
+  const [picking, setPicking] = useState(false);
+  const center = (findDepartment(form.department) ?? defaultDepartment).center;
   return (
+    <>
+    <div className="review-section owner-access-place">
+      <div className="review-section-heading"><h3>Ubicación en el mapa</h3></div>
+      <p className="text-sm leading-6 text-neutral-600">Como lo publicas tú, sale al momento sin revisión. Marca dónde está para que aparezca en el mapa.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" onClick={() => setPicking(true)} className="inline-flex h-11 cursor-pointer items-center gap-2 border border-neutral-300 bg-white px-4 text-sm font-semibold text-neutral-800 hover:border-neutral-950">
+          <MapPin className="h-4 w-4" aria-hidden="true" />{access.location ? "Cambiar el punto" : "Marcar en el mapa"}
+        </button>
+        <span className={`text-sm font-medium ${access.location ? "text-[#176b4d]" : "text-neutral-600"}`}>{access.location ? "Punto marcado ✓" : "Falta marcar el punto"}</span>
+      </div>
+      {picking ? (
+        <OwnerLocationDialog
+          forNewHome
+          property={{ slug: "nueva", title: [form.title, form.zone].filter(Boolean).join(" · ") || "Vivienda nueva", coordinates: access.location ?? center, locationConfirmedAt: undefined }}
+          onClose={() => setPicking(false)}
+          onConfirm={async (point) => { onChange({ ...access, location: point }); setPicking(false); }}
+        />
+      ) : null}
+    </div>
     <div className="review-section owner-access">
       <div className="review-section-heading"><h3>Cuenta del dueño</h3></div>
       <p className="text-sm leading-6 text-neutral-600">Se crea al enviar, sin Google. Con ella el dueño entra en zentrourbano.com/login para ver visitas, pausar o editar su anuncio.</p>
@@ -1248,22 +1275,29 @@ function OwnerAccessFields({ form, access, onChange }: { form: PropertyForm; acc
         </Field>
       </div>
     </div>
+    </>
   );
 }
 
 // After an aliado sends a home: the owner's sign-in, ready to send to the owner by WhatsApp.
-function OwnerReceipt({ receipt, aliado, isLocal, onAnother }: { receipt: { requestId: string; photosStored: number; ownerLogin?: string; ownerPassword?: string; ownerName?: string; ownerPhone?: string }; aliado: ForOwner; isLocal: boolean; onAnother: () => void }) {
+type OwnerReceiptData = { requestId: string; photosStored: number; ownerLogin?: string; ownerPassword?: string; ownerName?: string; ownerPhone?: string; propertySlug?: string | null };
+
+function OwnerReceipt({ receipt, aliado, isLocal, onAnother }: { receipt: OwnerReceiptData; aliado: ForOwner; isLocal: boolean; onAnother: () => void }) {
   const firstName = receipt.ownerName?.split(" ")[0] ?? "";
+  const home = isLocal ? "tu local" : "tu vivienda";
+  const listingUrl = receipt.propertySlug ? `zentrourbano.com/propiedades/${receipt.propertySlug}` : null;
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { ref.current?.focus({ preventScroll: true }); ref.current?.scrollIntoView({ block: "start", behavior: "instant" }); }, []);
-  const text = `Hola ${firstName}, soy ${aliado.aliadoName}, ${aliado.roleLabel}. Ya enviamos ${isLocal ? "tu local" : "tu vivienda"} a revisión en Zentro Urbano. Te aviso cuando esté publicada.\n\nTu cuenta para manejar tu anuncio:\nEntra en zentrourbano.com/login\nUsuario: ${receipt.ownerLogin ?? ""}\nContraseña: ${receipt.ownerPassword ?? ""}\n\nPuedes cambiar la contraseña en Mi cuenta. Publicar es gratis y nadie te cobra comisión.`;
+  const text = `Hola ${firstName}, soy ${aliado.aliadoName}, ${aliado.roleLabel}. ${listingUrl ? `Ya publicamos ${home} en Zentro Urbano: ${listingUrl}` : `Ya enviamos ${home} a revisión en Zentro Urbano. Te aviso cuando esté publicada.`}\n\nTu cuenta para manejar tu anuncio:\nEntra en zentrourbano.com/login\nUsuario: ${receipt.ownerLogin ?? ""}\nContraseña: ${receipt.ownerPassword ?? ""}\n\nPuedes cambiar la contraseña en Mi cuenta. Publicar es gratis y nadie te cobra comisión.`;
   return (
     <div ref={ref} tabIndex={-1} className="publication-receipt mx-auto max-w-2xl scroll-mt-24 border border-neutral-300 bg-white p-6 sm:p-8" role="status">
       <span className="flex h-10 w-10 items-center justify-center bg-[#edf7f2] text-[#176b4d]">
         <Check className="h-5 w-5" aria-hidden="true" />
       </span>
-      <h2 className="mt-5 text-2xl font-semibold tracking-tight">Enviado a revisión</h2>
-      <p className="mt-2 text-sm leading-6 text-neutral-600">Creamos la cuenta de {receipt.ownerName} y su anuncio quedó a revisión. Cuando se apruebe, aparece en tu panel y cuenta para tu pago.</p>
+      <h2 className="mt-5 text-2xl font-semibold tracking-tight">{listingUrl ? "¡Publicado!" : "Enviado a revisión"}</h2>
+      <p className="mt-2 text-sm leading-6 text-neutral-600">{listingUrl
+        ? `Creamos la cuenta de ${receipt.ownerName} y su anuncio ya está en Zentro. Ya aparece en tu panel con sus vistas y contactos.`
+        : `Creamos la cuenta de ${receipt.ownerName} y su anuncio quedó a revisión. Cuando se apruebe, aparece en tu panel.`}</p>
       <p className="mt-3 text-sm text-neutral-600">{receipt.photosStored} {receipt.photosStored === 1 ? "foto guardada" : "fotos guardadas"}. Referencia: <strong className="break-all">{receipt.requestId}</strong></p>
       <dl className="owner-access-card mt-5">
         <div><dt>Entra en</dt><dd>zentrourbano.com/login</dd></div>
@@ -1273,6 +1307,7 @@ function OwnerReceipt({ receipt, aliado, isLocal, onAnother }: { receipt: { requ
       <p className="mt-2 text-xs text-neutral-500">Anótala o mándasela ahora: por seguridad no la volvemos a mostrar.</p>
       <div className="mt-6 flex flex-wrap gap-3">
         {receipt.ownerPhone ? <a href={`https://wa.me/${receipt.ownerPhone}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer" className="zu-button zu-button-primary"><Phone size={17} aria-hidden="true" />Mandarle sus datos por WhatsApp</a> : null}
+        {receipt.propertySlug ? <Link href={`/propiedades/${receipt.propertySlug}`} className="zu-button zu-button-secondary">Ver el anuncio</Link> : null}
         <button type="button" onClick={onAnother} className="zu-button zu-button-secondary">Publicar otra vivienda</button>
         <Link href="/cliente#anuncios" className="zu-button zu-button-secondary">Volver a mi panel</Link>
       </div>

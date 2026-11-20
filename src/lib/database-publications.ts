@@ -40,7 +40,8 @@ export async function databaseRequests(accountId?:string) {
   return (rows || []).map(mapRequest);
 }
 // Set when an Aliado Zentro loaded the home for its owner: Zentro pays the aliado per approved listing.
-export type PublicationAliado = {memberId:string;name:string};
+// direct: published at once without the admin review (the aliado marked the map point).
+export type PublicationAliado = {memberId:string;name:string;direct?:boolean};
 type StoredRecord = {id:string;accountId:string;accountEmail:string;contactName:string;whatsapp:string;sourceText:string;details:PublicationDetails;price:number;currency:string;exchangeRate:number|null;correctionOf?:string;aliado?:PublicationAliado};
 export async function storeDatabaseRequest(record:StoredRecord,photos:UploadedPhoto[],key:string) {
   return withTransaction(connection=>insertRequest(connection,record,photos,key));
@@ -69,6 +70,17 @@ export async function storeAliadoRequest(record:Omit<StoredRecord,"accountId"|"a
 export async function aliadoRequests(memberId:string) {
   const rows=await queryRows<RequestRow>("SELECT * FROM publication_requests WHERE JSON_UNQUOTE(JSON_EXTRACT(payload,'$.aliado.memberId'))=:memberId ORDER BY created_at DESC LIMIT 100",{memberId});
   return (rows || []).map(mapRequest);
+}
+
+// Whether each home an aliado loaded is still on the site (the owner or Zentro may hide it).
+export async function aliadoListingStates(slugs:string[]) {
+  const states=new Map<string,{published:boolean;accountStatus:string}>();
+  if (!slugs.length) return states;
+  const values:Record<string,string>={};
+  const placeholders=slugs.slice(0,100).map((slug,index)=>{values[`s${index}`]=slug;return `:s${index}`;});
+  const rows=await queryRows<{slug:string;published:number;status:string|null}>(`SELECT p.slug,p.published,cap.status FROM properties p LEFT JOIN client_account_properties cap ON cap.property_slug=p.slug WHERE p.slug IN (${placeholders.join(",")})`,values);
+  for (const row of rows || []) states.set(row.slug,{published:Boolean(Number(row.published)),accountStatus:row.status ?? "active"});
+  return states;
 }
 
 async function insertRequest(connection:PoolConnection,record:StoredRecord,photos:UploadedPhoto[],key:string) {

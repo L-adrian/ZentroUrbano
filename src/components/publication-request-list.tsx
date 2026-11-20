@@ -48,7 +48,7 @@ export function PublicationRequestList({ requests, admin = false }: { requests: 
         <p className="request-reference">Referencia: {request.id}</p>
         {request.correctionOf && <p className="request-meta">Corrección de la solicitud {request.correctionOf}</p>}
         {admin && <p className="request-meta">{request.accountEmail || "Sin correo (entra con su WhatsApp)"}</p>}
-        {admin && request.aliado ? <p className="request-meta"><strong>Cargado por Aliado Zentro: {request.aliado.name}</strong></p> : null}
+        {admin && request.aliado ? <p className="request-meta"><strong>{request.aliado.direct ? "Publicado directo por" : "Cargado por"} Aliado Zentro: {request.aliado.name}</strong></p> : null}
         {request.reviewReason && <p>{request.status === "changes_requested" ? "Lo que pedimos corregir" : "Observación"}: {request.reviewReason}</p>}
         {!admin && !republish && request.details && correctable.has(request.status) && (corrected.has(request.id)
           ? <p className="request-meta">Ya enviaste la corrección. La revisamos y verás el resultado aquí.</p>

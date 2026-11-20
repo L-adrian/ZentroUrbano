@@ -5,7 +5,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { saveContactLeads } from "@/lib/contact-leads";
 import { hasDatabaseConfig, requiresDatabase } from "@/lib/mysql";
 import { getPublicationContactErrors, normalizePublicationPhone, validatePublicationDetails } from "@/lib/publication-input";
-import { ownerCorrectableRequest, PublicationError, storeAliadoRequest, storeDatabaseRequest, type UploadedPhoto } from "@/lib/database-publications";
+import { ownerCorrectableRequest, PublicationError, revalidateListingPages, reviewDatabaseRequest, storeAliadoRequest, storeDatabaseRequest, type UploadedPhoto } from "@/lib/database-publications";
+import { parseOwnerCoordinates } from "@/lib/owner-location";
 import bcrypt from "bcryptjs";
 import { getCurrentAccount } from "@/lib/mysql-auth";
 import { isDisposableEmail, isWeakPassword, normalizeSignupEmail, normalizeSignupName, signupLimits } from "@/lib/signup-rules";
@@ -95,6 +96,11 @@ export async function POST(request: NextRequest) {
   if (ownerAccount && !ownerAccount.ok) {
     return NextResponse.json({ ok: false, code: "OWNER_ACCOUNT", message: ownerAccount.message }, { status: 400 });
   }
+  // The aliado marks the home on the map, so it can be published without the admin review.
+  const aliadoPoint = aliado ? parseOwnerCoordinates(payload.location) : null;
+  if (aliado && !aliadoPoint) {
+    return NextResponse.json({ ok: false, message: "Marca en el mapa dónde está la vivienda." }, { status: 400 });
+  }
   const key = request.headers.get("idempotency-key") || "";
   if (hasDatabaseConfig() && !/^[a-zA-Z0-9_-]{32,64}$/.test(key)) {
     return NextResponse.json({ ok: false, code: "INVALID_REQUEST_KEY", message: "No pudimos identificar este envío. Vuelve a intentarlo; tus datos y fotos siguen en el formulario." }, { status: 400 });
@@ -122,8 +128,17 @@ export async function POST(request: NextRequest) {
     try {
       const result = await storeAliadoRequest({ id: requestId, contactName, whatsapp: normalizedPhone, sourceText, details,
         price: details.price, currency: details.currency, exchangeRate: details.exchangeRate,
-        aliado: { memberId: aliado.member.id, name: aliado.member.name } }, ownerAccount.owner, uploaded, key);
-      return NextResponse.json({ ok: true, ...result, ownerLogin: ownerAccount.owner.username }, { status: 201 });
+        aliado: { memberId: aliado.member.id, name: aliado.member.name, direct: true } }, ownerAccount.owner, uploaded, key);
+      // Published right away, as if the admin had approved it; Zentro can still hide it later. If
+      // publishing fails, the request simply waits in /admin/solicitudes like any other.
+      let published: { status: string; slug: string | null } | null = null;
+      if (result.status === "pending_review") {
+        published = await reviewDatabaseRequest(result.requestId, `aliado:${aliado.member.slug}`, {
+          decision: "approve", confirmed: true, latitude: aliadoPoint!.lat, longitude: aliadoPoint!.lng, reason: "Publicado directo por Aliado Zentro.",
+        }).catch((error) => { console.error("aliado direct publish failed", error); return null; });
+        if (published?.slug) revalidateListingPages(published.slug);
+      }
+      return NextResponse.json({ ok: true, ...result, ...(published ? { status: published.status, propertySlug: published.slug } : {}), ownerLogin: ownerAccount.owner.username }, { status: 201 });
     } catch (error) {
       return NextResponse.json({ ok: false, ...(error instanceof PublicationError && error.code ? { code: error.code } : {}), message: error instanceof PublicationError ? error.message : "No pudimos guardar la solicitud en la base de datos. Conservamos los datos; intenta nuevamente." }, { status: error instanceof PublicationError ? error.status : 503 });
     }

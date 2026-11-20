@@ -19,7 +19,9 @@ import { listCalendarHomes } from "@/lib/calendar";
 import { hasDatabaseConfig } from "@/lib/mysql";
 import { buildSeoMetadata } from "@/lib/seo";
 import { getUrbanitoLink, urbanitoBotUsername, urbanitoEnabled } from "@/lib/urbanito";
-import { aliadoRequests } from "@/lib/database-publications";
+import { aliadoListingStates, aliadoRequests } from "@/lib/database-publications";
+import { getListingAudience } from "@/lib/property-audience";
+import { ownerListingStatus, ownerListingStatusLabels } from "@/lib/listing-moderation";
 
 export const dynamic = "force-dynamic";
 
@@ -95,6 +97,14 @@ async function aliadoPanel(accountId: string, name: string, roleLabel: string): 
     getPanelState(member.id).catch(() => null),
     aliadoRequests(member.id).catch(() => null),
   ]);
+  // What the owner sees of each published home they loaded: people who opened it, asked for the
+  // WhatsApp and booked a visit, and whether it is still shown.
+  const loadedSlugs = (loaded ?? []).flatMap((request) => request.status === "approved" && request.propertySlug ? [request.propertySlug] : []);
+  const [audience, states, loadedBookings] = await Promise.all([
+    getListingAudience(loadedSlugs).catch(() => null),
+    aliadoListingStates(loadedSlugs).catch(() => null),
+    listBookingsFor(loadedSlugs).catch(() => null),
+  ]);
   return {
     name,
     roleLabel,
@@ -103,6 +113,13 @@ async function aliadoPanel(accountId: string, name: string, roleLabel: string): 
     panel,
     // The homes this aliado loaded for owners, with where each review stands.
     loaded: loaded === null ? null : loaded.map((request) => ({
+      metrics: request.status === "approved" && request.propertySlug ? {
+        audience: audience ? audience.get(request.propertySlug) ?? { views7: 0, views30: 0, viewsTotal: 0, contacts7: 0, contacts30: 0, contactsTotal: 0 } : null,
+        visits: loadedBookings === null ? null : loadedBookings.filter((booking) => booking.propertySlug === request.propertySlug && booking.status !== "cancelled").length,
+        state: states?.get(request.propertySlug) ? ownerListingStatusLabels[ownerListingStatus(states.get(request.propertySlug)!.accountStatus, states.get(request.propertySlug)!.published)] : null,
+        live: states?.get(request.propertySlug)?.published ?? null,
+      } : null,
+      direct: Boolean(request.aliado?.direct),
       id: request.id,
       title: request.details?.title || "Vivienda",
       zone: request.details?.zone ?? "",
